@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>1026944446347-0cmronpk9hvtp7faf5dqcgsv84l2e9ns.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.1026944446347-0cmronpk9hvtp7faf5dqcgsv84l2e9ns</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>1026944446347-2bvmj2smroh6efc72m47kohegpoosloq.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyCL-Y8hHYIoEjpRMmA1nNHmMGY_gFI0gCI</string>
+	<key>GCM_SENDER_ID</key>
+	<string>1026944446347</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.xyzstudio.fitfob</string>
+	<key>PROJECT_ID</key>
+	<string>fit-fob</string>
+	<key>STORAGE_BUCKET</key>
+	<string>fit-fob.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:1026944446347:ios:2dacad2a6f29917665898e</string>
+</dict>
+</plist>

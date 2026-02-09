@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "1026944446347",
+    "project_id": "fit-fob",
+    "storage_bucket": "fit-fob.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1026944446347:android:dff3f03d72ad08af65898e",
+        "android_client_info": {
+          "package_name": "com.xyzstudio.fitfob"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1026944446347-2bvmj2smroh6efc72m47kohegpoosloq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.xyzstudio.fitfob",
+            "certificate_hash": "f0c09913ac69b38341c8c79eebce1f5126f377e8"
+          }
+        },
+        {
+          "client_id": "1026944446347-4gpshovr4kn56afecqsevj7o0assovht.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBF0rJ0xgZDIMQyd7w3SBdEu4AbXVEk8QU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1026944446347-4gpshovr4kn56afecqsevj7o0assovht.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1026944446347-0cmronpk9hvtp7faf5dqcgsv84l2e9ns.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.xyzstudio.fitfob"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
