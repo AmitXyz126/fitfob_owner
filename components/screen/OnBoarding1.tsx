@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Image, Alert, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Image, Alert, StyleSheet, } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps'; // PROVIDER_GOOGLE add kiya
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps'; 
 
 const OnBoarding1 = () => {
   const [clubName, setClubName] = useState('Lois');
@@ -28,7 +28,7 @@ const OnBoarding1 = () => {
   };
 
   return (
-    <View className="flex-1 px-4"> {/* Padding thodi badhayi hai design ke liye */}
+    <View className="flex-1 "> 
       <Text className="text-2xl font-bold text-slate-900 mb-6">
         Fill your club details
       </Text>
@@ -63,11 +63,10 @@ const OnBoarding1 = () => {
       {/* --- LOCATION SECTION --- */}
       <View className="mb-4">
         <Text className="text-slate-400 text-sm mb-2 ml-1">Our club location</Text>
-        
-        {/* Map Container - Height fixed di hai */}
+      
         <View style={styles.mapWrapper}>
           <MapView
-            provider={PROVIDER_GOOGLE} // Google Maps force karne ke liye
+            provider={PROVIDER_GOOGLE} 
             style={styles.map}
             initialRegion={{
               latitude: 28.6139,
@@ -96,14 +95,14 @@ const OnBoarding1 = () => {
   );
 };
 
-// Map ke liye explicit styles zaroori hain
+
 const styles = StyleSheet.create({
   mapWrapper: {
     width: '100%',
-    height: 250, // h-44 ke barabar
+    height: 250, 
     borderRadius: 25,
     overflow: 'hidden',
-    backgroundColor: '#e2e8f0', // Loading ke waqt slate-200 dikhega
+    backgroundColor: '#e2e8f0', 
     borderWidth: 1,
     borderColor: '#f1f5f9',
   },

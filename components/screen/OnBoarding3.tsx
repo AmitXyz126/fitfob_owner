@@ -1,109 +1,117 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Image } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import LineGradient from '../lineGradient/LineGradient'; // Path sahi hai na bhai?
 
 const OnBoarding3 = () => {
-  const [city, setCity] = useState('');
+  const [fitnessTypes, setFitnessTypes] = useState(['Gym']);
+  const [amenities, setAmenities] = useState(['Parking', 'Wi-Fi']);
 
-   
-  const mapPoints = [
-    { latitude: 28.6139, longitude: 77.2090 }, // Center point
-    { latitude: 28.6200, longitude: 77.2200 }, // Top point
-    { latitude: 28.6000, longitude: 77.2150 }, // Bottom point
-  ];
+  const toggleSelection = (item: string, state: any, setState: any) => {
+    if (state.includes(item)) {
+      setState(state.filter((i: string) => i !== item));
+    } else {
+      setState([...state, item]);
+    }
+  };
+
+  const CheckboxItem = ({ label, isSelected, onPress }: any) => (
+    <View>
+      <TouchableOpacity 
+        onPress={onPress}
+        activeOpacity={0.7}
+        className="flex-row items-center py-3"
+      >
+        <View className={`w-6 h-6 rounded border ${isSelected ? 'bg-[#F6163C] border-[#F6163C]' : 'bg-white border-slate-300'} items-center justify-center mr-3`}>
+          {isSelected && <Ionicons name="checkmark" size={16} color="white" />}
+        </View>
+        <Text className={`text-[15px] ${isSelected ? 'text-slate-900 font-medium' : 'text-slate-500'}`}>
+          {label}
+        </Text>
+      </TouchableOpacity>
+      {/* Har item ke niche fading line */}
+      <LineGradient /> 
+    </View>
+  );
 
   return (
-    <View className="">
-      {/* --- AUTO DETECT LOCATION BOX --- */}
- 
-      <View className=" flex-row items-center justify-between rounded-3xl bg-slate-50 p-4 shadow-sm border border-slate-100">
-        <View className="flex-row items-center flex-1">
-          <View className="h-10 w-10 items-center justify-center rounded-full bg-red-50">
-            <MaterialCommunityIcons name="map-marker-radius" size={24} color="#F6163C" />
-          </View>
-          <View className="ml-3">
-            <Text className="font-bold text-slate-900 text-base">Auto-Detect Location</Text>
-            <Text className="text-xs text-slate-400">Use your current location</Text>
-          </View>
+    <View style={{ flex: 1 }}>
+      <ScrollView 
+        contentContainerStyle={{ flexGrow: 1 }} 
+        className="pt-4"
+        showsVerticalScrollIndicator={false}
+      >
+        <Text className="text-[26px] font-bold text-slate-900 mb-6">
+          Configure your club
+        </Text>
+
+        {/* --- TYPE OF FITNESS CLUB --- */}
+        <View className="mb-6">
+          <Text className="text-slate-400 text-[13px] mb-3 font-medium uppercase tracking-wider">
+            Type of Fitness club
+          </Text>
+          {['Gym', 'Yoga', 'Pilates', 'Dance', 'Other'].map((item) => (
+            <CheckboxItem 
+              key={item}
+              label={item}
+              isSelected={fitnessTypes.includes(item)}
+              onPress={() => toggleSelection(item, fitnessTypes, setFitnessTypes)}
+            />
+          ))}
         </View>
-        <TouchableOpacity className="rounded-full bg-white border border-slate-100  py-2 shadow-sm">
-          <Text className="font-bold text-[#F6163C]">Enable</Text>
-        </TouchableOpacity>
-      </View>
 
-      {/* --- SEARCH INPUT --- */}
-      <View className="mx-4 mt-4 flex-row items-center rounded-full bg-white px-5 py-2 shadow-lg border border-slate-50 z-10">
-        <TextInput
-          placeholder="Enter City name..."
-          className="flex-1 text-slate-600 h-10"
-          value={city}
-          onChangeText={setCity}
-          placeholderTextColor="#94a3b8"
-        />
-        <TouchableOpacity className="h-10 w-10 items-center justify-center rounded-full bg-[#F6163C]">
-          <Ionicons name="search-outline" size={20} color="white" />
-        </TouchableOpacity>
-      </View>
+        {/* --- AMENITIES --- */}
+        <View className="mb-6">
+          <Text className="text-slate-400 text-[13px] mb-3 font-medium uppercase tracking-wider">
+            Amenities
+          </Text>
+          {['Parking', 'Wi-Fi', 'Showers', 'AC', 'Trainers'].map((item) => (
+            <CheckboxItem 
+              key={item}
+              label={item}
+              isSelected={amenities.includes(item)}
+              onPress={() => toggleSelection(item, amenities, setAmenities)}
+            />
+          ))}
+        </View>
 
-      {/* --- MAP SECTION --- */}
-      <View className="mt-6 flex-1 overflow-hidden">
-        <MapView
-          className="w-full h-full"
-          initialRegion={{
-            latitude: 28.6139,
-            longitude: 77.2090,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
-          }}
-          customMapStyle={mapStyle} // Map ko clean dikhane ke liye niche style hai
-        >
-          {/* Main Marker */}
-          <Marker coordinate={mapPoints[0]}>
-            <View className="items-center">
-              <Ionicons name="location" size={50} color="#F6163C" />
-              <View className="h-2 w-2 rounded-full bg-red-200 border border-white" />
-            </View>
-          </Marker>
+        {/* --- TIMINGS --- */}
+        <View className="mb-10">
+          <Text className="text-slate-400 text-[13px] mb-4 font-medium uppercase tracking-wider">
+            Timings
+          </Text>
+          
+          <Text className="text-slate-400 text-[13px] mb-2">Weekday</Text>
+          <TouchableOpacity 
+            className="flex-row items-center justify-between bg-white border border-slate-100 rounded-2xl h-14 px-5 mb-4"
+            style={styles.inputShadow}
+          >
+            <Text className="text-slate-900 font-medium">Mon to Friday</Text>
+            <MaterialCommunityIcons name="clock-outline" size={20} color="#64748b" />
+          </TouchableOpacity>
 
-          {/* Smaller Markers */}
-          <Marker coordinate={mapPoints[1]}>
-            <Ionicons name="location" size={30} color="#F6163C" />
-          </Marker>
-
-          <Marker coordinate={mapPoints[2]}>
-            <Ionicons name="location" size={30} color="#F6163C" />
-          </Marker>
-
-          {/* Polyline like in screenshot */}
-          <Polyline
-            coordinates={mapPoints}
-            strokeColor="#F6163C"
-            strokeWidth={2}
-            lineDashPattern={[5, 5]} // Dotted line effect
-          />
-        </MapView>
-      </View>
+          <Text className="text-slate-400 text-[13px] mb-2">Weekend</Text>
+          <TouchableOpacity 
+            className="flex-row items-center justify-between bg-white border border-slate-100 rounded-2xl h-14 px-5"
+            style={styles.inputShadow}
+          >
+            <Text className="text-slate-900 font-medium">Sat or Sunday</Text>
+            <MaterialCommunityIcons name="clock-outline" size={20} color="#64748b" />
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </View>
   );
 };
 
-// Map Style for clean look (Optional)
-const mapStyle = [
-  {
-    "elementType": "geometry",
-    "stylers": [{ "color": "#f5f5f5" }]
-  },
-  {
-    "featureType": "road",
-    "elementType": "geometry",
-    "stylers": [{ "color": "#ffffff" }]
-  },
-  {
-    "featureType": "water",
-    "elementType": "geometry",
-    "stylers": [{ "color": "#e9e9e9" }]
+const styles = StyleSheet.create({
+  inputShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 1,
   }
-];
+});
 
 export default OnBoarding3;
