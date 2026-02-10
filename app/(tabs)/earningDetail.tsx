@@ -7,7 +7,7 @@ import LineGradient from '@/components/lineGradient/LineGradient';
 
 const EarningDetail = () => {
   const router = useRouter();
-  // Hum Wallet screen se data yahan receive karenge
+ 
   const params = useLocalSearchParams();
 
   return (

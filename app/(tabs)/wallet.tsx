@@ -3,7 +3,7 @@ import { Text, View, TouchableOpacity, Image, FlatList } from 'react-native';
 import { Container } from '@/components/Container';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router'; // 1. Navigation ke liye import
+import { useRouter } from 'expo-router'; 
 
 type TabType = 'Daily' | 'Weekly' | 'Monthly';
 
@@ -14,7 +14,7 @@ const DATA = [
 ];
 
 const Wallet = () => {
-  const router = useRouter(); // 2. Router initialize kiya
+  const router = useRouter();  
   const [activeTab, setActiveTab] = useState<TabType>('Monthly');
 
   const stats: Record<TabType, { label: string; amount: string; change: string }> = {

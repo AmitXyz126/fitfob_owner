@@ -4,15 +4,15 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 
 const OnBoarding4 = () => {
-  // 6 slots ke liye array
+ 
   const [images, setImages] = useState<(string | null)[]>(Array(6).fill(null));
 
-  // Seedha Gallery kholne ke liye function
+ 
   const pickFromGallery = async (index: number) => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     
     if (status !== 'granted') {
-      alert('Hume gallery access chahiye photos upload karne ke liye!');
+      alert('!');
       return;
     }
 
