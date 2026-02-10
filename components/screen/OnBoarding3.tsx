@@ -17,41 +17,41 @@ const OnBoarding3 = () => {
 
   const CheckboxItem = ({ label, isSelected, onPress }: any) => (
     <View>
-      <TouchableOpacity 
+      <TouchableOpacity
         onPress={onPress}
         activeOpacity={0.7}
-        className="flex-row items-center py-3"
-      >
-        <View className={`w-6 h-6 rounded border ${isSelected ? 'bg-[#F6163C] border-[#F6163C]' : 'bg-white border-slate-300'} items-center justify-center mr-3`}>
+        className="flex-row items-center py-3">
+        <View
+          className={`h-6 w-6 rounded border ${isSelected ? 'border-[#F6163C] bg-[#F6163C]' : 'border-slate-300 bg-white'} mr-3 items-center justify-center`}>
           {isSelected && <Ionicons name="checkmark" size={16} color="white" />}
         </View>
-        <Text className={`text-[15px] ${isSelected ? 'text-slate-900 font-medium' : 'text-slate-500'}`}>
+        <Text
+          className={`text-[15px] ${isSelected ? 'font-medium text-slate-900' : 'text-slate-500'}`}>
           {label}
         </Text>
       </TouchableOpacity>
       {/* Har item ke niche fading line */}
-      <LineGradient /> 
+      <LineGradient />
     </View>
   );
 
   return (
     <View style={{ flex: 1 }}>
-      <ScrollView 
-        contentContainerStyle={{ flexGrow: 1 }} 
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1 }}
         className="pt-4"
-        showsVerticalScrollIndicator={false}
-      >
-        <Text className="text-[26px] font-bold text-slate-900 mb-6">
+        showsVerticalScrollIndicator={false}>
+        <Text className="mb-6 font-bold text-[24px] leading-8 text-[#1C1C1C]">
           Configure your club
         </Text>
 
         {/* --- TYPE OF FITNESS CLUB --- */}
         <View className="mb-6">
-          <Text className="text-slate-400 text-[13px] mb-3 font-medium uppercase tracking-wider">
+          <Text className="mb-2 ml-1 font-sans text-sm leading-sm text-secondaryText">
             Type of Fitness club
           </Text>
           {['Gym', 'Yoga', 'Pilates', 'Dance', 'Other'].map((item) => (
-            <CheckboxItem 
+            <CheckboxItem
               key={item}
               label={item}
               isSelected={fitnessTypes.includes(item)}
@@ -62,11 +62,11 @@ const OnBoarding3 = () => {
 
         {/* --- AMENITIES --- */}
         <View className="mb-6">
-          <Text className="text-slate-400 text-[13px] mb-3 font-medium uppercase tracking-wider">
+          <Text className="mb-2 ml-1 font-sans text-sm font-normal leading-sm text-secondaryText">
             Amenities
           </Text>
           {['Parking', 'Wi-Fi', 'Showers', 'AC', 'Trainers'].map((item) => (
-            <CheckboxItem 
+            <CheckboxItem
               key={item}
               label={item}
               isSelected={amenities.includes(item)}
@@ -77,25 +77,23 @@ const OnBoarding3 = () => {
 
         {/* --- TIMINGS --- */}
         <View className="mb-10">
-          <Text className="text-slate-400 text-[13px] mb-4 font-medium uppercase tracking-wider">
+          <Text className="mb-2 ml-1 font-sans text-sm font-normal leading-sm text-secondaryText">
             Timings
           </Text>
-          
-          <Text className="text-slate-400 text-[13px] mb-2">Weekday</Text>
-          <TouchableOpacity 
-            className="flex-row items-center justify-between bg-white border border-slate-100 rounded-2xl h-14 px-5 mb-4"
-            style={styles.inputShadow}
-          >
-            <Text className="text-slate-900 font-medium">Mon to Friday</Text>
+
+          <Text className="mb-2 text-[13px] text-slate-400">Weekday</Text>
+          <TouchableOpacity
+            className="mb-4 h-14 flex-row items-center justify-between rounded-2xl border border-slate-100 bg-white px-5"
+            style={styles.inputShadow}>
+            <Text className="font-medium text-slate-900">Mon to Friday</Text>
             <MaterialCommunityIcons name="clock-outline" size={20} color="#64748b" />
           </TouchableOpacity>
 
-          <Text className="text-slate-400 text-[13px] mb-2">Weekend</Text>
-          <TouchableOpacity 
-            className="flex-row items-center justify-between bg-white border border-slate-100 rounded-2xl h-14 px-5"
-            style={styles.inputShadow}
-          >
-            <Text className="text-slate-900 font-medium">Sat or Sunday</Text>
+          <Text className="mb-2 text-[13px] text-slate-400">Weekend</Text>
+          <TouchableOpacity
+            className="h-14 flex-row items-center justify-between rounded-2xl border border-slate-100 bg-white px-5"
+            style={styles.inputShadow}>
+            <Text className="font-medium text-slate-900">Sat or Sunday</Text>
             <MaterialCommunityIcons name="clock-outline" size={20} color="#64748b" />
           </TouchableOpacity>
         </View>
@@ -111,7 +109,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.03,
     shadowRadius: 8,
     elevation: 1,
-  }
+  },
 });
 
 export default OnBoarding3;

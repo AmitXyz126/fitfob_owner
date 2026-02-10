@@ -46,11 +46,11 @@ const OnBoarding2 = () => {
 
         {/* --- OWNER NAME --- */}
         <View className="mb-6">
-          <Text className="text-slate-400 text-[13px] mb-2 ml-1">Owner&lsquo;s name</Text>
+          <Text className="mb-2 ml-1 font-sans text-sm leading-sm text-secondaryText">Owner&lsquo;s name</Text>
           <TextInput
             value={formData.name}
             onChangeText={(txt) => setFormData({ ...formData, name: txt })}
-            placeholder="Rohan Mehta" // Name ab placeholder mein hai
+            placeholder="Enter Name" 
             placeholderTextColor="#cbd5e1"
             className="w-full h-14 px-5 bg-white border border-slate-100 rounded-2xl text-slate-900 font-medium"
             style={styles.inputShadow}
@@ -59,7 +59,7 @@ const OnBoarding2 = () => {
 
         {/* --- PHONE NUMBER --- */}
         <View className="mb-6">
-          <Text className="text-slate-400 text-[13px] mb-2 ml-1">Phone Number</Text>
+          <Text className="mb-2 ml-1 font-sans text-sm leading-sm text-secondaryText">Phone Number</Text>
           <View 
             className="flex-row w-full h-14 bg-white border border-slate-100 rounded-2xl overflow-hidden"
             style={styles.inputShadow}
@@ -80,7 +80,7 @@ const OnBoarding2 = () => {
                 withCallingCode
                 containerButtonStyle={{ marginLeft: 5 }}
               />
-              <Text className="text-slate-900 font-medium ml-1">+{callingCode}</Text>
+              <Text className="mb-2 ml-1 font-sans text-sm leading-sm text-secondaryTexttext-slate-900 font-medium ml-1">+{callingCode}</Text>
               <Entypo name="chevron-small-down" size={18} color="#64748b" />
             </TouchableOpacity>
             
@@ -97,11 +97,11 @@ const OnBoarding2 = () => {
 
         {/* --- EMAIL ADDRESS --- */}
         <View className="mb-10">
-          <Text className="text-slate-400 text-[13px] mb-2 ml-1">Email Address</Text>
+          <Text className="mb-2 ml-1 font-sans text-sm leading-sm text-secondaryText">Email Address</Text>
           <TextInput
             value={formData.email}
             onChangeText={(txt) => setFormData({ ...formData, email: txt })}
-            placeholder="Loisbecket@gmail.com"  
+            placeholder="Enter Email Address"  
             placeholderTextColor="#cbd5e1"
             keyboardType="email-address"
             autoCapitalize="none"

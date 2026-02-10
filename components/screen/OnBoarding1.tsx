@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps'; 
 
 const OnBoarding1 = () => {
-  const [clubName, setClubName] = useState('Lois');
+  const [clubName, setClubName] = useState();
   const [image, setImage] = useState<string | null>(null);
 
   const pickImage = async () => {
@@ -51,10 +51,9 @@ const OnBoarding1 = () => {
 
       {/* --- CLUB NAME INPUT --- */}
       <View className="mb-6">
-        <Text className="text-slate-400 text-sm mb-2 ml-1">Gym/ Club Name</Text>
+        <Text className="mb-2 ml-1 font-sans text-sm leading-sm text-secondaryText">Gym/ Club Name</Text>
         <TextInput
           value={clubName}
-          onChangeText={setClubName}
           placeholder="Enter club name"
           className="w-full h-14 px-4 bg-white border border-slate-200 rounded-2xl text-slate-900 font-medium"
         />
@@ -62,7 +61,7 @@ const OnBoarding1 = () => {
 
       {/* --- LOCATION SECTION --- */}
       <View className="mb-4">
-        <Text className="text-slate-400 text-sm mb-2 ml-1">Our club location</Text>
+        <Text className="mb-2 ml-1 font-sans text-sm leading-sm text-secondaryText">Our club location</Text>
       
         <View style={styles.mapWrapper}>
           <MapView
