@@ -51,7 +51,6 @@ export default function CheckinsScreen() {
     setLoading(true);
     Vibration.vibrate(100);
 
-    // API Call logic yahan aayega
     setTimeout(() => {
       setLoading(false);
       setScanned(true);
@@ -63,7 +62,6 @@ export default function CheckinsScreen() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Container>
-  
         <View className="z-50 flex-row items-center justify-between ">
           <TouchableOpacity onPress={() => Keyboard.dismiss()}>
             <Ionicons name="chevron-back" size={24} color="#000" />
@@ -83,7 +81,7 @@ export default function CheckinsScreen() {
             <View className="flex-1 items-center">
               <Image
                 source={require('../../assets/images/scanIcon.png')}
-                className="h-30 w-30 mt-10"
+                className="mt-10 h-[64px] w-[64px]"
                 resizeMode="contain"
               />
 
@@ -133,21 +131,16 @@ export default function CheckinsScreen() {
 
               {/* MANUAL ID SECTION */}
               <View className="mb-10 mt-12 w-full">
-                <Text className="mb-2 ml-1 font-sans text-sm text-secondaryText">
-                  Use  ID
-                </Text>
-                <View className="h-14 flex-row items-center justify-between rounded-2xl border border-border bg-white px-4 shadow-sm">
+                <Text className="mb-2 ml-1 font-sans text-sm font-normal text-secondaryText">Use ID</Text>
+                <View className="h-14 flex-row items-center justify-between rounded-2xl border border-[#E5E7EB] bg-white px-4 ">
                   <TextInput
-                    placeholder="Enter ID: 123-456-789"
+                    placeholder="Enter ID:"
                     placeholderTextColor="#94A3B8"
                     keyboardType="numeric"
                     value={manualId}
                     onChangeText={setManualId}
-                    className="h-full flex-1 font-medium text-darkText"
+                    className="h-full flex-1 font-medium "
                   />
-                  <TouchableOpacity onPress={() => Vibration.vibrate(50)}>
-                    <Ionicons name="copy-outline" size={20} color="#6B7280" />
-                  </TouchableOpacity>
                 </View>
               </View>
             </View>

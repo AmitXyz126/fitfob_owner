@@ -66,11 +66,13 @@ export default function HomeScreen() {
         {/* Header */}
         <View className="mb-6 flex-row items-center justify-between">
           <View className="flex-row items-center">
-            <Image
-              className="h-12 w-12"
-              source={require('../../assets/images/scanIcon.png')}
-              resizeMode="contain"
-            />
+            <TouchableOpacity onPress={() => router.push('/clubProfile')}>
+              <Image
+                className="h-12 w-12"
+                source={require('../../assets/images/scanIcon.png')}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
             <View className="ml-3">
               <Text className="font-semibold text-[10px] uppercase tracking-widest text-slate-400">
                 Anytime Fitness Gym
@@ -91,29 +93,33 @@ export default function HomeScreen() {
         </View>
 
         {/* Monthly Earnings Card */}
-        <LinearGradient
-          colors={['#F6163C', '#FF5F7A']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{ borderRadius: 16, overflow: 'hidden' }}
-          className="relative mb-6 shadow-xl shadow-red-300">
-          {/* Background Pattern Image */}
-          <Image
-            source={require('../../assets/images/bgLayer.png')}
-            className="absolute right-0 top-0 h-full w-1/2"
-            resizeMode="cover"
-          />
+        <TouchableOpacity activeOpacity={0.9} onPress={() => router.push('/payoutHistory')}>
+          <LinearGradient
+            colors={['#F6163C', '#FF5F7A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{ borderRadius: 16, overflow: 'hidden' }}
+            className="relative mb-6 shadow-xl shadow-red-300">
+            {/* Background Pattern Image */}
+            <Image
+              source={require('../../assets/images/bgLayer.png')}
+              className="absolute right-0 top-0 h-full w-1/2"
+              resizeMode="cover"
+            />
 
-          <View className="relative z-10 rounded-lg px-4 py-5">
-            <View className="flex-row items-start justify-between">
-              <Text className="font-medium text-white/80">Monthly Earnings</Text>
-              <View className="rounded-full bg-[#0000001A] px-3 py-1.5 backdrop-blur-md">
-                <Text className="font-bold text-[10px]  text-[#FFF]">+20% this month</Text>
+            <View className="relative z-10 rounded-lg px-4 py-5">
+              <View className="flex-row items-start justify-between">
+                <Text className="font-medium text-white/80">Monthly Earnings</Text>
+                <View className="rounded-full bg-[#0000001A] px-3 py-1.5 backdrop-blur-md">
+                  <Text className="font-bold text-[10px]  text-[#FFF]">+20% this month</Text>
+                </View>
               </View>
+              <Text className="mt-2 text-4xl font-black tracking-tighter text-white">
+                ₹2,40,000
+              </Text>
             </View>
-            <Text className="mt-2 text-4xl font-black tracking-tighter text-white">₹2,40,000</Text>
-          </View>
-        </LinearGradient>
+          </LinearGradient>
+        </TouchableOpacity>
         {/* Stats Row */}
         <View className="mb-8 mt-4 flex-row justify-between">
           {/* Today's Check-ins Card */}
@@ -162,7 +168,7 @@ export default function HomeScreen() {
         {/* Title */}
         <View className="mb-4 flex-row items-center justify-between">
           <Text className="font-bold text-lg text-slate-900">Recent Check-ins</Text>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/ViewAllScreen')}>
+          <TouchableOpacity onPress={() => router.push('/ViewAllScreen')}>
             <Text className="rounded-full bg-[#F6163C] px-4 py-1.5 font-bold text-xs text-white">
               View All
             </Text>
@@ -179,12 +185,11 @@ export default function HomeScreen() {
         renderItem={({ item }) => (
           <View className="mb-3 flex-row items-center rounded-2xl border border-slate-100 bg-white p-3 shadow-sm shadow-slate-100">
             <Image source={{ uri: item.image }} className="h-14 w-14 rounded-xl" />
-            
-            <View className="ml-4 flex-1 ">
-              <View className='flex-row items-center gap-1 '>
 
-              <Text className="font-bold text-[15px] text-slate-900">{item.name}</Text>
-            <Image className='h-4 w-4' source={require("../../assets/images/tick.png")} />
+            <View className="ml-4 flex-1 ">
+              <View className="flex-row items-center gap-1 ">
+                <Text className="font-bold text-[15px] text-slate-900">{item.name}</Text>
+                <Image className="h-4 w-4" source={require('../../assets/images/tick.png')} />
               </View>
               <Text className="text-xs text-slate-400">{item.time}</Text>
             </View>

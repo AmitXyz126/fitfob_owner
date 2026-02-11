@@ -8,29 +8,28 @@ import OnBoarding1 from '../../components/screen/OnBoarding1';
 import OnBoarding2 from '@/components/screen/OnBoarding2';
 import OnBoarding3 from '@/components/screen/OnBoarding3';
 import OnBoarding4 from '@/components/screen/OnBoarding4';
-import OnBoarding5 from '@/components/screen/OnBoarding5'; // Success Screen
+import OnBoarding5 from '@/components/screen/OnBoarding5'; 
 
 import { useRouter } from 'expo-router';
 
 export default function OnBoardingStep() {
   const router = useRouter();
   const [step, setStep] = useState(1);
-  const [isFinished, setIsFinished] = useState(false); // Success state
+  const [isFinished, setIsFinished] = useState(false);  
   const totalSteps = 4; 
 
   const handleNext = () => {
     if (step < totalSteps) {
       setStep(step + 1);
     } else if (step === totalSteps && !isFinished) {
-      // Step 4 par Submit dabane se Success Screen dikhegi
-      setIsFinished(true);
+       setIsFinished(true);
     } else {
-      // Success Screen (Finish) dabane par redirect
+ 
       router.replace('/(tabs)');
     }
   };
 
-  // Agar Finish ho gaya hai toh sirf Success Screen dikhao
+ 
   if (isFinished) {
     return (
       <Container>

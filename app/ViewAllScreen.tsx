@@ -73,7 +73,7 @@ const ViewAllScreen = () => {
                 </Text>
                 {item.verified && (
                   // <Ionicons name="checkmark-circle" size={16} color="#22C55E" />
-                  <Image className='w-4 h-4' source={require("../../assets/images/tick.png")}  />
+                  <Image className='w-4 h-4' source={require("../assets/images/tick.png")}  />
                 )}
               </View>
               <Text className="text-xs text-slate-400 font-medium mt-0.5">

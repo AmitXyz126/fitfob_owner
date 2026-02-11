@@ -14,7 +14,8 @@ export default function TabLayout() {
         tabBarStyle: {
           height: 70,
           backgroundColor: 'white',
-          borderTopWidth: 0,
+          borderTopWidth: 1,
+
           elevation: 10,
           ...Platform.select({
             ios: { position: 'absolute' },
@@ -22,55 +23,45 @@ export default function TabLayout() {
           }),
         },
       }}>
-      {/* 1. HOME TAB */}
       <Tabs.Screen
         name="index"
         options={{
           tabBarIcon: ({ color, focused }) => (
             <View className="items-center">
               <Ionicons size={26} name={focused ? 'home' : 'home-outline'} color={color} />
-              {focused && <View className="mt-1 h-[3px] w-6 rounded-full bg-primary" />}
+              {focused && <View className="mt-1 h-[3px] w-6 rounded-full bg-[#F6163C]" />}
             </View>
           ),
         }}
       />
 
-      {/* 2. CHECK-INS / SCAN TAB */}
       <Tabs.Screen
         name="checkins"
         options={{
           tabBarIcon: ({ color, focused }) => (
             <View className="items-center">
               <Ionicons size={26} name={focused ? 'scan' : 'scan-outline'} color={color} />
-              {focused && <View className="mt-1 h-[3px] w-6 rounded-full bg-primary" />}
+              {focused && <View className="mt-1 h-[3px] w-6 rounded-full bg-[#F6163C]" />}
             </View>
           ),
         }}
       />
 
-      {/* 3. WALLET TAB */}
       <Tabs.Screen
         name="wallet"
         options={{
           tabBarIcon: ({ color, focused }) => (
             <View className="items-center">
               <Ionicons size={26} name={focused ? 'wallet' : 'wallet-outline'} color={color} />
-              {focused && <View className="mt-1 h-[3px] w-6 rounded-full bg-primary" />}
+              {focused && <View className="mt-1 h-[3px] w-6 rounded-full bg-[#F6163C]" />}
             </View>
           ),
         }}
       />
       <Tabs.Screen
-        name="ViewAllScreen"  
+        name="earningDetail"
         options={{
-          href: null,  
-          headerShown: false,
-        }}
-      />
-      <Tabs.Screen
-        name="earningDetail"  
-        options={{
-          href: null,  
+          href: null,
           headerShown: false,
         }}
       />
