@@ -8,8 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 const ClubPhotosScreen = () => {
   const router = useRouter();
   
-  // Empty state taaki user saari 6 photos khud lagaye
-  const [photos, setPhotos] = useState<{id: string, uri: string}[]>([]);
+   const [photos, setPhotos] = useState<{id: string, uri: string}[]>([]);
 
   const pickImage = async () => {
     if (photos.length >= 6) {
@@ -39,7 +38,7 @@ const ClubPhotosScreen = () => {
     }
   };
 
-  // Photo delete karne ka function
+
   const removePhoto = (id: string) => {
     setPhotos(photos.filter(p => p.id !== id));
   };
@@ -78,8 +77,7 @@ const ClubPhotosScreen = () => {
             </View>
           ))}
 
-          {/* Upload Placeholders (Dikhata rahega jab tak 6 photos na ho jayein) */}
-          {Array.from({ length: 6 - photos.length }).map((_, index) => (
+           {Array.from({ length: 6 - photos.length }).map((_, index) => (
             <TouchableOpacity 
               key={`empty-${index}`}
               onPress={pickImage}
