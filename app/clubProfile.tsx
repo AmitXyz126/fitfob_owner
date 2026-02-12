@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Image, TouchableOpacity, ScrollView, ImageBackground } from 'react-native';
 import {
   ChevronLeft,
@@ -16,11 +16,39 @@ import {
 import { useRouter } from 'expo-router';
 import { Container } from '@/components/Container';
 import LineGradient from '@/components/lineGradient/LineGradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MaterialIcons } from '@expo/vector-icons';
 
 const ClubProfileScreen = () => {
   const router = useRouter();
 
-  // MenuOption with showArrow
+  // --- States for Dynamic Data ---
+  const [clubInfo, setClubInfo] = useState({
+    name: 'Loading...',
+    image: null,
+    address: 'Fetching address...',
+  });
+
+  // --- Fetch Data from Onboarding ---
+  useEffect(() => {
+    const loadClubData = async () => {
+      try {
+        const savedData = await AsyncStorage.getItem('club_profile');
+        if (savedData) {
+          const parsedData = JSON.parse(savedData);
+          setClubInfo({
+            name: parsedData.clubName || 'Anytime Fitness Gym',
+            image: parsedData.image || null,
+            address: parsedData.address || '1234 Park Street, Mohali',
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load club data', error);
+      }
+    };
+    loadClubData();
+  }, []);
+
   const MenuOption = ({
     icon: Icon,
     title,
@@ -37,13 +65,13 @@ const ClubProfileScreen = () => {
         <View className="mr-4 rounded-xl bg-red-50 p-2">
           <Icon size={20} color="#EF4444" />
         </View>
-        <Text className="font-medium text-base text-[#697281]">{title}</Text>
+        <Text className="flex-1 font-medium text-base text-[#697281]" numberOfLines={1}>
+          {title}
+        </Text>
       </View>
 
       <View className="flex-row items-center">
         {value && <Text className="mr-2 text-sm text-gray-400">{value}</Text>}
-
-        {/* Verification Tick Image */}
         {showBadge && (
           <View className="mr-1">
             <Image
@@ -53,7 +81,6 @@ const ClubProfileScreen = () => {
             />
           </View>
         )}
-
         {showArrow && <ChevronRight size={20} color="#6B7280" />}
       </View>
     </TouchableOpacity>
@@ -73,63 +100,70 @@ const ClubProfileScreen = () => {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Banner with ImageBackground */}
-
+        {/* Banner */}
         <View className="mb-6 overflow-hidden rounded-[16px]">
           <ImageBackground
             source={require('../assets/images/bgprofile.png')}
             className="min-h-[170px] justify-center p-5"
             resizeMode="cover">
-            {/* Top Content: Profile Pic & Name */}
             <View className="flex-row items-center">
               <View className="relative">
-                {/* Main Profile Image Container */}
-                <View className="h-16 w-16 items-center justify-center rounded-full border-2 border-white/50 bg-white/30">
-                  <Image
-                    source={{ uri: 'https://i.pravatar.cc/100?u=fitness' }}
-                    className="h-14 w-14 rounded-full"
-                  />
-                </View>
-
-                {/* Edit Icon (image_9a0399.png) */}
                 <TouchableOpacity
-                  className="absolute -bottom-1 -right-1 rounded-full bg-white p-1.5 shadow-md shadow-black/20"
-                  activeOpacity={0.7}>
+                  activeOpacity={0.8}
+                  onPress={() => router.push('/EditClubDetails')} // <-- Yahan click karne par navigation hoga
+                >
+                  <View className="h-16 w-16 items-center justify-center rounded-full border-2 border-white/50 bg-white/30">
+                    <Image
+                      // --- DYNAMIC IMAGE ---
+                      source={
+                        clubInfo.image
+                          ? { uri: clubInfo.image }
+                          : { uri: 'https://i.pravatar.cc/100?u=fitness' }
+                      }
+                      className="h-14 w-14 rounded-full"
+                    />
+
+                    {/* Chota camera icon overlay (optional, design ke liye) */}
+                    <View className="absolute bottom-0 right-0 rounded-full border border-white bg-[#F6163C] p-1">
+                      <MaterialIcons name="edit" size={10} color="white" />
+                    </View>
+                  </View>
+                </TouchableOpacity>
+                <TouchableOpacity className="absolute -bottom-1 -right-1 rounded-full bg-white p-1.5 shadow-md">
                   <SquarePen size={14} color="#EF4444" strokeWidth={2.5} />
                 </TouchableOpacity>
               </View>
 
               <View className="ml-4 flex-1">
                 <View className="flex-row items-center">
-                  <Text className="mr-2 font-bold text-xl text-white">Anytime Fitness Gym</Text>
-                  <Image
-                    className="h-5 w-5"
-                    source={require('../assets/images/white-tick.png')}
-                  />
+                  {/* --- DYNAMIC NAME --- */}
+                  <Text className="mr-2 font-bold text-xl text-white">{clubInfo.name}</Text>
+                  <Image className="h-5 w-5" source={require('../assets/images/white-tick.png')} />
                 </View>
                 <Text className="text-sm text-white/90">anytimefitnessgym@gmail.com</Text>
               </View>
             </View>
-
-            {/* Center Gradient Line */}
             <View className="my-4">
               <LineGradient isWhite={true} />
             </View>
-
-            {/* Bottom Content: Categories */}
             <Text className="text-[14px] font-normal text-white">Gym, Yoga, Dance, Pilates</Text>
           </ImageBackground>
         </View>
 
-        {/* Menu Options Section */}
+        {/* Menu Section */}
         <View className="rounded-3xl bg-white px-4 py-2">
-          <MenuOption icon={MapPin} title="1234 Park Street, Mohali" />
+          {/* --- DYNAMIC ADDRESS --- */}
+          <MenuOption
+            onPress={() => router.push('/ClubLocationScreen')}
+            icon={MapPin}
+            title={clubInfo.address}
+          />
           <LineGradient />
 
           <MenuOption
             icon={ImageIcon}
             title="Club Photos"
-            onPress={() => router.push('/ClubPhotosScreen')} 
+            onPress={() => router.push('/ClubPhotosScreen')}
           />
           <LineGradient />
 
@@ -154,8 +188,12 @@ const ClubProfileScreen = () => {
           />
         </View>
 
-        {/* Logout Button */}
-        <TouchableOpacity className="mb-10 mt-8 flex-row items-center justify-center rounded-2xl bg-gray-50 py-4">
+        <TouchableOpacity
+          onPress={async () => {
+            await AsyncStorage.clear();
+            router.replace('../../');
+          }}
+          className="mb-10 mt-8 flex-row items-center justify-center rounded-2xl bg-gray-50 py-4">
           <LogOut size={20} color="#94A3B8" />
           <Text className="ml-2 font-bold text-base text-gray-400">Logout</Text>
         </TouchableOpacity>

@@ -6,7 +6,7 @@
     "scheme": ["fitfob_owner", "fb2349725998870415"],
     "facebookAppId": "2349725998870415",
     "facebookDisplayName": "fitfob_owner",
-    "platforms": ["ios", "android"],
+    "platforms": ["ios", "android", "web"],
     "web": {
       "bundler": "metro",
       "output": "static",

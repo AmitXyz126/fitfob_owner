@@ -74,10 +74,10 @@ export default function HomeScreen() {
               />
             </TouchableOpacity>
             <View className="ml-3">
-              <Text className="font-semibold text-[10px] uppercase tracking-widest text-slate-400">
-                Anytime Fitness Gym
+              <Text className="font-normal text-[12px]  text-[#1C1C1C]">
+              Welcome to Anytime Fitness Gym 
               </Text>
-              <Text className="font-bold text-xl text-slate-900">Hi, Garry 👋</Text>
+              <Text className="font-bold text-xl text-slate-900">Good Morning, Garry</Text>
             </View>
           </View>
           <View className="flex-row gap-2">
@@ -95,7 +95,7 @@ export default function HomeScreen() {
         {/* Monthly Earnings Card */}
         <TouchableOpacity activeOpacity={0.9} onPress={() => router.push('/payoutHistory')}>
           <LinearGradient
-            colors={['#F6163C', '#FF5F7A']}
+            colors={['#F6163C', '']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={{ borderRadius: 16, overflow: 'hidden' }}
@@ -114,7 +114,7 @@ export default function HomeScreen() {
                   <Text className="font-bold text-[10px]  text-[#FFF]">+20% this month</Text>
                 </View>
               </View>
-              <Text className="mt-2 text-4xl font-black tracking-tighter text-white">
+              <Text className="mt-2 text-4xl font-bold text-white">
                 ₹2,40,000
               </Text>
             </View>
@@ -134,7 +134,7 @@ export default function HomeScreen() {
             className="mr-3 flex-1 rounded-[24px] bg-white p-5">
             <Text className="font-medium text-[13px] text-slate-400">Today's Check-ins</Text>
             <View className="mt-2 flex-row items-end justify-between">
-              <Text className="text-3xl font-black text-slate-900">45</Text>
+              <Text className="text-3xl font-bold">45</Text>
               {/* Green Pill Indicator */}
               <View className="mb-1 flex-row items-center rounded-full bg-emerald-50 px-2 py-1">
                 <Ionicons name="arrow-up" size={12} color="#10B981" />
@@ -155,7 +155,7 @@ export default function HomeScreen() {
             className="flex-1 rounded-[24px] bg-white p-5">
             <Text className="font-medium text-[13px] text-slate-400">Active Members</Text>
             <View className="mt-2 flex-row items-end justify-between">
-              <Text className="text-3xl font-black text-slate-900">320</Text>
+              <Text className="text-3xl font-bold">320</Text>
               {/* Green Pill Indicator */}
               <View className="mb-1 flex-row items-center rounded-full bg-emerald-50 px-2 py-1">
                 <Ionicons name="arrow-up" size={12} color="#10B981" />

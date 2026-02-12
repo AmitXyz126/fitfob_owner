@@ -22,6 +22,7 @@ const OnBoarding4 = () => {
       aspect: [4, 3],
       quality: 0.7,
     });
+    console.log("Full Result 👉", JSON.stringify(result, null, 2));
 
     if (!result.canceled) {
       const newImages = [...images];

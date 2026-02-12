@@ -12,10 +12,11 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@expo/metro-runtime": "~6.1.2",
     "@expo/vector-icons": "^15.0.2",
     "@gorhom/bottom-sheet": "^5.2.8",
     "@pietile-native-kit/keyboard-aware-scrollview": "^1.5.0",
-    "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-clipboard/clipboard": "^1.16.3",
     "@react-navigation/native": "^7.1.28",
     "@react-navigation/native-stack": "^7.11.0",
@@ -30,6 +31,7 @@
     "expo-image-picker": "~17.0.10",
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.8",
+    "expo-location": "~19.0.8",
     "expo-random": "^14.0.1",
     "expo-router": "~6.0.10",
     "expo-status-bar": "~3.0.8",
@@ -44,6 +46,7 @@
     "react-native-country-picker-modal": "^2.0.0",
     "react-native-css-interop": "^0.2.1",
     "react-native-gesture-handler": "~2.28.0",
+    "react-native-google-places-autocomplete": "^2.6.4",
     "react-native-maps": "1.20.1",
     "react-native-otp-inputs": "^7.4.0",
     "react-native-reanimated": "~4.1.1",

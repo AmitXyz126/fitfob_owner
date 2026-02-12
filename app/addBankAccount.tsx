@@ -5,114 +5,131 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
-  KeyboardAvoidingView,  
-  Platform, 
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { ChevronLeft, Bell } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Container } from '@/components/Container';
 import { Button } from '@/components/Button';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const AddBankScreen = () => {
   const router = useRouter();
 
+  const [isPrimary, setIsPrimary] = useState(false);
   const [formData, setFormData] = useState({
-    holderName: '',
     accountNumber: '',
+    confirmAccountNumber: '',
     ifsc: '',
-    branch: '',
   });
+
+  // Validation: Button tabhi active hoga jab teeno fields bhari hongi
+  const isFormValid = 
+    formData.accountNumber.trim().length > 0 && 
+    formData.confirmAccountNumber.trim().length > 0 && 
+    formData.ifsc.trim().length > 0;
 
   return (
     <Container>
-       <KeyboardAvoidingView
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}>
+        
         {/* Header */}
         <View className="flex-row items-center justify-between py-4">
           <TouchableOpacity onPress={() => router.back()}>
             <ChevronLeft color="black" size={24} />
           </TouchableOpacity>
-          <Text className="font-bold text-lg text-gray-500">Add Bank Account</Text>
+          <Text className="font-medium text-lg text-[#697281]">Add Bank Account</Text>
           <TouchableOpacity>
-            <Bell color="#EF4444" size={24} fill="#EF4444" />
+            <Bell color="#F6163C" size={24} fill="#F6163C" />
           </TouchableOpacity>
         </View>
 
-         <ScrollView
+        <ScrollView
           showsVerticalScrollIndicator={false}
           className="mt-4"
           contentContainerStyle={{ flexGrow: 1 }}>
-          <View className="space-y-5">
-            {/* Holder Name */}
-            <View>
-              <Text className="mb-2 font-bold text-sm text-gray-700">Bank Account Holder Name</Text>
-              <TextInput
-                placeholder="Enter holder name"
-                className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-base"
-                value={formData.holderName}
-                onChangeText={(txt) => setFormData({ ...formData, holderName: txt })}
-              />
-            </View>
+          
+          <Text className="text-xl font-sans font-medium text-[#1C1C1C] mb-6">Add Bank Account</Text>
 
+          <View className="space-y-5">
             {/* Account Number */}
             <View>
-              <Text className="mb-2 font-bold text-sm text-gray-700">Bank Account No.</Text>
+              <Text className="mb-2 ml-1 mt-4 font-sans text-sm leading-sm text-secondaryText">
+                Bank Account Number
+              </Text>
               <TextInput
-                placeholder="Enter account number"
-                keyboardType="numeric"
-                className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-base"
+                placeholder="Loisbecket@gmail.com"
+                placeholderTextColor="#cbd5e1"
+                 className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-base text-slate-800"
                 value={formData.accountNumber}
                 onChangeText={(txt) => setFormData({ ...formData, accountNumber: txt })}
               />
             </View>
 
+            {/* Confirm Account Number */}
+            <View>
+              <Text className="mb-2 ml-1 mt-4 font-sans text-sm leading-sm text-secondaryText">
+                Confirm Bank Account Number
+              </Text>
+              <TextInput
+                placeholder="Loisbecket@gmail.com"
+                placeholderTextColor="#cbd5e1"
+                className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-base text-slate-800"
+                value={formData.confirmAccountNumber}
+                onChangeText={(txt) => setFormData({ ...formData, confirmAccountNumber: txt })}
+              />
+            </View>
+
             {/* IFSC Code */}
             <View>
-              <Text className="mb-2 font-bold text-sm text-gray-700">IFSC Code</Text>
+              <Text className="mb-2 ml-1 mt-4 font-sans text-sm leading-sm text-secondaryText">
+                IFSC Code
+              </Text>
               <TextInput
-                placeholder="Enter IFSC code"
+                placeholder="Loisbecket@gmail.com"
+                placeholderTextColor="#cbd5e1"
                 autoCapitalize="characters"
-                className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-base"
+                className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-base text-slate-800"
                 value={formData.ifsc}
                 onChangeText={(txt) => setFormData({ ...formData, ifsc: txt })}
               />
             </View>
-
-            {/* Branch Name */}
-            <View>
-              <Text className="mb-2 font-bold text-sm text-gray-700">Branch Name</Text>
-              <TextInput
-                placeholder="Enter branch name"
-                className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-base"
-                value={formData.branch}
-                onChangeText={(txt) => setFormData({ ...formData, branch: txt })}
-              />
-            </View>
           </View>
 
-          <Text className="mt-6 text-xs leading-5 text-gray-400">
-            Make sure you enter the correct details. This information will be used for all future
-            withdrawals.
-          </Text>
- 
+          {/* Checkbox Section */}
+          <TouchableOpacity 
+            onPress={() => setIsPrimary(!isPrimary)}
+            activeOpacity={0.7}
+            className="flex-row items-center mt-3 ml-1"
+          >
+            <MaterialCommunityIcons 
+              name={isPrimary ? "checkbox-marked" : "checkbox-blank-outline"} 
+              size={24} 
+              color={isPrimary ? "#F6163C" : "#D1D5DB"} 
+            />
+            <Text className="ml-1 text-[#666D6D] text-sm font-normal">Set this as my Primary Bank Account</Text>
+          </TouchableOpacity>
+
+          {/* Info Box */}
+          <View className="mt-4 bg-[#F6F6F6] p-5 rounded-2xl ">
+            <Text className="text-gray-400 text-xs font-semibold  leading-3">
+              All your dividends and default payouts will be deposited to this bank account
+            </Text>
+          </View>
+
           <View className="flex-1" />
 
-          
-          <View className="pb-6 pt-4">
+          {/* Continue Button */}
+          <View className="pb-8 pt-4">
             <Button
-              title="Save Bank Account"
+              title="Continue"
+              disabled={!isFormValid}
+               style={{ backgroundColor: isFormValid ? '#F6163C' : '#E5E7EB' }}
               onPress={() => {
-                if (!formData.holderName || !formData.accountNumber)
-                  return alert('Details bharo bhai!');
-
-                router.replace({
-                  pathname: '/ManageBankScreen',
-                  params: {
-                    newBankName: 'New Bank Added',
-                    newAcc: formData.accountNumber,
-                  },
-                });
+                router.push('/ManageBankScreen');
               }}
             />
           </View>

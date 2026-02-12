@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 import React, { useState } from 'react';
 import {
   View,
@@ -11,9 +12,9 @@ import {
 } from 'react-native';
 import { Entypo } from '@expo/vector-icons';
 import CountryPicker, { CountryCode, Country } from 'react-native-country-picker-modal';
+ import { LinearGradient } from 'expo-linear-gradient';
 
 const OnBoarding2 = () => {
- 
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -36,37 +37,39 @@ const OnBoarding2 = () => {
       style={{ flex: 1, backgroundColor: 'white' }}
     >
       <ScrollView 
-        contentContainerStyle={{ flexGrow: 1 }} 
-        className="pt-4"
+        contentContainerStyle={{ flexGrow: 1,  paddingTop: 20 }} 
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <Text className="text-[26px] font-bold text-slate-900 mb-8 mt-4">
+        <Text className="text-[26px] font-bold text-slate-900 mb-8">
           Fill your personal details
         </Text>
 
         {/* --- OWNER NAME --- */}
         <View className="mb-6">
-          <Text className="mb-2 ml-1 font-sans text-sm leading-sm text-secondaryText">Owner&lsquo;s name</Text>
+          <Text className="mb-2 ml-1 text-sm text-slate-500 font-medium">Owner's name</Text>
           <TextInput
             value={formData.name}
             onChangeText={(txt) => setFormData({ ...formData, name: txt })}
             placeholder="Enter Name" 
             placeholderTextColor="#cbd5e1"
-            className="w-full h-14 px-5 bg-white border border-slate-100 rounded-2xl text-slate-900 font-medium"
+            className="w-full h-14 px-5 bg-white border border-[#CCCECE] rounded-2xl text-slate-900 font-medium"
             style={styles.inputShadow}
           />
         </View>
 
         {/* --- PHONE NUMBER --- */}
         <View className="mb-6">
-          <Text className="mb-2 ml-1 font-sans text-sm leading-sm text-secondaryText">Phone Number</Text>
+          <Text className="mb-2 ml-1 text-sm text-slate-500 font-medium">Phone Number</Text>
           <View 
-            className="flex-row w-full h-14 bg-white border border-slate-100 rounded-2xl overflow-hidden"
+            className="flex-row items-center w-full h-14 bg-white border border-[#CCCECE] rounded-2xl overflow-hidden"
             style={styles.inputShadow}
           >
+            {/* Country Picker Section */}
             <TouchableOpacity 
               onPress={() => setVisible(true)}
-              className="flex-row items-center px-3 border-r border-slate-50 bg-slate-50/10"
+              activeOpacity={0.7}
+              className="flex-row items-center pl-4 pr-1"
             >
               <CountryPicker
                 {...{
@@ -78,26 +81,38 @@ const OnBoarding2 = () => {
                 onClose={() => setVisible(false)}
                 withFilter
                 withCallingCode
-                containerButtonStyle={{ marginLeft: 5 }}
+                containerButtonStyle={{ marginRight: 2 }}
               />
-              <Text className="mb-2 ml-1 font-sans text-sm leading-sm text-secondaryTexttext-slate-900 font-medium ml-1">+{callingCode}</Text>
-              <Entypo name="chevron-small-down" size={18} color="#64748b" />
+              <Entypo name="chevron-small-down" size={20} color="#64748b" />
             </TouchableOpacity>
-            
-            <TextInput
-              value={formData.phone}
-              onChangeText={(txt) => setFormData({ ...formData, phone: txt })}
-              placeholder="Enter mobile number" 
-              placeholderTextColor="#cbd5e1"
-              keyboardType="phone-pad"
-              className="flex-1 px-4 text-slate-900 font-medium"
+
+            {/* --- THE FADED LINE (LINEAR GRADIENT) --- */}
+            <LinearGradient
+               colors={['rgba(204, 206, 206, 0)', 'rgba(204, 206, 206, 1)', 'rgba(204, 206, 206, 0)']}
+              style={{
+                width: 1.4,
+                height: '60%', 
+                marginHorizontal: 5
+              }}
             />
+            
+            <View className="flex-row items-center flex-1">
+               <Text className="text-slate-900 font-medium ml-2">+{callingCode}</Text>
+               <TextInput
+                 value={formData.phone}
+                 onChangeText={(txt) => setFormData({ ...formData, phone: txt })}
+                 placeholder="9400000000" 
+                 placeholderTextColor="#cbd5e1"
+                 keyboardType="phone-pad"
+                 className="flex-1 h-full px-3 text-slate-900 font-medium"
+               />
+            </View>
           </View>
         </View>
 
         {/* --- EMAIL ADDRESS --- */}
         <View className="mb-10">
-          <Text className="mb-2 ml-1 font-sans text-sm leading-sm text-secondaryText">Email Address</Text>
+          <Text className="mb-2 ml-1 text-sm text-slate-500 font-medium">Email Address</Text>
           <TextInput
             value={formData.email}
             onChangeText={(txt) => setFormData({ ...formData, email: txt })}
@@ -105,12 +120,11 @@ const OnBoarding2 = () => {
             placeholderTextColor="#cbd5e1"
             keyboardType="email-address"
             autoCapitalize="none"
-            className="w-full h-14 px-5 bg-white border border-slate-100 rounded-2xl text-slate-900 font-medium"
+            className="w-full h-14 px-5 bg-white border border-[#CCCECE] rounded-2xl text-slate-900 font-medium"
             style={styles.inputShadow}
           />
         </View>
       </ScrollView>
- 
     </KeyboardAvoidingView>
   );
 };
@@ -122,13 +136,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.03,
     shadowRadius: 10,
     elevation: 1,
-  },
-  buttonShadow: {
-    shadowColor: '#F6163C',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 5,
   }
 });
 

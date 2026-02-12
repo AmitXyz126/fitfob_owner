@@ -36,7 +36,10 @@ const PayoutHistory = () => {
               <View className="rounded-full bg-gray-200 px-3 py-1">
                 <Text className="font-bold text-[10px] text-gray-500">Processing</Text>
               </View>
-              <Download size={18} color="#9CA3AF" />
+              \
+              <TouchableOpacity onPress={() => router.push('/DownloadScreen')} className="mr-2 p-1">
+                <Download size={18} color="#9CA3AF" />
+              </TouchableOpacity>
             </View>
           </View>
 

@@ -81,6 +81,7 @@ const ClubPhotosScreen = () => {
             <TouchableOpacity 
               key={`empty-${index}`}
               onPress={pickImage}
+              
               className="mb-4 h-32 w-[48%] items-center justify-center rounded-2xl bg-gray-50 border border-dashed border-gray-200"
             >
               <ImageIcon size={32} color="#D1D5DB" />

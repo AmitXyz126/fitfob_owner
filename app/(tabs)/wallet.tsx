@@ -86,7 +86,7 @@ const Wallet = () => {
   return (
     <Container>
       <View className="pb-2 pt-4">
-        <Text className="font-bold text-2xl text-slate-800">Earnings Overview</Text>
+        <Text className="font-medium text-xl ">Earnings Overview</Text>
       </View>
 
       <View className="my-4 flex-row rounded-xl bg-slate-100 p-1">
@@ -125,7 +125,7 @@ const Wallet = () => {
 
             {/* Amount and Percentage Badge Row */}
             <View className="mt-2 flex-row items-center justify-between">
-              <Text className="text-4xl font-black tracking-tighter text-white">₹2,40,000</Text>
+              <Text className="font-bold font-sans text-4xl leading-9 text-white">₹2,40,000</Text>
 
               {/* Percentage Badge */}
               <View className="rounded-full bg-black/10 px-3 py-1.5 backdrop-blur-md">
