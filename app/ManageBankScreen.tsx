@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'; // useEffect add kiya
 import { View, Text, TouchableOpacity, Image, ScrollView } from 'react-native';
-import { ChevronLeft, Bell, MoreVertical} from 'lucide-react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';  
+import { ChevronLeft, Bell, MoreVertical } from 'lucide-react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Container } from '@/components/Container';
 import { Button } from '@/components/Button';
 
@@ -17,22 +17,22 @@ const ManageBankScreen = () => {
       id: '1',
       name: 'Union Bank of India',
       acc: '**** 7463',
-      logo: 'https://upload.wikimedia.org/wikipedia/en/thumb/0/07/Union_Bank_of_India_Logo.svg/1200px-Union_Bank_of_India_Logo.svg.png',
+      logo: require('../assets/images/bank_logo.png'),
     },
     {
       id: '2',
       name: 'State Bank of India',
       acc: '**** 1234',
-      logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/SBI-Logo.svg/1200px-SBI-Logo.svg.png',
+      logo: require('../assets/images/bank_logo.png'),
     },
   ]);
 
   useEffect(() => {
     if (params.newBankName) {
       const newEntry = {
-        id: Math.random().toString(), 
+        id: Math.random().toString(),
         name: params.newBankName as string,
-        acc: `**** ${params.newAcc?.toString().slice(-4)}`,  
+        acc: `**** ${params.newAcc?.toString().slice(-4)}`,
         logo: 'https://cdn-icons-png.flaticon.com/512/2830/2830284.png',
       };
       setBanks((prev) => [...prev, newEntry]);
@@ -46,7 +46,7 @@ const ManageBankScreen = () => {
         <TouchableOpacity onPress={() => router.back()}>
           <ChevronLeft color="black" size={24} />
         </TouchableOpacity>
-        <Text className="font-bold text-lg text-gray-500">Manage Bank Account</Text>
+        <Text className="font-medium text-base text-[#697281]">Manage Bank Account</Text>
         <TouchableOpacity>
           <Bell color="#EF4444" size={24} fill="#EF4444" />
         </TouchableOpacity>
@@ -64,12 +64,16 @@ const ManageBankScreen = () => {
                 selectedBank === bank.id ? 'border-[#EF4444]' : 'border-gray-100'
               }`}>
               <View className="flex-1 flex-row items-center">
-                <View className="mr-4 h-12 w-12 items-center justify-center rounded-xl border border-gray-100 bg-gray-50">
-                  <Image source={{ uri: bank.logo }} className="h-8 w-8" resizeMode="contain" />
+                <View className="mr-4 h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-gray-100 bg-gray-50">
+                   <Image
+                    source={typeof bank.logo === 'string' ? { uri: bank.logo } : bank.logo}
+                    className="h-8 w-8"
+                    resizeMode="contain"
+                  />
                 </View>
                 <View>
                   <Text
-                    className={`font-bold text-[15px] ${selectedBank === bank.id ? 'text-black' : 'text-gray-700'}`}>
+                    className={`font-bold text-[15px] ${selectedBank === bank.id ? 'text-black' : 'text-[#6B7280]'}`}>
                     {bank.name}
                   </Text>
                   <Text className="font-medium text-xs text-gray-400">{bank.acc}</Text>

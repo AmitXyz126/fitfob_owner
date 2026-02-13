@@ -18,6 +18,7 @@
     "@pietile-native-kit/keyboard-aware-scrollview": "^1.5.0",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-clipboard/clipboard": "^1.16.3",
+    "@react-native-community/datetimepicker": "8.4.4",
     "@react-navigation/native": "^7.1.28",
     "@react-navigation/native-stack": "^7.11.0",
     "expo": "^54.0.0",

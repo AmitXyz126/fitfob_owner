@@ -1,86 +1,86 @@
-import React, { useState } from 'react';
-import { View, TouchableOpacity } from 'react-native';
-
-import { Button } from '@/components/Button';
-import { Container } from '@/components/Container';
-import { KeyboardAwareScrollView } from '@pietile-native-kit/keyboard-aware-scrollview';
-import OnBoarding1 from '../../components/screen/OnBoarding1';
-import OnBoarding2 from '@/components/screen/OnBoarding2';
-import OnBoarding3 from '@/components/screen/OnBoarding3';
-import OnBoarding4 from '@/components/screen/OnBoarding4';
-import OnBoarding5 from '@/components/screen/OnBoarding5'; 
-
-import { useRouter } from 'expo-router';
+import { Button } from "@/components/Button";
+import { Container } from "@/components/Container";
+import OnBoarding1 from "@/components/screen/OnBoarding1";
+import OnBoarding2_Part2 from "@/components/screen/OnBoarding2";
+import OnBoarding2_Details from "@/components/screen/OnBoarding2_Details";
+import OnBoarding3 from "@/components/screen/OnBoarding3";
+import OnBoarding4 from "@/components/screen/OnBoarding4";
+import { KeyboardAwareScrollView } from "@pietile-native-kit/keyboard-aware-scrollview";
+import { useRouter } from "expo-router";
+import { useState } from "react";
+import { TouchableOpacity, View } from "react-native";
 
 export default function OnBoardingStep() {
   const router = useRouter();
   const [step, setStep] = useState(1);
+  const [subStep, setSubStep] = useState(1);  
   const [isFinished, setIsFinished] = useState(false);  
   const totalSteps = 4; 
 
   const handleNext = () => {
+    if (step === 2 && subStep === 1) {
+      setSubStep(2);
+      return;
+    }
+
     if (step < totalSteps) {
       setStep(step + 1);
+      setSubStep(1); 
     } else if (step === totalSteps && !isFinished) {
        setIsFinished(true);
     } else {
- 
       router.replace('/(tabs)');
     }
   };
 
- 
-  if (isFinished) {
-    return (
-      <Container>
-        <OnBoarding5 />
-        <View className="px-6 pb-10">
-          <Button title="Finish" onPress={handleNext} />
-        </View>
-      </Container>
-    );
-  }
+   const handleBackPress = (targetStep: number) => {
+    if (targetStep < step) {
+      setStep(targetStep);
+      setSubStep(1);  
+    }
+   };
 
   return (
     <Container>
-      {/* --- PROGRESS BAR (Only 4 dots) --- */}
-      <View className="ios:mt-1 mt-4 flex-row justify-between bg-white pb-2">
+      {/* PROGRESS BAR */}
+      <View className="ios:mt-1 mt-4 flex-row justify-between bg-white pb-2  ">
         {[1, 2, 3, 4].map((item) => {
-          let bgColor = ' ';
-          if (item === step) bgColor = 'bg-primary border-2 border-[#FFC1C1] h-4';
-          else if (item < step) bgColor = 'bg-[#FFC1C1] h-3';
-          else bgColor = 'border h-3 border-border';
-
+          let bgColor = item === step ? 'bg-primary border-2 border-[#FFC1C1] h-4' : (item < step ? 'bg-[#FFC1C1] h-3' : 'border h-3 border-border');
+          
           return (
-            <TouchableOpacity
-              key={item}
-              onPress={() => item < step && setStep(item)}
-              disabled={item >= step}
-              className="mx-1 h-auto flex-1 justify-center"
-              activeOpacity={0.7}>
+            <TouchableOpacity 
+              key={item} 
+              onPress={() => handleBackPress(item)}
+              activeOpacity={0.7}
+              disabled={item >= step} 
+              className="mx-1 flex-1 justify-center"
+            >
               <View className={`w-full rounded-full ${bgColor}`} />
             </TouchableOpacity>
           );
         })}
       </View>
 
-      {/* --- CONTENT --- */}
-      <KeyboardAwareScrollView
+      <KeyboardAwareScrollView 
         style={{ flex: 1, backgroundColor: 'white' }}
-        contentContainerStyle={{ flexGrow: 1 }}
+        contentContainerStyle={{ flexGrow: 1 }} 
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled">
-        
-        <View className="mt-6 flex-1">
+      >
+        <View className=" flex-1 mt-5">
           {step === 1 && <OnBoarding1 />}
-          {step === 2 && <OnBoarding2 />}
+          
+          {step === 2 && (
+            subStep === 1 ? <OnBoarding2_Part2 /> : <OnBoarding2_Details />
+          )}
+
           {step === 3 && <OnBoarding3 />}
           {step === 4 && <OnBoarding4 />}
         </View>
 
-        <View className="mb-10 mt-auto pt-6">
+         <View className="">
           <Button
-            title={step === totalSteps ? 'Submit' : 'Next'}
+            title={(step === totalSteps && subStep === 2) ? 'Submit' : 'Next'}
             onPress={handleNext}
           />
         </View>

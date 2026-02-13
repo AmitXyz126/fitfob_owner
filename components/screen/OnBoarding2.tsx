@@ -1,142 +1,173 @@
-/* eslint-disable react/no-unescaped-entities */
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet
-} from 'react-native';
-import { Entypo } from '@expo/vector-icons';
-import CountryPicker, { CountryCode, Country } from 'react-native-country-picker-modal';
- import { LinearGradient } from 'expo-linear-gradient';
+ import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 
-const OnBoarding2 = () => {
-  const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    email: '',
+const OnBoarding2_Part2 = () => {
+   const [region, setRegion] = useState({
+    latitude: 30.6791,
+    longitude: 76.7303,
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
   });
 
-  const [countryCode, setCountryCode] = useState<CountryCode>('IN');
-  const [callingCode, setCallingCode] = useState('91');
-  const [visible, setVisible] = useState<boolean>(false);
+   const [locationInfo, setLocationInfo] = useState({
+    name: "CP67 Mall Mohali",
+    address: "International Airport Road, Sector 67, Sahibzada Ajit Singh Nagar, Punjab 160062, India.(CP67 Mall)"
+  });
 
-  const onSelect = (country: Country) => {
-    setCountryCode(country.cca2);
-    setCallingCode(country.callingCode[0]);
-    setVisible(false);
+  const mapRef = useRef<MapView>(null);
+
+   const handleLocationSelect = (data: any, details: any = null) => {
+    if (details) {
+      const { lat, lng } = details.geometry.location;
+      
+      const newRegion = {
+        latitude: lat,
+        longitude: lng,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      };
+
+      setRegion(newRegion);
+      mapRef.current?.animateToRegion(newRegion, 1000);
+
+      // Card update logic
+      setLocationInfo({
+        name: data.structured_formatting?.main_text || "Selected Location",
+        address: details.formatted_address
+      });
+    }
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={{ flex: 1, backgroundColor: 'white' }}
-    >
-      <ScrollView 
-        contentContainerStyle={{ flexGrow: 1,  paddingTop: 20 }} 
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <Text className="text-[26px] font-bold text-slate-900 mb-8">
-          Fill your personal details
-        </Text>
+    <View style={{ flex: 1, backgroundColor: 'white' }}>
+      <Text className="text-[26px] font-bold text-slate-900 mb-4">
+        Fill your location
+      </Text>
 
-        {/* --- OWNER NAME --- */}
-        <View className="mb-6">
-          <Text className="mb-2 ml-1 text-sm text-slate-500 font-medium">Owner's name</Text>
-          <TextInput
-            value={formData.name}
-            onChangeText={(txt) => setFormData({ ...formData, name: txt })}
-            placeholder="Enter Name" 
-            placeholderTextColor="#cbd5e1"
-            className="w-full h-14 px-5 bg-white border border-[#CCCECE] rounded-2xl text-slate-900 font-medium"
-            style={styles.inputShadow}
-          />
-        </View>
-
-        {/* --- PHONE NUMBER --- */}
-        <View className="mb-6">
-          <Text className="mb-2 ml-1 text-sm text-slate-500 font-medium">Phone Number</Text>
-          <View 
-            className="flex-row items-center w-full h-14 bg-white border border-[#CCCECE] rounded-2xl overflow-hidden"
-            style={styles.inputShadow}
-          >
-            {/* Country Picker Section */}
-            <TouchableOpacity 
-              onPress={() => setVisible(true)}
-              activeOpacity={0.7}
-              className="flex-row items-center pl-4 pr-1"
-            >
-              <CountryPicker
-                {...{
-                  countryCode,
-                  withFlag: true,
-                  onSelect,
-                  visible,
-                }}
-                onClose={() => setVisible(false)}
-                withFilter
-                withCallingCode
-                containerButtonStyle={{ marginRight: 2 }}
-              />
-              <Entypo name="chevron-small-down" size={20} color="#64748b" />
-            </TouchableOpacity>
-
-            {/* --- THE FADED LINE (LINEAR GRADIENT) --- */}
-            <LinearGradient
-               colors={['rgba(204, 206, 206, 0)', 'rgba(204, 206, 206, 1)', 'rgba(204, 206, 206, 0)']}
-              style={{
-                width: 1.4,
-                height: '60%', 
-                marginHorizontal: 5
-              }}
-            />
-            
-            <View className="flex-row items-center flex-1">
-               <Text className="text-slate-900 font-medium ml-2">+{callingCode}</Text>
-               <TextInput
-                 value={formData.phone}
-                 onChangeText={(txt) => setFormData({ ...formData, phone: txt })}
-                 placeholder="9400000000" 
-                 placeholderTextColor="#cbd5e1"
-                 keyboardType="phone-pad"
-                 className="flex-1 h-full px-3 text-slate-900 font-medium"
-               />
+      {/* --- SEARCH BAR (Google Autocomplete) --- */}
+      <View style={styles.searchWrapper}>
+        <GooglePlacesAutocomplete
+          placeholder="Search Location"
+          fetchDetails={true}
+          onPress={handleLocationSelect}
+          query={{
+            key: 'YOUR_GOOGLE_API_KEY',  
+            language: 'en',
+          }}
+          renderRightButton={() => (
+            <View style={{ justifyContent: 'center', paddingRight: 10 }}>
+              <Ionicons name="search-outline" size={22} color="#94A3B8" />
             </View>
-          </View>
-        </View>
+          )}
+          styles={{
+            container: { flex: 0 },
+            textInput: styles.searchTextInput,
+            listView: styles.searchListView,
+          }}
+        />
+      </View>
 
-        {/* --- EMAIL ADDRESS --- */}
-        <View className="mb-10">
-          <Text className="mb-2 ml-1 text-sm text-slate-500 font-medium">Email Address</Text>
-          <TextInput
-            value={formData.email}
-            onChangeText={(txt) => setFormData({ ...formData, email: txt })}
-            placeholder="Enter Email Address"  
-            placeholderTextColor="#cbd5e1"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            className="w-full h-14 px-5 bg-white border border-[#CCCECE] rounded-2xl text-slate-900 font-medium"
-            style={styles.inputShadow}
-          />
+      {/* --- MAP SECTION --- */}
+      <View style={styles.mapContainer}>
+        <MapView
+          ref={mapRef}
+          provider={PROVIDER_GOOGLE}
+          style={styles.map} 
+          initialRegion={region}
+        >
+          <Marker coordinate={{ latitude: region.latitude, longitude: region.longitude }}>
+             <Image 
+                source={{ uri: 'https://cdn-icons-png.flaticon.com/512/684/684908.png' }} 
+                style={{ width: 40, height: 40 }} 
+                tintColor="#F6163C"
+             />
+          </Marker>
+        </MapView>
+
+        <TouchableOpacity style={styles.currentLocBtn}>
+          <MaterialIcons name="my-location" size={18} color="#F6163C" />
+          <Text style={{ marginLeft: 5, fontWeight: '600', color: '#64748B', fontSize: 12 }}>
+            Current Location
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* --- ADDRESS DETAILS CARD (Dynamic Data) --- */}
+      <View className="mt-4 p-4 border border-slate-100 rounded-3xl bg-white shadow-sm shadow-slate-200">
+        <View className="flex-row justify-between items-start mb-2">
+          <View className="flex-row items-center flex-1">
+             <View className="bg-red-50 p-2 rounded-full mr-2">
+                <MaterialIcons name="location-on" size={20} color="#F6163C" />
+             </View>
+             <Text className="font-bold text-slate-900 text-[16px] flex-1" numberOfLines={1}>
+               {locationInfo.name}
+             </Text>
+          </View>
+          <TouchableOpacity className="bg-slate-100 px-3 py-1 rounded-full">
+            <Text className="text-slate-500 text-xs font-bold">Change</Text>
+          </TouchableOpacity>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        
+        <Text className="text-slate-400 text-[13px] leading-5 ml-10">
+          {locationInfo.address}
+        </Text>
+      </View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  inputShadow: {
+  searchWrapper: {
+    zIndex: 100,  
+    marginBottom: 16,
+  },
+  searchTextInput: {
+    height: 56,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    fontSize: 15,
+    color: '#475569',
+    backgroundColor: '#FFFFFF',
+  },
+  searchListView: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    marginTop: 5,
+    backgroundColor: 'white',
+    elevation: 5,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 10,
-    elevation: 1,
+    shadowOpacity: 0.1,
+  },
+  mapContainer: {
+    height: 350,
+    width: '100%',
+    borderRadius: 24,
+    overflow: 'hidden',
+    position: 'relative',
+    zIndex: 1,
+  },
+  map: { flex: 1 },
+  currentLocBtn: {
+    position: 'absolute',
+    bottom: 15,
+    right: 15,
+    backgroundColor: 'white',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
   }
 });
 
-export default OnBoarding2;
+export default OnBoarding2_Part2;

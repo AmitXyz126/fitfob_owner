@@ -1,85 +1,16 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable react-hooks/exhaustive-deps */
-import React, { useState, useRef, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  Image,
-  Alert,
-  StyleSheet,
-  ActivityIndicator,
-  ScrollView,
-} from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Image } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import * as Location from 'expo-location';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { Container } from '../Container';
 
 const OnBoarding1 = () => {
-  const mapRef = useRef<MapView>(null);
-  const [clubName, setClubName] = useState('');
+  const [clubName, setClubName] = useState('Lois');
+  const [ownerName, setOwnerName] = useState('Rohan Mehta');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('Loisbecket@gmail.com');
   const [image, setImage] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [address, setAddress] = useState('Fetching location...');
-
-  const [region, setRegion] = useState({
-    latitude: 28.6139,
-    longitude: 77.209,
-    latitudeDelta: 0.005,
-    longitudeDelta: 0.005,
-  });
-
-   const updateAddressFromCoords = async (lat: number, lon: number) => {
-    try {
-      let response = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lon });
-      if (response.length > 0) {
-        const item = response[0];
-        const formattedAddress = `${item.name || ''} ${item.street || ''}, ${item.city || ''}`;
-        setAddress(formattedAddress.trim() || 'Unknown Location');
-      }
-    } catch (e) {
-      console.log('Address fetch error', e);
-    }
-  };
-
-   useEffect(() => {
-    updateAddressFromCoords(region.latitude, region.longitude);
-  }, []);
-
-  // 2. Current Location (GPS) button logic
-  const handleEnableLocation = async () => {
-    setLoading(true);
-    try {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Please enable location in settings.');
-        setLoading(false);
-        return;
-      }
-
-      let currentLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-
-      const { latitude, longitude } = currentLocation.coords;
-      const newRegion = {
-        latitude,
-        longitude,
-        latitudeDelta: 0.005,
-        longitudeDelta: 0.005,
-      };
-
-      mapRef.current?.animateToRegion(newRegion, 1000);
-      setRegion(newRegion);
-      updateAddressFromCoords(latitude, longitude);
-    } catch (error) {
-      Alert.alert('Error', 'Could not fetch GPS location.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -94,95 +25,96 @@ const OnBoarding1 = () => {
   };
 
   return (
-       <ScrollView showsVerticalScrollIndicator={false}>
-        <Text className="mb-6 mt-4 font-bold text-2xl text-slate-900">Fill your club details</Text>
+    <>
+      <Text className="mb-8 font-bold text-[24px] text-[#1C1C1C]">Fill your club details</Text>
 
-        {/* PROFILE UPLOAD */}
-        <View className="mb-8 items-center">
-          <TouchableOpacity onPress={pickImage} activeOpacity={0.9} className="relative">
-            <View className="h-32 w-32 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-slate-300 bg-slate-50">
-              {image ? (
-                <Image source={{ uri: image }} className="h-full w-full" />
-              ) : (
-                <Ionicons name="image-outline" size={40} color="#FFC1C1" />
-              )}
-            </View>
-            <View className="absolute bottom-0 right-0 h-10 w-10 items-center justify-center rounded-full border-4 border-white bg-[#F6163C]">
-              <MaterialIcons name="photo-camera" size={18} color="white" />
-            </View>
-          </TouchableOpacity>
-        </View>
+       <View className="mb-10 items-center">
+        <TouchableOpacity onPress={pickImage} activeOpacity={0.8} className="relative">
+          <View
+            style={{ borderStyle: 'dashed' }}
+            className="h-36 w-36 items-center justify-center overflow-hidden rounded-full border-2 border-[#CBD5E1] bg-white">
+            {image ? (
+              <Image source={{ uri: image }} className="h-full w-full" />
+            ) : (
+              <View className="items-center justify-center">
+                {/* Custom placeholder icon using Ionicons */}
+                <Ionicons name="images-outline" size={48} color="#FFC1C1" />
+              </View>
+            )}
+          </View>
+          {/* Red Camera Floating Button */}
+          <View className="absolute bottom-1 right-2 h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-[#F6163C]">
+            <MaterialIcons name="photo-camera" size={18} color="white" />
+          </View>
+        </TouchableOpacity>
+      </View>
 
-        {/* CLUB NAME */}
-        <View className="mb-6">
-          <Text className="mb-2 ml-1 text-sm text-slate-500">Gym/ Club Name</Text>
+      {/* INPUT SECTION */}
+      <View className="space-y-4">
+        {/* GYM/CLUB NAME */}
+        <View>
+          <Text className="mb-2 ml-1 font-medium text-[13px] text-slate-500">Gym/ Club Name</Text>
           <TextInput
             value={clubName}
             onChangeText={setClubName}
-            placeholder="Enter club name"
-            className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 font-medium text-slate-900"
+            placeholder="Enter gym name"
+            placeholderTextColor="#94A3B8"
+            className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 font-medium text-[15px] text-slate-900"
           />
         </View>
 
-        {/* LOCATION SECTION */}
-        <View className="mb-4">
-          <Text className="mb-2 ml-1 text-sm text-slate-500">Our club location</Text>
+        <Text className="mb-2 mt-4 font-bold text-[16px] text-[#1C1C1C]">Owner’s details</Text>
 
-          <View style={styles.mapContainer}>
-            <MapView
-              ref={mapRef}
-              provider={PROVIDER_GOOGLE}
-              style={styles.map}
-              region={region}
-              showsCompass={false}
-              onRegionChangeComplete={(newRegion) => {
-                setRegion(newRegion);
-                updateAddressFromCoords(newRegion.latitude, newRegion.longitude);
-              }}>
-              <Marker coordinate={{ latitude: region.latitude, longitude: region.longitude }}>
-                <View className="rounded-full border border-slate-100  bg-white p-2">
-                  <MaterialIcons name="location-on" size={24} color="#F6163C" />
-                </View>
-              </Marker>
-            </MapView>
+        {/* OWNER NAME */}
+        <View>
+          <Text className="mb-2 ml-1 font-medium text-[13px] text-slate-500">Owner’s name</Text>
+          <TextInput
+            value={ownerName}
+            onChangeText={setOwnerName}
+            placeholder="Enter owner name"
+            placeholderTextColor="#94A3B8"
+            className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 font-medium text-[15px] text-slate-900"
+          />
+        </View>
 
-            {/* FLOATING ADDRESS BAR */}
-            <View className="absolute left-3 right-3 top-3 h-14 flex-row items-center rounded-2xl border border-slate-100 bg-white/95 px-4 shadow-sm">
-              <TextInput
-                placeholder={loading ? 'Fetching...' : 'Address...'}
-                value={address}
-                onChangeText={setAddress}
-                className="mr-2 h-full flex-1 font-medium text-[11px] text-slate-600"
+        {/* PHONE NUMBER */}
+        <View>
+          <Text className="mb-2 ml-1 mt-4 font-medium text-[13px] text-slate-500">Phone Number</Text>
+          <View className="h-14 w-full flex-row items-center rounded-xl border border-slate-200 bg-white px-3">
+            <View className="mr-3 h-6 flex-row items-center border-r border-slate-200 pr-3">
+              <Image
+                source={{ uri: 'https://flagcdn.com/w40/in.png' }}
+                className="mr-1 h-4 w-6"
+                resizeMode="contain"
               />
-
-              <TouchableOpacity
-                onPress={handleEnableLocation}
-                disabled={loading}
-                className="rounded-xl border border-slate-200 bg-slate-100 p-2">
-                {loading ? (
-                  <ActivityIndicator size="small" color="#F6163C" />
-                ) : (
-                  <MaterialIcons name="my-location" size={20} color="#F6163C" />
-                )}
-              </TouchableOpacity>
+              <Ionicons name="chevron-down" size={14} color="#64748B" />
             </View>
+            <TextInput
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="numeric"
+              placeholder="Enter mobile number"
+              placeholderTextColor="#94A3B8"
+              className="flex-1 font-medium text-[15px] text-slate-900"
+            />
           </View>
         </View>
-      </ScrollView>
-   );
-};
 
-const styles = StyleSheet.create({
-  mapContainer: {
-    width: '100%',
-    height: 380,
-    borderRadius: 20,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-    position: 'relative',
-  },
-  map: { width: '100%', height: '100%' },
-});
+        {/* EMAIL ADDRESS */}
+        <View className="mb-6 mt-4">
+          <Text className="mb-2 ml-1 font-medium text-[13px] text-slate-500">Email Address</Text>
+          <TextInput
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            placeholder="Enter email address"
+            placeholderTextColor="#94A3B8"
+            className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 font-medium text-[15px] text-slate-900"
+          />
+        </View>
+      </View>
+    </>
+  );
+};
 
 export default OnBoarding1;

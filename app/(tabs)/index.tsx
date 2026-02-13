@@ -14,6 +14,7 @@ const RECENT_CHECKINS = [
     type: 'Standard',
     image: 'https://i.pravatar.cc/150?u=tina',
     color: '#94A3B8',
+    icon: 'hexagon', // Standard icon
   },
   {
     id: '2',
@@ -74,8 +75,8 @@ export default function HomeScreen() {
               />
             </TouchableOpacity>
             <View className="ml-3">
-              <Text className="font-normal text-[12px]  text-[#1C1C1C]">
-              Welcome to Anytime Fitness Gym 
+              <Text className="text-[12px] font-normal  text-[#1C1C1C]">
+                Welcome to Anytime Fitness Gym
               </Text>
               <Text className="font-bold text-xl text-slate-900">Good Morning, Garry</Text>
             </View>
@@ -95,9 +96,9 @@ export default function HomeScreen() {
         {/* Monthly Earnings Card */}
         <TouchableOpacity activeOpacity={0.9} onPress={() => router.push('/payoutHistory')}>
           <LinearGradient
-            colors={['#F6163C', '']}
+            colors={['#F6163C', '#FF8FA3']}
             start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
+            end={{ x: 2, y: 2 }}
             style={{ borderRadius: 16, overflow: 'hidden' }}
             className="relative mb-6 shadow-xl shadow-red-300">
             {/* Background Pattern Image */}
@@ -114,9 +115,7 @@ export default function HomeScreen() {
                   <Text className="font-bold text-[10px]  text-[#FFF]">+20% this month</Text>
                 </View>
               </View>
-              <Text className="mt-2 text-4xl font-bold text-white">
-                ₹2,40,000
-              </Text>
+              <Text className="mt-2 font-bold text-4xl text-white">₹2,40,000</Text>
             </View>
           </LinearGradient>
         </TouchableOpacity>
@@ -134,7 +133,7 @@ export default function HomeScreen() {
             className="mr-3 flex-1 rounded-[24px] bg-white p-5">
             <Text className="font-medium text-[13px] text-slate-400">Today's Check-ins</Text>
             <View className="mt-2 flex-row items-end justify-between">
-              <Text className="text-3xl font-bold">45</Text>
+              <Text className="font-bold text-3xl">45</Text>
               {/* Green Pill Indicator */}
               <View className="mb-1 flex-row items-center rounded-full bg-emerald-50 px-2 py-1">
                 <Ionicons name="arrow-up" size={12} color="#10B981" />
@@ -155,7 +154,7 @@ export default function HomeScreen() {
             className="flex-1 rounded-[24px] bg-white p-5">
             <Text className="font-medium text-[13px] text-slate-400">Active Members</Text>
             <View className="mt-2 flex-row items-end justify-between">
-              <Text className="text-3xl font-bold">320</Text>
+              <Text className="font-bold text-3xl">320</Text>
               {/* Green Pill Indicator */}
               <View className="mb-1 flex-row items-center rounded-full bg-emerald-50 px-2 py-1">
                 <Ionicons name="arrow-up" size={12} color="#10B981" />
@@ -181,7 +180,7 @@ export default function HomeScreen() {
         data={RECENT_CHECKINS}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        // contentContainerStyle={{ paddingBottom: 40 }}
         renderItem={({ item }) => (
           <View className="mb-3 flex-row items-center rounded-2xl border border-slate-100 bg-white p-3 shadow-sm shadow-slate-100">
             <Image source={{ uri: item.image }} className="h-14 w-14 rounded-xl" />
@@ -195,7 +194,9 @@ export default function HomeScreen() {
             </View>
             <View
               style={{ backgroundColor: `${item.color}15`, borderColor: `${item.color}30` }}
-              className="rounded-full border px-3 py-1">
+              className="flex-row gap-1 rounded-full border px-3 py-1">
+              <Ionicons name="shield-checkmark" size={12} color={item.color} />
+
               <Text style={{ color: item.color }} className="font-bold text-[10px] uppercase">
                 {item.type}
               </Text>
