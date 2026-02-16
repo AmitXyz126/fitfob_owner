@@ -106,7 +106,7 @@ const ClubPhotosScreen = () => {
         <TouchableOpacity 
           onPress={pickImage}
           disabled={photos.length >= 6}
-          className={`w-full items-center justify-center rounded-2xl py-4 shadow-lg ${photos.length >= 6 ? 'bg-gray-300' : 'bg-[#EF4444] shadow-red-200'}`}
+          className={`w-full items-center justify-center rounded-2xl py-4 shadow-lg ${photos.length >= 6 ? 'bg-gray-300' : 'bg-[#F6163C)] shadow-red-200'}`}
         >
           <Text className="font-bold text-white">
             {photos.length >= 6 ? 'Limit Reached' : 'Add Photos'}

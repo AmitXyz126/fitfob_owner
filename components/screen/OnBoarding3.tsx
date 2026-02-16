@@ -1,15 +1,7 @@
 /* eslint-disable no-unused-expressions */
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  Platform,
-  Modal,
-} from 'react-native';
-import {   Ionicons } from '@expo/vector-icons';
+import { View, Text, ScrollView, TouchableOpacity, Platform, Modal } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import LineGradient from '../lineGradient/LineGradient';
 
@@ -34,7 +26,7 @@ const OnBoarding3 = () => {
     'Monday to Thursday',
     'Everyday (Mon - Sun)',
   ];
-  
+
   const weekendOptions = [
     'Saturday & Sunday',
     'Sunday Only',
@@ -42,7 +34,7 @@ const OnBoarding3 = () => {
     'Closed on Weekends',
   ];
 
-  // Time format 
+  // Time format
   const formatTimeParts = (timeValue: any) => {
     const date = new Date(timeValue);
     let hours = date.getHours();
@@ -92,19 +84,18 @@ const OnBoarding3 = () => {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: 'white' }}>
+    <View>
       <ScrollView
-        contentContainerStyle={{ flexGrow: 1,  }}
+        contentContainerStyle={{ flexGrow: 1 }}
         className="pt-4"
         showsVerticalScrollIndicator={false}>
-        
         <Text className="mb-6 font-bold text-[24px] leading-8 text-[#1C1C1C]">
           Configure your club
         </Text>
 
         {/* --- TYPE OF FITNESS CLUB --- */}
         <View className="mb-6">
-          <Text className="mb-2 ml-1 font-bold text-xs uppercase tracking-wider text-slate-400">
+          <Text className="mb-2 ml-1 font-bold text-xs  text-slate-400">
             Type of Fitness club
           </Text>
           {['Gym', 'Yoga', 'Pilates', 'Dance', 'Other'].map((item) => (
@@ -119,7 +110,7 @@ const OnBoarding3 = () => {
 
         {/* --- AMENITIES --- */}
         <View className="mb-6">
-          <Text className="mb-2 ml-1 font-bold text-xs uppercase tracking-wider text-slate-400">
+          <Text className="mb-2 ml-1 font-bold text-xs  tracking-wider text-slate-400">
             Amenities
           </Text>
           {['Parking', 'Wi-Fi', 'Showers', 'AC', 'Trainers'].map((item) => (
@@ -134,14 +125,12 @@ const OnBoarding3 = () => {
 
         {/* --- TIMINGS SECTION --- */}
         <View className="mb-10">
-          <Text className="mb-4 ml-1 font-bold text-xs uppercase tracking-wider text-slate-400">
+          <Text className="mb-4 ml-1 font-bold text-xs  tracking-wider text-slate-400">
             Timings
           </Text>
 
           {/* Time Selector Row */}
-          <View
-            className="mb-6 h-16 w-full flex-row items-center justify-between rounded-2xl border border-slate-100 bg-white px-2 shadow-sm shadow-slate-200"
-            style={styles.inputShadow}>
+          <View className="mb-6 h-16 w-full flex-row items-center justify-between rounded-2xl">
             <TouchableOpacity
               onPress={() => setShowPicker(showPicker === 'start' ? null : 'start')}
               className={`h-12 flex-1 flex-row items-center justify-between rounded-xl px-4 ${showPicker === 'start' ? 'border border-red-100 bg-red-50' : 'bg-slate-50'}`}>
@@ -186,7 +175,11 @@ const OnBoarding3 = () => {
                 is24Hour={false}
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                 onChange={onTimeChange}
-                style={{ height: 120 }}
+                style={{ height: 120 , borderRadius:50}}
+                 textColor="#F6163C"
+                 accentColor="#F6163C"
+                 
+                 
               />
             </View>
           )}
@@ -195,8 +188,7 @@ const OnBoarding3 = () => {
           <Text className="mb-2 ml-1 font-medium text-[13px] text-slate-400">Weekday Schedule</Text>
           <TouchableOpacity
             onPress={() => setShowDayModal('weekday')}
-            className="mb-4 h-14 flex-row items-center justify-between rounded-2xl border border-slate-100 bg-white px-5 shadow-sm shadow-slate-100"
-            style={styles.inputShadow}>
+            className="mb-4 h-14 flex-row items-center justify-between rounded-2xl border border-slate-100 bg-white px-5  ">
             <Text className="font-medium text-slate-900">{weekdayRange}</Text>
             <Ionicons name="chevron-down" size={20} color="#94A3B8" />
           </TouchableOpacity>
@@ -205,14 +197,12 @@ const OnBoarding3 = () => {
           <Text className="mb-2 ml-1 font-medium text-[13px] text-slate-400">Weekend Schedule</Text>
           <TouchableOpacity
             onPress={() => setShowDayModal('weekend')}
-            className="h-14 flex-row items-center justify-between rounded-2xl border border-slate-100 bg-white px-5 "
-            style={styles.inputShadow}>
+            className="h-14 flex-row items-center justify-between rounded-2xl border border-slate-100 bg-white px-5 ">
             <Text className="font-medium text-slate-900">{weekendRange}</Text>
             <Ionicons name="chevron-down" size={20} color="#94A3B8" />
           </TouchableOpacity>
         </View>
-
-       </ScrollView>
+      </ScrollView>
 
       {/* --- DAY SELECTION MODAL --- */}
       <Modal visible={!!showDayModal} transparent animationType="fade">
@@ -250,14 +240,14 @@ const OnBoarding3 = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  inputShadow: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-});
+// const styles = StyleSheet.create({
+//   inputShadow: {
+//     shadowColor: '#000',
+//     shadowOffset: { width: 0, height: 2 },
+//     shadowOpacity: 0.05,
+//     shadowRadius: 8,
+//     elevation: 2,
+//   },
+// });
 
 export default OnBoarding3;

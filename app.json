@@ -43,7 +43,7 @@
       "bundleIdentifier": "com.xyzstudio.fitfob",
       "googleServicesFile": "./GoogleService-Info.plist",
       "config": {
-        "googleMapsApiKey": "TERI_GOOGLE_MAPS_KEY_YAHAN_DAAL"
+        "googleMapsApiKey": ""
       }
     },
     "android": {
@@ -54,7 +54,7 @@
       "googleServicesFile": "./google-services.json",
       "config": {
         "googleMaps": {
-          "apiKey": "TERI_GOOGLE_MAPS_KEY_YAHAN_DAAL"
+          "apiKey": ""
         }
       }
     }

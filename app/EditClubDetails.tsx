@@ -64,7 +64,7 @@ const EditClubDetails = () => {
   };
 
   return (
-    <>
+    <Container>
       {/* KeyboardAvoidingView handles buttons moving up with keyboard */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -198,7 +198,7 @@ const EditClubDetails = () => {
           </View>
         </TouchableOpacity>
       </Modal>
-    </>
+    </Container>
   );
 };
 

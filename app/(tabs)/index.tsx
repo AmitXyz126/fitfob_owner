@@ -14,8 +14,7 @@ const RECENT_CHECKINS = [
     type: 'Standard',
     image: 'https://i.pravatar.cc/150?u=tina',
     color: '#94A3B8',
-    icon: 'hexagon', // Standard icon
-  },
+    icon: 'hexagon',  },
   {
     id: '2',
     name: 'Amelia Thomas',
@@ -61,8 +60,8 @@ const RECENT_CHECKINS = [
 export default function HomeScreen() {
   const router = useRouter();
   return (
-    <Container>
-      {/* --- FIXED HEADER & CARDS --- */}
+    <Container style={{ paddingBottom: 0 }}>
+    
       <View style={{ paddingTop: Platform.OS === 'ios' ? 10 : 20 }}>
         {/* Header */}
         <View className="mb-6 flex-row items-center justify-between">
@@ -87,7 +86,7 @@ export default function HomeScreen() {
               className="rounded-full border border-slate-100 bg-white p-2 shadow-sm">
               <Ionicons name="notifications" size={20} color="#F6163C" />
             </TouchableOpacity>
-            <TouchableOpacity className="rounded-full border border-slate-100 bg-slate-50 p-2 shadow-sm">
+            <TouchableOpacity className="rounded-full border border-slate-100 bg-white p-2 shadow-sm">
               <Ionicons name="paper-plane" size={20} color="#F6163C" />
             </TouchableOpacity>
           </View>
@@ -126,9 +125,9 @@ export default function HomeScreen() {
             style={{
               shadowColor: '#000',
               shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.05,
+              shadowOpacity: 0.04,
               shadowRadius: 10,
-              elevation: 3,
+              elevation: 1,
             }}
             className="mr-3 flex-1 rounded-[24px] bg-white p-5">
             <Text className="font-medium text-[13px] text-slate-400">Today's Check-ins</Text>
@@ -145,11 +144,11 @@ export default function HomeScreen() {
           {/* Active Members Card */}
           <View
             style={{
-              shadowColor: '#000',
+              
               shadowOffset: { width: 0, height: 4 },
               shadowOpacity: 0.05,
               shadowRadius: 10,
-              elevation: 3,
+              elevation: 1,
             }}
             className="flex-1 rounded-[24px] bg-white p-5">
             <Text className="font-medium text-[13px] text-slate-400">Active Members</Text>
@@ -168,13 +167,12 @@ export default function HomeScreen() {
         <View className="mb-4 flex-row items-center justify-between">
           <Text className="font-bold text-lg text-slate-900">Recent Check-ins</Text>
           <TouchableOpacity onPress={() => router.push('/ViewAllScreen')}>
-            <Text className="rounded-full bg-[#F6163C] px-4 py-1.5 font-bold text-xs text-white">
+            <Text className="rounded-full bg-[#F6163C] px-4 py-2.5 font-bold text-xs text-white">
               View All
             </Text>
           </TouchableOpacity>
         </View>
       </View>
-
       {/* --- SCROLLABLE LIST --- */}
       <FlatList
         data={RECENT_CHECKINS}
@@ -182,7 +180,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         // contentContainerStyle={{ paddingBottom: 40 }}
         renderItem={({ item }) => (
-          <View className="mb-3 flex-row items-center rounded-2xl border border-slate-100 bg-white p-3 shadow-sm shadow-slate-100">
+          <View className="mb-3 flex-row items-center rounded-2xl border border-slate-100 bg-white p-3  ">
             <Image source={{ uri: item.image }} className="h-14 w-14 rounded-xl" />
 
             <View className="ml-4 flex-1 ">

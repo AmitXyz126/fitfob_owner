@@ -162,7 +162,7 @@ export default function SignUp() {
           <Button
             className="rounded-xl"
             title="Create Account"
-            onPress={() => router.push('/onBoardingScreen/OnBoardingStep')}
+            onPress={() => router.push('/auth/OtpScreen')}
           />
         </View>
 
