@@ -178,7 +178,9 @@ export default function HomeScreen() {
         data={RECENT_CHECKINS}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
-        // contentContainerStyle={{ paddingBottom: 40 }}
+      contentContainerStyle={{ 
+          paddingBottom: Platform.OS === 'ios' ? 100 : 20 
+        }}
         renderItem={({ item }) => (
           <View className="mb-3 flex-row items-center rounded-2xl border border-slate-100 bg-white p-3  ">
             <Image source={{ uri: item.image }} className="h-14 w-14 rounded-xl" />

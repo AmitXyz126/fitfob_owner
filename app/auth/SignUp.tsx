@@ -1,12 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  Image,
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Button } from '@/components/Button';
@@ -18,60 +12,87 @@ import * as Google from 'expo-auth-session/providers/google';
 import * as Facebook from 'expo-auth-session/providers/facebook';
 import { ResponseType } from 'expo-auth-session';
 import { GoogleAuthProvider, FacebookAuthProvider, signInWithCredential } from 'firebase/auth';
-import { auth } from '../config/firebaseConfig';
+import { useSignupRequest } from '@/hooks/useAuth';
+
+// Validation Imports
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 
 WebBrowser.maybeCompleteAuthSession();
 
+const signupSchema = z
+  .object({
+    identifier: z.string().min(1, 'Email/Phone is required').email('Invalid email format'),
+    password: z.string().min(6, 'Password must be at least 6 characters'),
+    confirmPassword: z.string().min(1, 'Please confirm your password'),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ['confirmPassword'],
+  });
+
+type SignupFormData = z.infer<typeof signupSchema>;
+
 export default function SignUp() {
   const router = useRouter();
+  const signupMutation = useSignupRequest();
 
-  // States for visibility
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
 
-  // Google Auth Request
-  const [googleRequest, googleResponse, googlePromptAsync] = Google.useIdTokenAuthRequest({
-    clientId: '1026944446347-4gpshovr4kn56afecqsevj7o0assovht.apps.googleusercontent.com', 
-    iosClientId: '1026944446347-0cmronpk9hvtp7faf5dqcgsv84l2e9ns.apps.googleusercontent.com',
-    androidClientId: '1026944446347-2bvmj2smroh6efc72m47kohegpoosloq.apps.googleusercontent.com',
+  const {
+    control,
+    handleSubmit,
+    setError,  
+    formState: { errors },
+  } = useForm<SignupFormData>({
+    resolver: zodResolver(signupSchema),
+    defaultValues: { identifier: '', password: '', confirmPassword: '' },
   });
 
-  // Facebook Auth Request
+  const onSubmit = (data: SignupFormData) => {
+    const payload = {
+      identifier: data.identifier,
+      password: data.password,
+      confirmPassword: data.confirmPassword,
+      role: 'Client',
+    };
+
+    console.log('🚀 Sending Payload:', payload);
+
+    signupMutation.mutate(payload, {
+      onSuccess: (response) => {
+        console.log('✅ Signup Successful:', response);
+        router.push({
+          pathname: '/auth/OtpScreen',
+          params: { email: data.identifier },
+        });
+      },
+      onError: (error: any) => {
+        const serverMessage = error?.response?.data?.error?.message || error?.response?.data?.message || "";
+        
+         if (serverMessage.toLowerCase().includes("already exists")) {
+          setError('identifier', {
+            type: 'manual',
+            message: 'This email is already registered',
+          });
+        } else {
+          alert(serverMessage || 'Signup failed');
+        }
+      },
+    });
+  };
+
+  // Social Auth Hooks
+  const [googleRequest, googleResponse, googlePromptAsync] = Google.useIdTokenAuthRequest({
+    clientId: '1026944446347-4gpshovr4kn56afecqsevj7o0assovht.apps.googleusercontent.com',
+  });
+
   const [fbRequest, fbResponse, fbPromptAsync] = Facebook.useAuthRequest({
     clientId: '2349725998870415',
     responseType: ResponseType.Token,
   });
-
-  React.useEffect(() => {
-    if (googleResponse?.type === 'success') {
-      const { id_token } = googleResponse.params;
-      const credential = GoogleAuthProvider.credential(id_token);
-      signInWithCredential(auth, credential)
-        .then(() => {
-           // Navigate to Onboarding
-           router.replace('/onBoardingScreen/OnBoardingStep');
-        })
-        .catch((error) => {
-           console.error("Google Sign-In Error", error);
-           alert(error.message);
-        });
-    }
-  }, [googleResponse]);
-
-  React.useEffect(() => {
-    if (fbResponse?.type === 'success') {
-      const { access_token } = fbResponse.params;
-      const credential = FacebookAuthProvider.credential(access_token);
-      signInWithCredential(auth, credential)
-        .then(() => {
-           router.replace('/onBoardingScreen/OnBoardingStep');
-        })
-        .catch((error) => {
-           console.error("Facebook Sign-In Error", error);
-           alert(error.message);
-        });
-    }
-  }, [fbResponse]);
 
   return (
     <Container>
@@ -79,130 +100,116 @@ export default function SignUp() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
-        {/* Logo  */}
+        
         <View className="mt-12 items-center">
-          <Image
-            source={require('../../assets/images/Vector.png')}
-            className="h-[54px] w-[54px]"
-            resizeMode="contain"
-          />
-
-          <Text className="font-bold text-4xl leading-4xl text-darkText">Sign up</Text>
-          <Text className="mt-2 text-center font-medium text-sm leading-sm text-secondaryText">
-            Create an account to continue!
-          </Text>
+          <Image source={require('../../assets/images/Vector.png')} className="h-[54px] w-[54px]" resizeMode="contain" />
+          <Text className="font-bold text-4xl text-darkText">Sign up</Text>
+          <Text className="mt-2 text-center font-medium text-sm text-secondaryText">Create an account to continue!</Text>
         </View>
 
-        {/* Form Section */}
         <View className="mt-10 space-y-5">
-          {/*  Email or Phone number */}
+          {/* Email or Phone */}
           <View>
-            <Text className="mb-2 ml-1 font-sans text-sm leading-sm text-secondaryText">
-              Email or Phone number
-            </Text>
-            <View className="h-14 justify-center rounded-2xl border border-border bg-white px-4 shadow-sm shadow-border">
-              <TextInput
-                placeholder="Email or Phone number"
-                placeholderTextColor="text-darkText"
-                className="h-full text-darkText"
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
+            <Text className="mb-2 ml-1 text-sm text-secondaryText">Email or Phone number</Text>
+            <Controller
+              control={control}
+              name="identifier"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <View className={`h-14 justify-center rounded-2xl border ${errors.identifier ? 'border-red-500' : 'border-border'} bg-white px-4 `}>
+                  <TextInput
+                    placeholder="Email or Phone number"
+                    onBlur={onBlur}
+                    onChangeText={onChange}
+                    value={value}
+                    className="h-full text-darkText"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                  />
+                </View>
+              )}
+            />
+            {errors.identifier && <Text className="ml-1 mt-1 text-xs text-red-500">{errors.identifier.message}</Text>}
           </View>
 
-          {/* 2. Password */}
+          {/* Password */}
           <View>
-            <Text className="mb-2 ml-1 mt-2 font-sans text-sm leading-sm text-secondaryText">
-              Set Password
-            </Text>
-            <View className="h-14 flex-row items-center rounded-2xl border border-border bg-white px-4 shadow-sm shadow-border">
-              <TextInput
-                placeholder="*******"
-                placeholderTextColor="text-darkText"
-                secureTextEntry={!isPasswordVisible}
-                className="h-full flex-1 text-darkText"
-              />
-              <TouchableOpacity onPress={() => setIsPasswordVisible(!isPasswordVisible)}>
-                <Ionicons
-                  name={isPasswordVisible ? 'eye-outline' : 'eye-off-outline'}
-                  size={20}
-                  color="#6B7280"
-                />
-              </TouchableOpacity>
-            </View>
+            <Text className="mb-2 ml-1 mt-2 text-sm text-secondaryText">Set Password</Text>
+            <Controller
+              control={control}
+              name="password"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <View className={`h-14 flex-row items-center rounded-2xl border ${errors.password ? 'border-red-500' : 'border-border'} bg-white px-4  `}>
+                  <TextInput
+                    placeholder="*******"
+                    secureTextEntry={!isPasswordVisible}
+                    onBlur={onBlur}
+                    onChangeText={onChange}
+                    value={value}
+                    className="h-full flex-1 text-darkText"
+                  />
+                  <TouchableOpacity onPress={() => setIsPasswordVisible(!isPasswordVisible)}>
+                    <Ionicons name={isPasswordVisible ? 'eye-outline' : 'eye-off-outline'} size={20} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+              )}
+            />
+            {errors.password && <Text className="ml-1 mt-1 text-xs text-red-500">{errors.password.message}</Text>}
           </View>
 
-          {/* 3. Confirm Password */}
+          {/* Confirm Password */}
           <View>
-            <Text className="mb-2 ml-1 mt-2 font-sans text-sm leading-sm text-secondaryText">
-              Confirm Password
-            </Text>
-            <View className="h-14 flex-row items-center rounded-2xl border border-border bg-white px-4 shadow-sm shadow-border">
-              <TextInput
-                placeholder="*******"
-                placeholderTextColor="text-darkText"
-                secureTextEntry={!isConfirmPasswordVisible}
-                className="h-full flex-1 text-darkText"
-              />
-              <TouchableOpacity
-                onPress={() => setIsConfirmPasswordVisible(!isConfirmPasswordVisible)}>
-                <Ionicons
-                  name={isConfirmPasswordVisible ? 'eye-outline' : 'eye-off-outline'}
-                  size={20}
-                  color="#6B7280"
-                />
-              </TouchableOpacity>
-            </View>
+            <Text className="mb-2 ml-1 mt-2 text-sm text-secondaryText">Confirm Password</Text>
+            <Controller
+              control={control}
+              name="confirmPassword"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <View className={`h-14 flex-row items-center rounded-2xl border ${errors.confirmPassword ? 'border-red-500' : 'border-border'} bg-white px-4  `}>
+                  <TextInput
+                    placeholder="*******"
+                    secureTextEntry={!isConfirmPasswordVisible}
+                    onBlur={onBlur}
+                    onChangeText={onChange}
+                    value={value}
+                    className="h-full flex-1 text-darkText"
+                  />
+                  <TouchableOpacity onPress={() => setIsConfirmPasswordVisible(!isConfirmPasswordVisible)}>
+                    <Ionicons name={isConfirmPasswordVisible ? 'eye-outline' : 'eye-off-outline'} size={20} color="#6B7280" />
+                  </TouchableOpacity>
+                </View>
+              )}
+            />
+            {errors.confirmPassword && <Text className="ml-1 mt-1 text-xs text-red-500">{errors.confirmPassword.message}</Text>}
           </View>
         </View>
 
-        {/* SignUp Button */}
         <View className="mt-8">
           <Button
             className="rounded-xl"
-            title="Create Account"
-            onPress={() => router.push('/auth/OtpScreen')}
+            title={signupMutation.isPending ? 'Please wait...' : 'Create Account'}
+            onPress={handleSubmit(onSubmit)}
+            disabled={signupMutation.isPending}
           />
         </View>
 
-        {/* Divider */}
         <View className="mb-2 mt-8 flex-row items-center px-4">
-          <LinearGradient
-            colors={['rgba(0,0,0,0)', '#000000']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={{ height: 1.5, flex: 1 }}
-          />
-
+          <LinearGradient colors={['rgba(0,0,0,0)', '#000000']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 1.5, flex: 1 }} />
           <Text className="mx-2 font-medium text-xs text-darkText">OR</Text>
-
-          <LinearGradient
-            colors={['#000000', 'rgba(0,0,0,0)']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={{ height: 1.5, flex: 1 }}
-          />
+          <LinearGradient colors={['#000000', 'rgba(0,0,0,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 1.5, flex: 1 }} />
         </View>
+
         <View className="mb-6">
           <View className="mt-2 flex-row justify-between">
-            <TouchableOpacity 
-              onPress={() => googlePromptAsync()}
-              className="h-14 flex-[0.47] flex-row items-center justify-center rounded-2xl bg-[#F2F2F2]">
+            <TouchableOpacity onPress={() => googlePromptAsync()} className="h-14 flex-[0.47] flex-row items-center justify-center rounded-2xl bg-[#F2F2F2]">
               <Image source={require('../../assets/images/Google.png')} className="h-6 w-6" />
             </TouchableOpacity>
-            <TouchableOpacity 
-              onPress={() => fbPromptAsync()}
-              className="h-14 flex-[0.47] flex-row items-center justify-center rounded-2xl bg-[#F2F2F2]">
+            <TouchableOpacity onPress={() => fbPromptAsync()} className="h-14 flex-[0.47] flex-row items-center justify-center rounded-2xl bg-[#F2F2F2]">
               <Image source={require('../../assets/images/Facebook.png')} className="h-6 w-6" />
             </TouchableOpacity>
           </View>
         </View>
-        {/* Login Link */}
-        <View className="flex-row justify-center">
-          <Text className="text-secondaryText" style={{ fontFamily: 'PlusJakartaSans-Medium' }}>
-            Already have an account?{'  '}
-          </Text>
+
+        <View className="flex-row justify-center pb-6">
+          <Text className="text-secondaryText">Already have an account?{' '}</Text>
           <TouchableOpacity onPress={() => router.push('/auth/Login')}>
             <Text className="font-bold text-primary">Login</Text>
           </TouchableOpacity>
