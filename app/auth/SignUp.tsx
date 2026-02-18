@@ -59,7 +59,7 @@ export default function SignUp() {
       identifier: data.identifier,
       password: data.password,
       confirmPassword: data.confirmPassword,
-      role: 'Client',
+      role: 'ClubOwner',
     };
 
     signupMutation.mutate(payload, {

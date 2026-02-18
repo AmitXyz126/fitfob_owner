@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { loginUserApi, signupStep1Api, verifyOtpApi } from "@/app/api/authApi";
+import { loginUserApi, signupStep1Api, verifyOtpApi } from "@/api/authApi";
 import { useAuthStore } from "@/store/useAuthStore";
 
 // Pehla Hook: Sirf OTP mangwane ke liye
