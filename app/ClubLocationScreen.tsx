@@ -52,7 +52,7 @@ const ClubLocationScreen = () => {
 
    useEffect(() => {
     getAddressFromCoords(region.latitude, region.longitude);
-  }, []);
+  }, [region.latitude, region.longitude]);
 
   return (
     <Container>

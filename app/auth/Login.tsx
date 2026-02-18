@@ -1,6 +1,6 @@
 /* eslint-disable react/no-unescaped-entities */
- import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Image } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Image, ActivityIndicator } from 'react-native'; // ActivityIndicator add kiya
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Button } from '@/components/Button';
@@ -28,6 +28,9 @@ export default function Login() {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);  
 
+  // Loading state shortcut
+  const isLoading = loginMutation.isPending;
+
   // 2. Form Hook Setup
   const {
     control,
@@ -40,8 +43,7 @@ export default function Login() {
   });
 
   const onSubmit = (data: LoginFormData) => {
-    console.log('🚀 Login Attempt:', data);
-
+    console.log(data, "login payload")
     loginMutation.mutate(data, {
       onSuccess: (response) => {
         router.replace('/(tabs)'); 
@@ -49,8 +51,6 @@ export default function Login() {
       onError: (error: any) => {
         const serverMsg = error?.response?.data?.error?.message || "Something went wrong";
         
-        console.log("❌ Error from Backend:", serverMsg);
-
         if (serverMsg.toLowerCase().includes("password")) {
           setError('password', { 
             type: 'manual', 
@@ -72,9 +72,24 @@ export default function Login() {
 
   return (
     <Container>
+      {/* --- FULL SCREEN LOADING OVERLAY --- */}
+      {isLoading && (
+        <View 
+          className="absolute inset-0 z-50 items-center justify-center" 
+          style={{ backgroundColor: 'rgba(255, 255, 255, 0.8)' }}
+        >
+          <View className="items-center justify-center p-8 bg-white rounded-3xl  border border-[#CCCECE]">
+            <ActivityIndicator size="large" color="#F6163C" />
+            <Text className="mt-4 font-bold text-lg text-slate-900">Logging In</Text>
+            <Text className="text-slate-400 mt-1">Authenticating your account...</Text>
+          </View>
+        </View>
+      )}
+
       <KeyboardAwareScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+         pointerEvents={isLoading ? 'none' : 'auto'}
         contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
         
         {/* Header Section */}
@@ -104,6 +119,7 @@ export default function Login() {
                     onBlur={onBlur}
                     onChangeText={onChange}
                     value={value}
+                    editable={!isLoading}
                     className="h-full text-darkText"
                     autoCapitalize="none"
                     keyboardType="email-address"
@@ -128,9 +144,10 @@ export default function Login() {
                     onBlur={onBlur}
                     onChangeText={onChange}
                     value={value}
+                    editable={!isLoading}
                     className="h-full flex-1 text-darkText"
                   />
-                  <TouchableOpacity onPress={() => setIsPasswordVisible(!isPasswordVisible)}>
+                  <TouchableOpacity disabled={isLoading} onPress={() => setIsPasswordVisible(!isPasswordVisible)}>
                     <Ionicons name={isPasswordVisible ? 'eye-outline' : 'eye-off-outline'} size={20} color="#6B7280" />
                   </TouchableOpacity>
                 </View>
@@ -142,6 +159,7 @@ export default function Login() {
           {/* Remember Me & Forgot Password Row */}
           <View className="flex-row items-center justify-between px-1 mt-3">
             <TouchableOpacity 
+              disabled={isLoading}
               onPress={() => setRememberMe(!rememberMe)} 
               className="flex-row items-center"
             >
@@ -151,7 +169,7 @@ export default function Login() {
               <Text className="ml-2 text-sm text-secondaryText font-medium">Remember me</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => router.push('/auth/ForgotPasswordScreen')}>
+            <TouchableOpacity disabled={isLoading} onPress={() => router.push('/auth/ForgotPasswordScreen')}>
               <Text className="font-bold text-primary text-sm">Forgot Password?</Text>
             </TouchableOpacity>
           </View>
@@ -161,9 +179,9 @@ export default function Login() {
         <View className="mt-8">
           <Button
             className="rounded-xl"
-            title={loginMutation.isPending ? 'Logging in...' : 'Login'}
+            title="Login"
             onPress={handleSubmit(onSubmit)}
-            disabled={loginMutation.isPending}
+            disabled={isLoading}
           />
         </View>
 
@@ -176,10 +194,10 @@ export default function Login() {
 
         {/* Social Buttons */}
         <View className="mb-6 flex-row justify-between mt-2">
-            <TouchableOpacity className="h-14 flex-[0.47] items-center justify-center rounded-2xl bg-[#F2F2F2]">
+            <TouchableOpacity disabled={isLoading} className="h-14 flex-[0.47] items-center justify-center rounded-2xl bg-[#F2F2F2]">
               <Image source={require('../../assets/images/Google.png')} className="h-6 w-6" />
             </TouchableOpacity>
-            <TouchableOpacity className="h-14 flex-[0.47] items-center justify-center rounded-2xl bg-[#F2F2F2]">
+            <TouchableOpacity disabled={isLoading} className="h-14 flex-[0.47] items-center justify-center rounded-2xl bg-[#F2F2F2]">
               <Image source={require('../../assets/images/Facebook.png')} className="h-6 w-6" />
             </TouchableOpacity>
         </View>
@@ -187,7 +205,7 @@ export default function Login() {
         {/* Footer */}
         <View className="flex-row justify-center pb-6">
           <Text className="text-secondaryText">Don't have an account?{' '}</Text>
-          <TouchableOpacity onPress={() => router.push('/auth/SignUp')}>
+          <TouchableOpacity disabled={isLoading} onPress={() => router.push('/auth/SignUp')}>
             <Text className="font-bold text-primary">Sign Up</Text>
           </TouchableOpacity>
         </View>

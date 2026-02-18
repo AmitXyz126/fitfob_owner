@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Button } from '@/components/Button';
@@ -24,7 +24,6 @@ export default function OtpScreen() {
   }, [timer]);
 
   const handleChange = (text: string, index: number) => {
-    // Only allow numbers
     const cleanText = text.replace(/[^0-9]/g, '');
     const newOtp = [...otp];
     newOtp[index] = cleanText;
@@ -45,7 +44,6 @@ export default function OtpScreen() {
 
   const handleVerify = () => {
     const otpString = otp.join('');
-
     console.log('🚀 Verifying OTP:', { identifier: email, otp: otpString });
 
     verifyMutation.mutate(
@@ -59,8 +57,7 @@ export default function OtpScreen() {
           router.push('/auth/Login');
         },
         onError: (error: any) => {
-          const serverError =
-            error?.response?.data?.error?.message || error?.response?.data?.message;
+          const serverError = error?.response?.data?.error?.message || error?.response?.data?.message;
           console.error('❌ OTP Error:', serverError);
 
           if (serverError?.toLowerCase().includes('expired')) {
@@ -85,6 +82,19 @@ export default function OtpScreen() {
 
   return (
     <Container>
+      {/* ---LOADING OVERLAY --- */}
+      {verifyMutation.isPending && (
+        <View 
+          className="absolute inset-0 z-50 items-center justify-center" 
+          style={{ backgroundColor: 'rgba(255, 255, 255, 0.8)' }}
+        >
+          <View className="items-center justify-center p-8 bg-white rounded-3xl shadow-xl border border-slate-50">
+            <ActivityIndicator size="large" color="#F6163C" />
+            <Text className="mt-4 font-bold text-lg text-slate-900">Verifying...</Text>
+          </View>
+        </View>
+      )}
+
       <KeyboardAwareScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ flexGrow: 1 }}
@@ -145,7 +155,7 @@ export default function OtpScreen() {
           </View>
 
           <View className="mb-4 mt-auto pt-10">
-            <Button
+            <Button 
               title={verifyMutation.isPending ? 'Verifying...' : 'Continue'}
               onPress={handleVerify}
               disabled={!isOtpComplete || verifyMutation.isPending}

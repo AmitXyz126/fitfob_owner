@@ -1,28 +1,27 @@
 import React from 'react';
-import { View, Text, Image } from 'react-native'; 
+import { View, Text, Image } from 'react-native';
+import { Button } from '../Button';
+import { router } from 'expo-router';
 
 const OnBoarding5 = () => {
   return (
-    <View className="flex-1 bg-white items-center justify-center">
-      <View className="items-center mb-2">
-        
-        {/* --- SUCCESS IMAGE/GIF --- */}
-
-        {/* --- TEXT SECTION --- */}
-        <Text className="text-[28px] font-bold text-slate-900 mb-3 text-center">
+    <View className="flex-1 items-center justify-center bg-white">
+      <View className="mb-2 items-center">
+        <Text className="mb-3 text-center font-bold text-[28px] text-slate-900">
           Congratulations
         </Text>
-        
-        <Text className="text-[15px] text-slate-400 text-center leading-5 px-1">
+
+        <Text className="px-1 text-center text-[15px] leading-5 text-slate-400">
           You have successfully completed the process
         </Text>
-        <View className=" bg-white w-[200px] h-[200px] items-center justify-center mb-2">
-          <Image 
-            source={require('../../assets/gif/tick.gif')} 
-            className="w-[126px] h-[126px]"
+        <View className=" mb-2 h-[200px] w-[200px] items-center justify-center bg-white">
+          <Image
+            source={require('../../assets/gif/tick.gif')}
+            className="h-[126px] w-[126px]"
             resizeMode="contain"
           />
         </View>
+        <Button onPress={() => router.push('/ReviewStatusScreen')} title={'Finish'} />
       </View>
     </View>
   );

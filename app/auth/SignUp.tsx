@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Button } from '@/components/Button';
@@ -41,6 +41,9 @@ export default function SignUp() {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
 
+  // Loading indicator shortcut
+  const isLoading = signupMutation.isPending;
+
   const {
     control,
     handleSubmit,
@@ -59,11 +62,8 @@ export default function SignUp() {
       role: 'Client',
     };
 
-    console.log('🚀 Sending Payload:', payload);
-
     signupMutation.mutate(payload, {
       onSuccess: (response) => {
-        console.log('✅ Signup Successful:', response);
         router.push({
           pathname: '/auth/OtpScreen',
           params: { email: data.identifier },
@@ -96,9 +96,23 @@ export default function SignUp() {
 
   return (
     <Container>
+       {isLoading && (
+        <View 
+          className="absolute inset-0 z-50 items-center justify-center" 
+          style={{ backgroundColor: 'rgba(255, 255, 255, 0.8)' }}
+        >
+          <View className="items-center justify-center p-8 bg-white rounded-3xl  border border-[#CCCECE]">
+            <ActivityIndicator size="large" color="#F6163C" />
+            <Text className="mt-4 font-bold text-lg text-slate-900">Creating Account</Text>
+            <Text className="text-slate-400 mt-1">Please wait a moment...</Text>
+          </View>
+        </View>
+      )}
+
       <KeyboardAwareScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+         pointerEvents={isLoading ? 'none' : 'auto'}
         contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
         
         <View className="mt-12 items-center">
@@ -121,6 +135,7 @@ export default function SignUp() {
                     onBlur={onBlur}
                     onChangeText={onChange}
                     value={value}
+                    editable={!isLoading}
                     className="h-full text-darkText"
                     keyboardType="email-address"
                     autoCapitalize="none"
@@ -145,6 +160,7 @@ export default function SignUp() {
                     onBlur={onBlur}
                     onChangeText={onChange}
                     value={value}
+                    editable={!isLoading}
                     className="h-full flex-1 text-darkText"
                   />
                   <TouchableOpacity onPress={() => setIsPasswordVisible(!isPasswordVisible)}>
@@ -170,6 +186,7 @@ export default function SignUp() {
                     onBlur={onBlur}
                     onChangeText={onChange}
                     value={value}
+                    editable={!isLoading}
                     className="h-full flex-1 text-darkText"
                   />
                   <TouchableOpacity onPress={() => setIsConfirmPasswordVisible(!isConfirmPasswordVisible)}>
@@ -185,9 +202,9 @@ export default function SignUp() {
         <View className="mt-8">
           <Button
             className="rounded-xl"
-            title={signupMutation.isPending ? 'Please wait...' : 'Create Account'}
+            title="Create Account"
             onPress={handleSubmit(onSubmit)}
-            disabled={signupMutation.isPending}
+            disabled={isLoading}
           />
         </View>
 
@@ -199,10 +216,10 @@ export default function SignUp() {
 
         <View className="mb-6">
           <View className="mt-2 flex-row justify-between">
-            <TouchableOpacity onPress={() => googlePromptAsync()} className="h-14 flex-[0.47] flex-row items-center justify-center rounded-2xl bg-[#F2F2F2]">
+            <TouchableOpacity disabled={isLoading} onPress={() => googlePromptAsync()} className="h-14 flex-[0.47] flex-row items-center justify-center rounded-2xl bg-[#F2F2F2]">
               <Image source={require('../../assets/images/Google.png')} className="h-6 w-6" />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => fbPromptAsync()} className="h-14 flex-[0.47] flex-row items-center justify-center rounded-2xl bg-[#F2F2F2]">
+            <TouchableOpacity disabled={isLoading} onPress={() => fbPromptAsync()} className="h-14 flex-[0.47] flex-row items-center justify-center rounded-2xl bg-[#F2F2F2]">
               <Image source={require('../../assets/images/Facebook.png')} className="h-6 w-6" />
             </TouchableOpacity>
           </View>
@@ -210,7 +227,7 @@ export default function SignUp() {
 
         <View className="flex-row justify-center pb-6">
           <Text className="text-secondaryText">Already have an account?{' '}</Text>
-          <TouchableOpacity onPress={() => router.push('/auth/Login')}>
+          <TouchableOpacity disabled={isLoading} onPress={() => router.push('/auth/Login')}>
             <Text className="font-bold text-primary">Login</Text>
           </TouchableOpacity>
         </View>

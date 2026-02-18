@@ -104,13 +104,13 @@ const ClubProfileScreen = () => {
         <View className="mb-6 overflow-hidden rounded-[16px]">
           <ImageBackground
             source={require('../assets/images/bgprofile.png')}
-            className="min-h-[170px] justify-center p-5"
+            className=" justify-center p-4"
             resizeMode="cover">
             <View className="flex-row items-center">
               <View className="relative">
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  onPress={() => router.push('/EditClubDetails')} // <-- Yahan click karne par navigation hoga
+                  onPress={() => router.push('/EditClubDetails')}  
                 >
                   <View className="h-16 w-16 items-center justify-center rounded-full border-2 border-white/50 bg-white/30">
                     <Image
@@ -123,7 +123,7 @@ const ClubProfileScreen = () => {
                       className="h-14 w-14 rounded-full"
                     />
 
-                    {/* Chota camera icon overlay (optional, design ke liye) */}
+                    
                     <View className="absolute bottom-0 right-0 rounded-full border border-white bg-[#F6163C] p-1">
                       <MaterialIcons name="edit" size={10} color="white" />
                     </View>

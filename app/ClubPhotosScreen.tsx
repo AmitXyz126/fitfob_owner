@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, Alert } from 'react-native';
-import { ChevronLeft, Image as ImageIcon, Plus, X } from 'lucide-react-native'; // X icon add kiya
+import { ChevronLeft, Image as ImageIcon, Plus, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Container } from '@/components/Container';
 import * as ImagePicker from 'expo-image-picker';
@@ -12,7 +12,7 @@ const ClubPhotosScreen = () => {
 
   const pickImage = async () => {
     if (photos.length >= 6) {
-      Alert.alert('Limit Reached', 'Aap maximum 6 photos hi upload kar sakte hain.');
+      Alert.alert('Limit Reached', 'only 6 photo upload.');
       return;
     }
 
@@ -56,7 +56,7 @@ const ClubPhotosScreen = () => {
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
         <View className="mt-4">
-          <Text className="text-2xl font-black text-[#1C1C1C]">Upload Club Photos</Text>
+          <Text className="text-2xl font-bold text-[#1C1C1C]">Upload Club Photos</Text>
           <Text className="mt-1 text-sm text-gray-400 leading-5">
             Upload up to 6 photos of your gym so members know what to expect
           </Text>
@@ -106,7 +106,7 @@ const ClubPhotosScreen = () => {
         <TouchableOpacity 
           onPress={pickImage}
           disabled={photos.length >= 6}
-          className={`w-full items-center justify-center rounded-2xl py-4 shadow-lg ${photos.length >= 6 ? 'bg-gray-300' : 'bg-[#F6163C)] shadow-red-200'}`}
+          className={`w-full items-center justify-center rounded-2xl py-4 shadow-lg ${photos.length >= 6 ? 'bg-gray-300' : 'bg-[#F6163C] shadow-red-200'}`}
         >
           <Text className="font-bold text-white">
             {photos.length >= 6 ? 'Limit Reached' : 'Add Photos'}
