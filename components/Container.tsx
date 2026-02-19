@@ -18,5 +18,5 @@ export const Container = ({ children, style }: ContainerProps) => {
 };
 
 const styles = {
-  container: 'flex flex-1 px-6 pb-5 ios:pb-1 bg-[#FFF]',
+  container: 'flex flex-1 px-4 pb-5 ios:pb-1 bg-[#FFF]',
 };

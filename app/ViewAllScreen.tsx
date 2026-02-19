@@ -1,4 +1,4 @@
-import  { useState } from 'react';
+import { useState } from 'react';
 import { View, Text, Image, TouchableOpacity, FlatList, TextInput, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -17,18 +17,22 @@ const ViewAllScreen = () => {
   const router = useRouter();
   const [search, setSearch] = useState('');
 
+   const filteredData = ALL_CHECKINS.filter(item => 
+    item.name.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <Container>
       {/* --- HEADER --- */}
       <View 
         style={{ paddingTop: Platform.OS === 'ios' ? 10 : 20 }} 
-        className="flex-row items-center justify-between  mb-4"
+        className="flex-row items-center justify-between mb-4"
       >
         <TouchableOpacity onPress={() => router.back()} className="p-2">
           <Ionicons name="chevron-back" size={24} color="#1E293B" />
         </TouchableOpacity>
         
-        <Text className="text-lg font-bold text-slate-800">Recent Check-ins</Text>
+        <Text className="text-base font-medium leading-6 text-[#697281]">Recent Check-ins</Text>
         
         <TouchableOpacity className="p-2">
           <Ionicons name="notifications" size={24} color="#F6163C" />
@@ -36,8 +40,8 @@ const ViewAllScreen = () => {
       </View>
 
       {/* --- SEARCH BAR --- */}
-      <View className=" mb-6">
-        <View className="flex-row items-center bg-white border border-slate-100 rounded-full px-4 py-1 shadow-sm shadow-slate-200">
+      <View className="mb-6">
+        <View className="flex-row items-center bg-white border border-[#E5E7EB] rounded-full px-4 py-1">
           <TextInput 
             placeholder="Search Members" 
             placeholderTextColor="#94A3B8"
@@ -53,12 +57,12 @@ const ViewAllScreen = () => {
 
       {/* --- RECENT CHECK-INS LIST --- */}
       <FlatList
-        data={ALL_CHECKINS}
+        data={filteredData}
         keyExtractor={(item, index) => item.id + index}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{  paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: 40 }}
         renderItem={({ item }) => (
-          <View className="mb-4 flex-row items-center bg-white rounded-[24px] border border-slate-50 p-3 shadow-sm shadow-slate-100">
+          <View className="mb-4 flex-row items-center bg-white rounded-[8px] border border-[#E5E7EB] p-3">
             {/* User Avatar */}
             <Image 
               source={{ uri: item.image }} 
@@ -72,8 +76,7 @@ const ViewAllScreen = () => {
                   {item.name}
                 </Text>
                 {item.verified && (
-                  // <Ionicons name="checkmark-circle" size={16} color="#22C55E" />
-                  <Image className='w-4 h-4' source={require("../assets/images/tick.png")}  />
+                  <Image className='w-4 h-4' source={require("../assets/images/tick.png")} />
                 )}
               </View>
               <Text className="text-xs text-slate-400 font-medium mt-0.5">
@@ -81,15 +84,26 @@ const ViewAllScreen = () => {
               </Text>
             </View>
 
-            {/* Membership Badge */}
+            {/* Membership Badge with Image */}
             <View 
               style={{ 
                 backgroundColor: `${item.color}15`, 
-                borderColor: `${item.color}25` 
+                borderColor: `${item.color}25`,
+                width: 90  
               }}
-              className="flex-row items-center rounded-full border px-3 py-1.5"
+              className="flex-row items-center justify-center rounded-full border py-1.5"
             >
-              <Ionicons name="shield-checkmark" size={12} color={item.color} />
+              <Image
+                source={
+                  item.type === 'Luxury'
+                    ? require('../assets/images/luxury.png')
+                    : item.type === 'Premium'
+                      ? require('../assets/images/premium.png')
+                      : require('../assets/images/standardicon.png')
+                }
+                style={{ width: 14, height: 14 }}
+                resizeMode="contain"
+              />
               <Text 
                 style={{ color: item.color }} 
                 className="ml-1.5 font-bold text-[11px]"

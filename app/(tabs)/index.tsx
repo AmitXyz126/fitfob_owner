@@ -14,7 +14,7 @@ const RECENT_CHECKINS = [
     type: 'Standard',
     image: 'https://i.pravatar.cc/150?u=tina',
     color: '#94A3B8',
-    icon: 'hexagon',  },
+  },
   {
     id: '2',
     name: 'Amelia Thomas',
@@ -61,21 +61,20 @@ export default function HomeScreen() {
   const router = useRouter();
   return (
     <Container style={{ paddingBottom: 0 }}>
-    
       <View style={{ paddingTop: Platform.OS === 'ios' ? 10 : 20 }}>
         {/* Header */}
         <View className="mb-6 flex-row items-center justify-between">
           <View className="flex-row items-center">
             <TouchableOpacity onPress={() => router.push('/clubProfile')}>
               <Image
-                className="h-12 w-12"
-                source={require('../../assets/images/scanIcon.png')}
+                className="h-12 w-12 rounded-full"
+                source={require('../../assets/images/fitfob_profile.png')}
                 resizeMode="contain"
               />
             </TouchableOpacity>
             <View className="ml-3">
               <Text className="text-[12px] font-normal  text-[#1C1C1C]">
-                Welcome to Anytime Fitness Gym
+                Welcome to Fitfob fitness Club
               </Text>
               <Text className="font-bold text-xl text-slate-900">Good Morning, Garry</Text>
             </View>
@@ -83,7 +82,7 @@ export default function HomeScreen() {
           <View className="flex-row gap-2">
             <TouchableOpacity
               style={{ elevation: 2 }}
-              className="rounded-full border border-slate-100 bg-white p-2 shadow-sm">
+              className="rounded-full border border-white bg-white p-2 shadow-sm">
               <Ionicons name="notifications" size={20} color="#F6163C" />
             </TouchableOpacity>
             <TouchableOpacity className="rounded-full border border-slate-100 bg-white p-2 shadow-sm">
@@ -110,7 +109,9 @@ export default function HomeScreen() {
             <View className="relative z-10 rounded-lg px-4 py-5">
               <View className="flex-row items-start justify-between">
                 <Text className="font-medium text-white/80">Monthly Earnings</Text>
-                <View className="rounded-full bg-[#0000001A] px-3 py-1.5 backdrop-blur-md">
+                <View className="flex-row items-center gap-1 rounded-full bg-[#0000001A] px-3 py-1.5 backdrop-blur-md">
+                  <Ionicons name="arrow-up" size={15} color="#FFF" />
+
                   <Text className="font-bold text-[10px]  text-[#FFF]">+20% this month</Text>
                 </View>
               </View>
@@ -119,23 +120,23 @@ export default function HomeScreen() {
           </LinearGradient>
         </TouchableOpacity>
         {/* Stats Row */}
-        <View className="mb-8 mt-4 flex-row justify-between">
+        <View className="mb-8 mt-4 flex-row justify-between ">
           {/* Today's Check-ins Card */}
           <View
             style={{
               shadowColor: '#000',
               shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.04,
+              shadowOpacity: 0.09,
               shadowRadius: 10,
               elevation: 1,
             }}
             className="mr-3 flex-1 rounded-[24px] bg-white p-5">
-            <Text className="font-medium text-[13px] text-slate-400">Today's Check-ins</Text>
+            <Text className="mb-3 font-medium text-[12px] text-[#B3B3B3]">Today's Check-ins</Text>
             <View className="mt-2 flex-row items-end justify-between">
               <Text className="font-bold text-3xl">45</Text>
               {/* Green Pill Indicator */}
-              <View className="mb-1 flex-row items-center rounded-full bg-emerald-50 px-2 py-1">
-                <Ionicons name="arrow-up" size={12} color="#10B981" />
+              <View className="m mb-1 flex-row items-center rounded-full bg-emerald-50 px-2 py-2">
+                <Ionicons name="arrow-up" size={15} color="#10B981" />
                 <Text className="ml-0.5 font-bold text-[12px] text-emerald-500">+5</Text>
               </View>
             </View>
@@ -144,19 +145,20 @@ export default function HomeScreen() {
           {/* Active Members Card */}
           <View
             style={{
-              
               shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.05,
+              shadowOpacity: 0.09,
               shadowRadius: 10,
               elevation: 1,
             }}
             className="flex-1 rounded-[24px] bg-white p-5">
-            <Text className="font-medium text-[13px] text-slate-400">Active Members</Text>
+            <Text className="mb-3 font-sans text-[12px] font-normal leading-4 text-[#B3B3B3]">
+              Active Members
+            </Text>
             <View className="mt-2 flex-row items-end justify-between">
               <Text className="font-bold text-3xl">320</Text>
               {/* Green Pill Indicator */}
               <View className="mb-1 flex-row items-center rounded-full bg-emerald-50 px-2 py-1">
-                <Ionicons name="arrow-up" size={12} color="#10B981" />
+                <Ionicons name="arrow-up" size={15} color="#10B981" />
                 <Text className="ml-0.5 font-bold text-[12px] text-emerald-500">+5</Text>
               </View>
             </View>
@@ -167,7 +169,7 @@ export default function HomeScreen() {
         <View className="mb-4 flex-row items-center justify-between">
           <Text className="font-bold text-lg text-slate-900">Recent Check-ins</Text>
           <TouchableOpacity onPress={() => router.push('/ViewAllScreen')}>
-            <Text className="rounded-full bg-[#F6163C] px-4 py-2.5 font-bold text-xs text-white">
+            <Text className="rounded-full bg-[#F6163C] px-4 py-2.5 font-normal  leading-4 text-white">
               View All
             </Text>
           </TouchableOpacity>
@@ -178,11 +180,11 @@ export default function HomeScreen() {
         data={RECENT_CHECKINS}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ 
-          paddingBottom: Platform.OS === 'ios' ? 100 : 20 
+        contentContainerStyle={{
+          paddingBottom: Platform.OS === 'ios' ? 100 : 20,
         }}
         renderItem={({ item }) => (
-          <View className="mb-3 flex-row items-center rounded-2xl border border-slate-100 bg-white p-3  ">
+          <View className="mb-3 flex-row items-center rounded-2xl border border-slate-100 bg-white p-3">
             <Image source={{ uri: item.image }} className="h-14 w-14 rounded-xl" />
 
             <View className="ml-4 flex-1 ">
@@ -192,12 +194,30 @@ export default function HomeScreen() {
               </View>
               <Text className="text-xs text-slate-400">{item.time}</Text>
             </View>
-            <View
-              style={{ backgroundColor: `${item.color}15`, borderColor: `${item.color}30` }}
-              className="flex-row gap-1 rounded-full border px-3 py-1">
-              <Ionicons name="shield-checkmark" size={12} color={item.color} />
 
-              <Text style={{ color: item.color }} className="font-bold text-[10px] uppercase">
+            <View
+              style={{
+                backgroundColor: `${item.color}15`,
+                borderColor: `${item.color}30`,
+                width: 95,
+              }}
+              className="flex-row items-center justify-center gap-1 rounded-full border py-1.5">
+              <Image
+                source={
+                  item.type === 'Luxury'
+                    ? require('../../assets/images/luxury.png')
+                    : item.type === 'Premium'
+                      ? require('../../assets/images/premium.png')
+                      : require('../../assets/images/standardicon.png')
+                }
+                style={{ width: 15, height: 15 }}
+                resizeMode="contain"
+              />
+
+              <Text
+                style={{ color: item.color }}
+                className="text-[12px] font-normal "
+                numberOfLines={1}>
                 {item.type}
               </Text>
             </View>

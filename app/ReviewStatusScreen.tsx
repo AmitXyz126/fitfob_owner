@@ -1,39 +1,38 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, } from 'react-native';
+import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { Container } from '@/components/Container';
 import { Ionicons } from '@expo/vector-icons';
+import { Button } from '@/components/Button';
+import { router } from 'expo-router';
 
 export default function ReviewStatusScreen() {
   return (
     <Container style={{ flex: 1 }}>
       {/* Back Button */}
-      <TouchableOpacity className="mt-5 ml-2 p-2">
+      <TouchableOpacity className="ml-2 mt-5 p-2">
         <Ionicons name="chevron-back" size={24} color="#CBD5E1" />
       </TouchableOpacity>
 
       <View className="flex-1 items-center justify-center px-6">
-        {/* Megaphone Icon */}
-        <View className="mb-12">
-           {/* Agar aapke paas image h toh Image use kro, warna Ionicons best h */}
-          <Ionicons name="megaphone" size={120} color="#F6163C" />
-        </View>
-
-        <Text className="text-[28px] font-bold text-slate-900 text-center leading-9">
+        <Text className="text-center font-bold font-sans text-[24px] leading-8 text-[#1C1C1C]">
           We’re reviewing your submission
         </Text>
-        
-        <Text className="mt-5 text-[15px] text-slate-500 text-center leading-6 font-medium">
-          We need more time to verify your identity. This may be due to your document requiring manual review or delays with our third-party partner. We’ll update you once the review is complete.
+
+        <Text className="mt-2 text-center font-sans text-[12px] font-normal  leading-6 text-slate-500">
+          We need more time to verify your identity. This may be due to your document requiring
+          manual review or delays with our third-party partner. We’ll update you once the review is
+          complete.
         </Text>
+        {/* Megaphone Icon */}
+        <Image
+          className="mt-3"
+          source={require('../assets/images/submission.png')}
+          style={{ width: 124, height: 124 }}
+          resizeMode="contain"
+        />
       </View>
 
-      <View className="px-2 mb-6">
-        <TouchableOpacity 
-          activeOpacity={0.8}
-          className="bg-[#F6163C] py-4 rounded-2xl"
-        >
-          <Text className="text-center text-white font-bold text-lg">Done</Text>
-        </TouchableOpacity>
+      <View className="mb-6 px-6">
+        <Button title="Done" onPress={() => router.replace('/OnBoarding5')} />
       </View>
     </Container>
   );

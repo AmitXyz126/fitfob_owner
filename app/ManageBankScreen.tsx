@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect } from 'react'; // useEffect add kiya
 import { View, Text, TouchableOpacity, Image, ScrollView } from 'react-native';
 import { ChevronLeft, Bell, MoreVertical } from 'lucide-react-native';
@@ -91,7 +92,7 @@ const ManageBankScreen = () => {
         </View>
       </ScrollView>
 
-      <View className="absolute bottom-6 left-5 right-5">
+      <View className="absolute bottom-8 left-5 right-5">
         <Button onPress={() => router.push('/bankSummary')} title="Withdrawal" />
       </View>
     </Container>

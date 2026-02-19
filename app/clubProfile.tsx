@@ -10,7 +10,6 @@ import {
   Wifi,
   Wallet,
   LogOut,
-  Bell,
   SquarePen,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -89,19 +88,21 @@ const ClubProfileScreen = () => {
   return (
     <Container>
       {/* Header */}
-      <View className="flex-row items-center justify-between py-4">
-        <TouchableOpacity onPress={() => router.back()}>
+      <View className="relative mb-4 flex-row items-center py-4">
+        <TouchableOpacity onPress={() => router.back()} className="absolute left-0 z-10 p-2">
           <ChevronLeft color="black" size={24} />
         </TouchableOpacity>
-        <Text className="font-bold text-lg text-gray-500">Club Profile</Text>
-        <TouchableOpacity>
-          <Bell color="#EF4444" size={24} fill="#EF4444" />
-        </TouchableOpacity>
+
+        <View className="flex-1">
+          <Text className="text-center font-medium font-sans text-base text-[#697281]">
+            Club Profile
+          </Text>
+        </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Banner */}
-        <View className="mb-6 overflow-hidden rounded-[16px]">
+        <View className="mb-2 overflow-hidden rounded-[16px]">
           <ImageBackground
             source={require('../assets/images/bgprofile.png')}
             className=" justify-center p-4"
@@ -110,8 +111,7 @@ const ClubProfileScreen = () => {
               <View className="relative">
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  onPress={() => router.push('/EditClubDetails')}  
-                >
+                  onPress={() => router.push('/EditClubDetails')}>
                   <View className="h-16 w-16 items-center justify-center rounded-full border-2 border-white/50 bg-white/30">
                     <Image
                       // --- DYNAMIC IMAGE ---
@@ -123,7 +123,6 @@ const ClubProfileScreen = () => {
                       className="h-14 w-14 rounded-full"
                     />
 
-                    
                     <View className="absolute bottom-0 right-0 rounded-full border border-white bg-[#F6163C] p-1">
                       <MaterialIcons name="edit" size={10} color="white" />
                     </View>
@@ -151,7 +150,7 @@ const ClubProfileScreen = () => {
         </View>
 
         {/* Menu Section */}
-        <View className="rounded-3xl bg-white px-4 py-2">
+        <View className="mb-16 rounded-3xl bg-white px-4 py-2">
           {/* --- DYNAMIC ADDRESS --- */}
           <MenuOption
             onPress={() => router.push('/ClubLocationScreen')}
@@ -193,7 +192,7 @@ const ClubProfileScreen = () => {
             await AsyncStorage.clear();
             router.replace('../../');
           }}
-          className="mb-10 mt-8 flex-row items-center justify-center rounded-2xl bg-gray-50 py-4">
+          className=" mt-10 flex-row items-center justify-center rounded-[8px] bg-[#F8F8F8] py-4">
           <LogOut size={20} color="#94A3B8" />
           <Text className="ml-2 font-bold text-base text-gray-400">Logout</Text>
         </TouchableOpacity>

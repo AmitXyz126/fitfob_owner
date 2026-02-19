@@ -24,8 +24,7 @@ const AddBankScreen = () => {
     ifsc: '',
   });
 
-  // Validation: Button tabhi active hoga jab teeno fields bhari hongi
-  const isFormValid = 
+   const isFormValid = 
     formData.accountNumber.trim().length > 0 && 
     formData.confirmAccountNumber.trim().length > 0 && 
     formData.ifsc.trim().length > 0;
@@ -41,7 +40,7 @@ const AddBankScreen = () => {
           <TouchableOpacity onPress={() => router.back()}>
             <ChevronLeft color="black" size={24} />
           </TouchableOpacity>
-          <Text className="font-medium text-lg text-[#697281]">Add Bank Account</Text>
+          <Text className="font-medium text-base text-[#697281]">Add Bank Account</Text>
           <TouchableOpacity>
             <Bell color="#F6163C" size={24} fill="#F6163C" />
           </TouchableOpacity>
@@ -56,6 +55,7 @@ const AddBankScreen = () => {
 
           <View className="space-y-5">
             {/* Account Number */}
+            
             <View>
               <Text className="mb-2 ml-1 mt-4 font-sans text-sm leading-sm text-secondaryText">
                 Bank Account Number

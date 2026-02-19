@@ -4,6 +4,7 @@ import { ChevronLeft, Bell } from 'lucide-react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Container } from '@/components/Container';
 import LineGradient from '@/components/lineGradient/LineGradient';
+import { Button } from '@/components/Button';
 
 const BankSummaryScreen = () => {
   const router = useRouter();
@@ -35,7 +36,7 @@ const BankSummaryScreen = () => {
         <TouchableOpacity onPress={() => router.back()}>
           <ChevronLeft color="black" size={24} />
         </TouchableOpacity>
-        <Text className="font-bold text-lg text-gray-500">Bank Account</Text>
+        <Text className="font-medium text-base text-[#697281]">Bank Account</Text>
         <TouchableOpacity>
           <Bell color="#EF4444" size={24} fill="#EF4444" />
         </TouchableOpacity>
@@ -71,13 +72,8 @@ const BankSummaryScreen = () => {
 
       {/* Bottom Button */}
       <View className="absolute bottom-6 left-5 right-5">
-        <TouchableOpacity
-          onPress={() => router.replace('/(tabs)')}
-          activeOpacity={0.8}
-          className="items-center rounded-2xl bg-[#EF4444] py-4 shadow-lg shadow-red-200">
-          <Text className="font-bold text-base text-white">Back to Main Menu</Text>
-        </TouchableOpacity>
-      </View>
+           <Button onPress={()=> router.replace('/(tabs)') } title={'Back to Main Menu'} />
+       </View>
     </Container>
   );
 };
