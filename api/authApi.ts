@@ -4,7 +4,7 @@ import { ENDPOINTS } from './endpoint';
 // 1. Signup
 export const signupStep1Api = async (payload: any) => {
   const response = await axios.post(ENDPOINTS.REGISTER, payload);
-  return response.data; // { message: "OTP sent successfully" }
+  return response.data;  
 };
 
 export const verifyOtpApi = async (payload: any) => {

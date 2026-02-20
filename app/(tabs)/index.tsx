@@ -169,7 +169,7 @@ export default function HomeScreen() {
         <View className="mb-4 flex-row items-center justify-between">
           <Text className="font-bold text-lg text-slate-900">Recent Check-ins</Text>
           <TouchableOpacity onPress={() => router.push('/ViewAllScreen')}>
-            <Text className="rounded-full bg-[#F6163C] px-4 py-2.5 font-normal  leading-4 text-white">
+            <Text className="rounded-full bg-[#F6163C] px-4 py-2.5 font-normal leading-4 text-white">
               View All
             </Text>
           </TouchableOpacity>

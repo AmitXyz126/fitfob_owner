@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable react/no-unescaped-entities */
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import {
@@ -131,7 +132,9 @@ export default function CheckinsScreen() {
 
               {/* MANUAL ID SECTION */}
               <View className="mb-10 mt-12 w-full">
-                <Text className="mb-2 ml-1 font-sans text-sm font-normal text-secondaryText">Use ID</Text>
+                <Text className="mb-2 ml-1 font-sans text-sm font-normal text-secondaryText">
+                  Use ID
+                </Text>
                 <View className="h-14 flex-row items-center justify-between rounded-2xl border border-[#E5E7EB] bg-white px-4 ">
                   <TextInput
                     placeholder="Enter ID:"
@@ -154,32 +157,66 @@ export default function CheckinsScreen() {
           snapPoints={snapPoints}
           enablePanDownToClose
           backdropComponent={renderBackdrop}
-          backgroundStyle={{ borderRadius: 45 }}
+          backgroundStyle={{ borderRadius: 20 }}
           onClose={() => setScanned(false)}>
           <BottomSheetView style={{ padding: 32, alignItems: 'center' }}>
             {status === 'success' ? (
-              <View className="w-full items-center">
+              <View className="w-full items-center py-2">
+                {/* User Profile Image */}
                 <Image
                   source={{ uri: 'https://i.pravatar.cc/150?u=tina' }}
-                  className="mb-4 h-24 w-24 rounded-[30px]"
+                  className="mb-4 h-24 w-24 rounded-[6px]"
+                  resizeMode="cover"
                 />
-                <Text className="font-bold text-xl text-darkText">Amit Singh</Text>
-                <Text className="my-1 text-center text-2xl font-black text-green-500">
+
+                {/* Name and Blue/Green Tick Row */}
+                <View className="flex-row justify-center gap-1">
+                  <Text className="font-bold text-xl text-slate-900">Amit Singh</Text>
+                  <Image
+                    source={require('../../assets/images/tick.png')}
+                    style={{ width: 16, height: 16 }}
+                    resizeMode="contain"
+                  />
+                </View>
+
+                {/* Success Message */}
+                <Text className="mt-8 text-center text-2xl font-bold text-[#00C94F]">
                   Check-in Successful!
                 </Text>
+
+                <Text className="mt-1 font-normal text-xs text-[#697281]">Tina Sharma har checked in at 9:41 AM</Text>
+
+                {/* Done Button */}
                 <TouchableOpacity
                   onPress={() => bottomSheetRef.current?.close()}
-                  className="mt-6 w-full items-center rounded-2xl bg-[#F6163C] py-4">
+                  activeOpacity={0.8}
+                  className="mt-10 w-full items-center rounded-2xl bg-[#F6163C] py-4  ">
                   <Text className="font-bold text-lg text-white">Done</Text>
                 </TouchableOpacity>
               </View>
             ) : (
-              <View className="w-full items-center">
-                <Ionicons name="close-circle" size={80} color="#F6163C" />
-                <Text className="mt-2 text-2xl font-black text-[#F6163C]">Check-in Failed!</Text>
+              <View className="w-full items-center  py-6">
+                {/* Check-in Failed Icon/Image */}
+                <View className="mb-6 h-32 w-32 items-center justify-center">
+                  <Image
+                    source={require('../../assets/images/wrong.png')}
+                    style={{ width: 120, height: 120 }}
+                    resizeMode="contain"
+                  />
+                </View>
+
+                {/* Text Section */}
+                <Text className="font-bold font-sans text-2xl text-[#FC383A]">
+                  Check-in Failed!
+                </Text>
+                <Text className="mt-1 text-center font-sans text-xs font-normal text-[#697281]">
+                  Invalid QR Code. Please try again.
+                </Text>
+
                 <TouchableOpacity
                   onPress={() => bottomSheetRef.current?.close()}
-                  className="mt-8 w-full items-center rounded-2xl bg-[#F6163C] py-4">
+                  activeOpacity={0.8}
+                  className="mt-5 w-full items-center rounded-2xl bg-[#F6163C] py-4 ">
                   <Text className="font-bold text-lg text-white">Try Again</Text>
                 </TouchableOpacity>
               </View>

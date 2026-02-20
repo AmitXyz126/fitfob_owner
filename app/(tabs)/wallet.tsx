@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities */
 import React, { useState, useMemo } from 'react';
 import { Text, View, TouchableOpacity, Image, FlatList } from 'react-native';
 import { Container } from '@/components/Container';
@@ -35,6 +36,42 @@ const DATA = [
     image: 'https://randomuser.me/api/portraits/men/3.jpg',
     type: 'Monthly',
   },
+  {
+    id: '4',
+    name: 'Bruce Wayne',
+    plan: 'Premium pass',
+    price: '₹2500.00',
+    date: '22nd Jan',
+    image: 'https://randomuser.me/api/portraits/men/3.jpg',
+    type: 'Monthly',
+  },
+  {
+    id: '5',
+    name: 'Bruce Wayne',
+    plan: 'Premium pass',
+    price: '₹2500.00',
+    date: '22nd Jan',
+    image: 'https://randomuser.me/api/portraits/men/3.jpg',
+    type: 'Monthly',
+  },
+  {
+    id: '6',
+    name: 'Bruce Wayne',
+    plan: 'Premium pass',
+    price: '₹2500.00',
+    date: '22nd Jan',
+    image: 'https://randomuser.me/api/portraits/men/3.jpg',
+    type: 'Monthly',
+  },
+  {
+    id: '7',
+    name: 'Bruce Wayne',
+    plan: 'Premium pass',
+    price: '₹2500.00',
+    date: '22nd Jan',
+    image: 'https://randomuser.me/api/portraits/men/3.jpg',
+    type: 'Monthly',
+  },
 ];
 
 const Wallet = () => {
@@ -57,13 +94,7 @@ const Wallet = () => {
       onPress={() =>
         router.push({
           pathname: '/earningDetail',
-          params: {
-            name: item.name,
-            price: item.price,
-            image: item.image,
-            date: item.date,
-            plan: item.plan,
-          },
+          params: { ...item },
         })
       }
       className="mb-3 flex-row items-center rounded-lg border border-[#E5E7EB] bg-white p-3">
@@ -84,71 +115,66 @@ const Wallet = () => {
   );
 
   return (
-    <Container>
-      <View className="pb-2 pt-4">
-        <Text className="font-medium text-xl ">Earnings Overview</Text>
-      </View>
-
-      <View className="my-4 flex-row rounded-xl bg-slate-100 p-1">
-        {(['Daily', 'Weekly', 'Monthly'] as TabType[]).map((tab) => (
-          <TouchableOpacity
-            key={tab}
-            onPress={() => setActiveTab(tab)}
-            className={`flex-1 items-center rounded-lg py-2.5 ${activeTab === tab ? 'bg-white shadow-sm' : ''}`}>
-            <Text
-              className={`font-bold ${activeTab === tab ? 'text-slate-900' : 'text-slate-400'}`}>
-              {tab}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
+    <Container style={{ flex: 1 }}>
+      {/* Fixed Top Section */}
       <View>
+        <View className="pb-2 pt-4">
+          <Text className="font-medium text-xl ">Earnings Overview</Text>
+        </View>
+
+        <View className="my-4 flex-row rounded-xl bg-slate-100 p-1">
+          {/* Tabs UI - Same as yours */}
+          {(['Daily', 'Weekly', 'Monthly'] as TabType[]).map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              onPress={() => setActiveTab(tab)}
+              className={`flex-1 items-center rounded-lg py-2.5 ${activeTab === tab ? 'bg-white shadow-sm' : ''}`}>
+              <Text
+                className={`font-bold ${activeTab === tab ? 'text-slate-900' : 'text-slate-400'}`}>
+                {tab}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         <LinearGradient
           colors={['#F6163C', '#FF5F7A']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{ borderRadius: 16, overflow: 'hidden' }}
           className="relative mb-6 shadow-xl shadow-red-300">
-          {/* Background Pattern Image */}
           <Image
             source={require('../../assets/images/bgLayer.png')}
             className="absolute right-0 top-0 h-full w-1/2"
             resizeMode="cover"
           />
-
           <View className="relative z-10 px-4 py-5">
-            {/* Label Row */}
-            <View className="flex-row items-center justify-between">
-              <Text className="font-medium text-white/80">Monthly Earnings</Text>
-            </View>
-
-            {/* Amount and Percentage Badge Row */}
+            <Text className="font-medium text-white/80">Monthly Earnings</Text>
             <View className="mt-2 flex-row items-center justify-between">
               <Text className="font-bold font-sans text-4xl leading-9 text-white">₹2,40,000</Text>
-
-              {/* Percentage Badge */}
               <View className="rounded-full bg-black/10 px-3 py-1.5 backdrop-blur-md">
                 <Text className="font-bold text-[10px] text-white">+20% this month</Text>
               </View>
             </View>
           </View>
         </LinearGradient>
+
+        <View className="mb-4 mt-4 flex-row items-center justify-between">
+          <Text className="font-bold text-lg text-slate-800">{activeTab} Transactions</Text>
+          <TouchableOpacity className="flex-row items-center rounded-full border border-slate-200 px-3 py-1.5">
+            <Ionicons name="options-outline" size={18} color="#F6163C" />
+            <Text className="ml-1.5 font-bold text-slate-700">Filter</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <View className="mb-4 mt-4 flex-row items-center justify-between">
-        <Text className="font-bold text-lg text-slate-800">{activeTab} Transactions</Text>
-        <TouchableOpacity className="flex-row items-center rounded-full border border-slate-200 px-3 py-1.5">
-          <Ionicons name="options-outline" size={18} color="#F6163C" />
-          <Text className="ml-1.5 font-bold text-slate-700">Filter</Text>
-        </TouchableOpacity>
-      </View>
-
+      {/* Scrollable List - Added flex: 1 to fill the remaining gap */}
       <FlatList
         data={filteredData}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
+        style={{ flex: 1 }}  
         contentContainerStyle={{ paddingBottom: 20 }}
       />
     </Container>

@@ -1,5 +1,5 @@
 import { SafeAreaView, Edge } from 'react-native-safe-area-context';
-import { ViewStyle, Platform } from 'react-native';
+import { ViewStyle, } from 'react-native';
 
 interface ContainerProps {
   children: React.ReactNode;
@@ -7,8 +7,8 @@ interface ContainerProps {
 }
 
 export const Container = ({ children, style }: ContainerProps) => {
-  const edges: Edge[] =
-    Platform.OS === 'android' ? ['top', 'left', 'right'] : ['top', 'bottom', 'left', 'right'];
+ 
+  const edges: Edge[] = ['top', 'left', 'right']; 
 
   return (
     <SafeAreaView edges={edges} className={styles.container} style={style}>
@@ -18,5 +18,5 @@ export const Container = ({ children, style }: ContainerProps) => {
 };
 
 const styles = {
-  container: 'flex flex-1 px-4 pb-5 ios:pb-1 bg-[#FFF]',
+   container: 'flex flex-1 px-4 bg-[#FFF]', 
 };

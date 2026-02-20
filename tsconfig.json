@@ -5,9 +5,21 @@
     "baseUrl": ".",
     "jsx": "react-jsx",
     "paths": {
-      "@/*": ["*"],
-      "@firebase/auth": ["./node_modules/@firebase/auth/dist/rn/index.rn.d.ts"]
+      "@/*": [
+        "*"
+      ],
+      "@firebase/auth": [
+        "./node_modules/@firebase/auth/dist/rn/index.rn.d.ts"
+      ]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts"]
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts",
+    "nativewind-env.d.ts,",
+    "declarations.d.ts",
+    "nativewind-env.d.ts"
+  ]
 }
