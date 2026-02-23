@@ -127,7 +127,7 @@ export default function Welcome() {
           {/* Bottom CTA */}
           <View className="pb-12">
             <Pressable
-              onPress={() => router.push('/(tabs)')}
+              onPress={() => router.push('/auth/Login')}
               className="mb-4 rounded-2xl border border-primary bg-primary py-4">
               <Text className="text-center font-bold text-sm leading-sm text-background">
                 Login

@@ -47,7 +47,7 @@ export default function SignUp() {
   const {
     control,
     handleSubmit,
-    setError,  
+    setError,
     formState: { errors },
   } = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
@@ -56,12 +56,11 @@ export default function SignUp() {
 
   const onSubmit = (data: SignupFormData) => {
     const payload = {
-      identifier: data.identifier,
+      identifier: data.identifier.toLowerCase().trim(),
       password: data.password,
       confirmPassword: data.confirmPassword,
-      role: 'ClubOwner',
+      role: 'ClubOwner', 
     };
-
     signupMutation.mutate(payload, {
       onSuccess: (response) => {
         router.push({
@@ -70,9 +69,10 @@ export default function SignUp() {
         });
       },
       onError: (error: any) => {
-        const serverMessage = error?.response?.data?.error?.message || error?.response?.data?.message || "";
-        
-         if (serverMessage.toLowerCase().includes("already exists")) {
+        const serverMessage =
+          error?.response?.data?.error?.message || error?.response?.data?.message || '';
+
+        if (serverMessage.toLowerCase().includes('already exists')) {
           setError('identifier', {
             type: 'manual',
             message: 'This email is already registered',
@@ -96,15 +96,14 @@ export default function SignUp() {
 
   return (
     <Container>
-       {isLoading && (
-        <View 
-          className="absolute inset-0 z-50 items-center justify-center" 
-          style={{ backgroundColor: 'rgba(255, 255, 255, 0.8)' }}
-        >
-          <View className="items-center justify-center p-8 bg-white rounded-3xl  border border-[#CCCECE]">
+      {isLoading && (
+        <View
+          className="absolute inset-0 z-50 items-center justify-center"
+          style={{ backgroundColor: 'rgba(255, 255, 255, 0.8)' }}>
+          <View className="items-center justify-center rounded-3xl border border-[#CCCECE]  bg-white p-8">
             <ActivityIndicator size="large" color="#F6163C" />
             <Text className="mt-4 font-bold text-lg text-slate-900">Creating Account</Text>
-            <Text className="text-slate-400 mt-1">Please wait a moment...</Text>
+            <Text className="mt-1 text-slate-400">Please wait a moment...</Text>
           </View>
         </View>
       )}
@@ -112,13 +111,18 @@ export default function SignUp() {
       <KeyboardAwareScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-         pointerEvents={isLoading ? 'none' : 'auto'}
+        pointerEvents={isLoading ? 'none' : 'auto'}
         contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
-        
         <View className="mt-12 items-center">
-          <Image source={require('../../assets/images/Vector.png')} className="h-[54px] w-[54px]" resizeMode="contain" />
+          <Image
+            source={require('../../assets/images/Vector.png')}
+            className="h-[54px] w-[54px]"
+            resizeMode="contain"
+          />
           <Text className="font-bold text-4xl text-darkText">Sign up</Text>
-          <Text className="mt-2 text-center font-medium text-sm text-secondaryText">Create an account to continue!</Text>
+          <Text className="mt-2 text-center font-medium text-sm text-secondaryText">
+            Create an account to continue!
+          </Text>
         </View>
 
         <View className="mt-10 space-y-5">
@@ -129,7 +133,8 @@ export default function SignUp() {
               control={control}
               name="identifier"
               render={({ field: { onChange, onBlur, value } }) => (
-                <View className={`h-14 justify-center rounded-2xl border ${errors.identifier ? 'border-red-500' : 'border-border'} bg-white px-4 `}>
+                <View
+                  className={`h-14 justify-center rounded-2xl border ${errors.identifier ? 'border-red-500' : 'border-border'} bg-white px-4 `}>
                   <TextInput
                     placeholder="Email or Phone number"
                     onBlur={onBlur}
@@ -143,7 +148,9 @@ export default function SignUp() {
                 </View>
               )}
             />
-            {errors.identifier && <Text className="ml-1 mt-1 text-xs text-red-500">{errors.identifier.message}</Text>}
+            {errors.identifier && (
+              <Text className="ml-1 mt-1 text-xs text-red-500">{errors.identifier.message}</Text>
+            )}
           </View>
 
           {/* Password */}
@@ -153,7 +160,8 @@ export default function SignUp() {
               control={control}
               name="password"
               render={({ field: { onChange, onBlur, value } }) => (
-                <View className={`h-14 flex-row items-center rounded-2xl border ${errors.password ? 'border-red-500' : 'border-border'} bg-white px-4  `}>
+                <View
+                  className={`h-14 flex-row items-center rounded-2xl border ${errors.password ? 'border-red-500' : 'border-border'} bg-white px-4  `}>
                   <TextInput
                     placeholder="*******"
                     secureTextEntry={!isPasswordVisible}
@@ -164,12 +172,18 @@ export default function SignUp() {
                     className="h-full flex-1 text-darkText"
                   />
                   <TouchableOpacity onPress={() => setIsPasswordVisible(!isPasswordVisible)}>
-                    <Ionicons name={isPasswordVisible ? 'eye-outline' : 'eye-off-outline'} size={20} color="#6B7280" />
+                    <Ionicons
+                      name={isPasswordVisible ? 'eye-outline' : 'eye-off-outline'}
+                      size={20}
+                      color="#6B7280"
+                    />
                   </TouchableOpacity>
                 </View>
               )}
             />
-            {errors.password && <Text className="ml-1 mt-1 text-xs text-red-500">{errors.password.message}</Text>}
+            {errors.password && (
+              <Text className="ml-1 mt-1 text-xs text-red-500">{errors.password.message}</Text>
+            )}
           </View>
 
           {/* Confirm Password */}
@@ -179,7 +193,8 @@ export default function SignUp() {
               control={control}
               name="confirmPassword"
               render={({ field: { onChange, onBlur, value } }) => (
-                <View className={`h-14 flex-row items-center rounded-2xl border ${errors.confirmPassword ? 'border-red-500' : 'border-border'} bg-white px-4  `}>
+                <View
+                  className={`h-14 flex-row items-center rounded-2xl border ${errors.confirmPassword ? 'border-red-500' : 'border-border'} bg-white px-4  `}>
                   <TextInput
                     placeholder="*******"
                     secureTextEntry={!isConfirmPasswordVisible}
@@ -189,13 +204,22 @@ export default function SignUp() {
                     editable={!isLoading}
                     className="h-full flex-1 text-darkText"
                   />
-                  <TouchableOpacity onPress={() => setIsConfirmPasswordVisible(!isConfirmPasswordVisible)}>
-                    <Ionicons name={isConfirmPasswordVisible ? 'eye-outline' : 'eye-off-outline'} size={20} color="#6B7280" />
+                  <TouchableOpacity
+                    onPress={() => setIsConfirmPasswordVisible(!isConfirmPasswordVisible)}>
+                    <Ionicons
+                      name={isConfirmPasswordVisible ? 'eye-outline' : 'eye-off-outline'}
+                      size={20}
+                      color="#6B7280"
+                    />
                   </TouchableOpacity>
                 </View>
               )}
             />
-            {errors.confirmPassword && <Text className="ml-1 mt-1 text-xs text-red-500">{errors.confirmPassword.message}</Text>}
+            {errors.confirmPassword && (
+              <Text className="ml-1 mt-1 text-xs text-red-500">
+                {errors.confirmPassword.message}
+              </Text>
+            )}
           </View>
         </View>
 
@@ -209,24 +233,40 @@ export default function SignUp() {
         </View>
 
         <View className="mb-2 mt-8 flex-row items-center px-4">
-          <LinearGradient colors={['rgba(0,0,0,0)', '#000000']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 1.5, flex: 1 }} />
+          <LinearGradient
+            colors={['rgba(0,0,0,0)', '#000000']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{ height: 1.5, flex: 1 }}
+          />
           <Text className="mx-2 font-medium text-xs text-darkText">OR</Text>
-          <LinearGradient colors={['#000000', 'rgba(0,0,0,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 1.5, flex: 1 }} />
+          <LinearGradient
+            colors={['#000000', 'rgba(0,0,0,0)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{ height: 1.5, flex: 1 }}
+          />
         </View>
 
         <View className="mb-6">
           <View className="mt-2 flex-row justify-between">
-            <TouchableOpacity disabled={isLoading} onPress={() => googlePromptAsync()} className="h-14 flex-[0.47] flex-row items-center justify-center rounded-2xl bg-[#F2F2F2]">
+            <TouchableOpacity
+              disabled={isLoading}
+              onPress={() => googlePromptAsync()}
+              className="h-14 flex-[0.47] flex-row items-center justify-center rounded-2xl bg-[#F2F2F2]">
               <Image source={require('../../assets/images/Google.png')} className="h-6 w-6" />
             </TouchableOpacity>
-            <TouchableOpacity disabled={isLoading} onPress={() => fbPromptAsync()} className="h-14 flex-[0.47] flex-row items-center justify-center rounded-2xl bg-[#F2F2F2]">
+            <TouchableOpacity
+              disabled={isLoading}
+              onPress={() => fbPromptAsync()}
+              className="h-14 flex-[0.47] flex-row items-center justify-center rounded-2xl bg-[#F2F2F2]">
               <Image source={require('../../assets/images/Facebook.png')} className="h-6 w-6" />
             </TouchableOpacity>
           </View>
         </View>
 
         <View className="flex-row justify-center pb-6">
-          <Text className="text-secondaryText">Already have an account?{' '}</Text>
+          <Text className="text-secondaryText">Already have an account? </Text>
           <TouchableOpacity disabled={isLoading} onPress={() => router.push('/auth/Login')}>
             <Text className="font-bold text-primary">Login</Text>
           </TouchableOpacity>

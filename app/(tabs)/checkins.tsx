@@ -180,11 +180,13 @@ export default function CheckinsScreen() {
                 </View>
 
                 {/* Success Message */}
-                <Text className="mt-8 text-center text-2xl font-bold text-[#00C94F]">
+                <Text className="mt-8 text-center font-bold text-2xl text-[#00C94F]">
                   Check-in Successful!
                 </Text>
 
-                <Text className="mt-1 font-normal text-xs text-[#697281]">Tina Sharma har checked in at 9:41 AM</Text>
+                <Text className="mt-1 text-xs font-normal text-[#697281]">
+                  Tina Sharma har checked in at 9:41 AM
+                </Text>
 
                 {/* Done Button */}
                 <TouchableOpacity
@@ -210,7 +212,7 @@ export default function CheckinsScreen() {
                   Check-in Failed!
                 </Text>
                 <Text className="mt-1 text-center font-sans text-xs font-normal text-[#697281]">
-                  Invalid QR Code. Please try again.
+                  invalid OR code. Please try again
                 </Text>
 
                 <TouchableOpacity

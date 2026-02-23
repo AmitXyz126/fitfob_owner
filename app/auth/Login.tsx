@@ -1,6 +1,6 @@
 /* eslint-disable react/no-unescaped-entities */
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Image, ActivityIndicator } from 'react-native'; // ActivityIndicator add kiya
+import { View, Text, TextInput, TouchableOpacity, Image, ActivityIndicator } from 'react-native'; 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Button } from '@/components/Button';
@@ -46,7 +46,7 @@ export default function Login() {
     console.log(data, "login payload")
     loginMutation.mutate(data, {
       onSuccess: (response) => {
-        router.replace('/(tabs)'); 
+        router.replace('/onBoardingScreen/OnBoardingStep'); 
       },
       onError: (error: any) => {
         const serverMsg = error?.response?.data?.error?.message || "Something went wrong";
@@ -79,7 +79,7 @@ export default function Login() {
           style={{ backgroundColor: 'rgba(255, 255, 255, 0.8)' }}
         >
           <View className="items-center justify-center p-8 bg-white rounded-3xl  border border-[#CCCECE]">
-            <ActivityIndicator size="large" color="#F6163C" />
+            <ActivityIndicator size="large" color=" " />
             <Text className="mt-4 font-bold text-lg text-slate-900">Logging In</Text>
             <Text className="text-slate-400 mt-1">Authenticating your account...</Text>
           </View>

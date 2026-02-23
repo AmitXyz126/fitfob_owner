@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Button } from '@/components/Button';
@@ -43,52 +43,48 @@ export default function OtpScreen() {
   const isOtpComplete = otp.every((digit) => digit !== '');
 
   const handleVerify = () => {
+    console.log("DEBUG: Email from params:", handleVerify);
     const otpString = otp.join('');
-    console.log('🚀 Verifying OTP:', { identifier: email, otp: otpString });
 
-    verifyMutation.mutate(
-      {
-        identifier: email as string,
-        otp: parseInt(otpString, 10),
+    if (otpString.length < 6) return;
+
+    // Email check safe handling
+    if (!email) {
+      Alert.alert("Error", "Email not found. Please go back and try again.");
+      return;
+    }
+
+    const finalPayload = {
+      identifier: (email as string).toLowerCase().trim(),
+      otp: otpString.trim(),
+    };
+    console.log('🚀 Mutating with:', finalPayload);
+
+    verifyMutation.mutate(finalPayload, {
+      onSuccess: (data) => {
+        console.log('✅ Screen Level Success:', data);
+       },
+      onError: (err: any) => {
+         const msg = err.response?.data?.error?.message || 'Verification Failed. Please check your OTP.';
+        Alert.alert("Error", msg);
       },
-      {
-        onSuccess: (data) => {
-          console.log('✅ OTP Match Success:', data);
-          router.push('/auth/Login');
-        },
-        onError: (error: any) => {
-          const serverError = error?.response?.data?.error?.message || error?.response?.data?.message;
-          console.error('❌ OTP Error:', serverError);
-
-          if (serverError?.toLowerCase().includes('expired')) {
-            alert('OTP has expired. Please click Resend.');
-            setTimer(0);
-          } else {
-            alert(serverError || 'Invalid OTP. Please try again.');
-          }
-
-          setOtp(['', '', '', '', '', '']);
-          inputRefs.current[0]?.focus();
-        },
-      }
-    );
+    });
   };
 
   const handleResend = () => {
     setTimer(60);
     setOtp(['', '', '', '', '', '']);
-    alert('New OTP sent to your email!');
+     Alert.alert('Success', 'New OTP sent to your email!');
   };
 
   return (
     <Container>
       {/* ---LOADING OVERLAY --- */}
       {verifyMutation.isPending && (
-        <View 
-          className="absolute inset-0 z-50 items-center justify-center" 
-          style={{ backgroundColor: 'rgba(255, 255, 255, 0.8)' }}
-        >
-          <View className="items-center justify-center p-8 bg-white rounded-3xl shadow-xl border border-slate-50">
+        <View
+          className="absolute inset-0 z-50 items-center justify-center"
+          style={{ backgroundColor: 'rgba(255, 255, 255, 0.8)' }}>
+          <View className="items-center justify-center rounded-3xl border border-slate-50 bg-white p-8 shadow-xl">
             <ActivityIndicator size="large" color="#F6163C" />
             <Text className="mt-4 font-bold text-lg text-slate-900">Verifying...</Text>
           </View>
@@ -155,7 +151,7 @@ export default function OtpScreen() {
           </View>
 
           <View className="mb-4 mt-auto pt-10">
-            <Button 
+            <Button
               title={verifyMutation.isPending ? 'Verifying...' : 'Continue'}
               onPress={handleVerify}
               disabled={!isOtpComplete || verifyMutation.isPending}

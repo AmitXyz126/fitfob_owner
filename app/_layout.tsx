@@ -8,7 +8,6 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
-
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="clubProfile" />
         <Stack.Screen name="ClubPhotosScreen" />
@@ -16,7 +15,6 @@ export default function RootLayout() {
         <Stack.Screen name="addBankAccount" />
         <Stack.Screen name="bankSummary" />
         <Stack.Screen name="payoutHistory" />
-
         <Stack.Screen name="ViewAllScreen" />
       </Stack>
     </QueryClientProvider>

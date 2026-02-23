@@ -11,13 +11,14 @@ import {
   Wallet,
   LogOut,
   SquarePen,
+  FileText,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Container } from '@/components/Container';
 import LineGradient from '@/components/lineGradient/LineGradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
-
+ 
 const ClubProfileScreen = () => {
   const router = useRouter();
 
@@ -61,8 +62,8 @@ const ClubProfileScreen = () => {
       activeOpacity={onPress ? 0.7 : 1}
       className="flex-row items-center justify-between py-4">
       <View className="flex-1 flex-row items-center">
-        <View className="mr-4 rounded-xl bg-red-50 p-2">
-          <Icon size={20} color="#EF4444" />
+        <View className="mr-4 rounded-xl bg-[#E237441F] p-2">
+          <Icon  size={20} color="#EF4444"  />
         </View>
         <Text className="flex-1 font-medium text-base text-[#697281]" numberOfLines={1}>
           {title}
@@ -150,7 +151,7 @@ const ClubProfileScreen = () => {
         </View>
 
         {/* Menu Section */}
-        <View className="mb-16 rounded-3xl bg-white px-4 py-2">
+        <View className="mb-16 rounded-3xl bg- px-4 py-2">
           {/* --- DYNAMIC ADDRESS --- */}
           <MenuOption
             onPress={() => router.push('/ClubLocationScreen')}
@@ -174,6 +175,11 @@ const ClubProfileScreen = () => {
           />
           <LineGradient />
 
+          <MenuOption
+            icon={FileText}
+            title="Documents"
+          />
+          <LineGradient />
           <MenuOption icon={Clock} title="Timings" />
           <LineGradient />
 
