@@ -168,8 +168,7 @@ export default function CheckinsScreen() {
                   className="mb-4 h-24 w-24 rounded-[6px]"
                   resizeMode="cover"
                 />
-
-                {/* Name and Blue/Green Tick Row */}
+            {/* Name and Blue/Green Tick Row */}
                 <View className="flex-row justify-center gap-1">
                   <Text className="font-bold text-xl text-slate-900">Amit Singh</Text>
                   <Image
@@ -192,7 +191,7 @@ export default function CheckinsScreen() {
                 <TouchableOpacity
                   onPress={() => bottomSheetRef.current?.close()}
                   activeOpacity={0.8}
-                  className="mt-10 w-full items-center rounded-2xl bg-[#F6163C] py-4  ">
+                  className="mt-10 w-full items-center rounded-2xl bg-[#F6163C] py-4">
                   <Text className="font-bold text-lg text-white">Done</Text>
                 </TouchableOpacity>
               </View>
@@ -209,11 +208,12 @@ export default function CheckinsScreen() {
 
                 {/* Text Section */}
                 <Text className="font-bold font-sans text-2xl text-[#FC383A]">
-                  Check-in Failed!
+                   Check-in Failed!
                 </Text>
                 <Text className="mt-1 text-center font-sans text-xs font-normal text-[#697281]">
                   invalid OR code. Please try again
-                </Text>
+                </Text> 
+                
 
                 <TouchableOpacity
                   onPress={() => bottomSheetRef.current?.close()}

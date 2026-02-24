@@ -95,7 +95,7 @@ const OnBoarding3 = () => {
 
         {/* --- TYPE OF FITNESS CLUB --- */}
         <View className="mb-6">
-          <Text className="mb-2 ml-1 font-bold text-xs  text-slate-400">
+          <Text className="mb-2 ml-1 font-normal font-sans text-sm text-[#697281]">
             Type of Fitness club
           </Text>
           {['Gym', 'Yoga', 'Pilates', 'Dance', 'Other'].map((item) => (
@@ -110,7 +110,7 @@ const OnBoarding3 = () => {
 
         {/* --- AMENITIES --- */}
         <View className="mb-6">
-          <Text className="mb-2 ml-1 font-bold text-xs  tracking-wider text-slate-400">
+          <Text className="mb-2 ml-1 font-normal font-sans text-sm text-[#697281]">
             Amenities
           </Text>
           {['Parking', 'Wi-Fi', 'Showers', 'AC', 'Trainers'].map((item) => (
@@ -125,7 +125,7 @@ const OnBoarding3 = () => {
 
         {/* --- TIMINGS SECTION --- */}
         <View className="mb-10">
-          <Text className="mb-4 ml-1 font-bold text-xs  tracking-wider text-slate-400">
+          <Text className="mb-2 ml-1 font-normal font-sans text-sm text-[#697281]">
             Timings
           </Text>
 

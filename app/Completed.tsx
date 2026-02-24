@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { Button } from '@/components/Button';
 import { Container } from '@/components/Container';
 
-const OnBoarding5 = () => {
+const Completed = () => {
   return (
     <Container>
       <View className="flex-1 items-center justify-center bg-white">
@@ -32,4 +32,4 @@ const OnBoarding5 = () => {
   );
 };
 
-export default OnBoarding5;
+export default Completed;

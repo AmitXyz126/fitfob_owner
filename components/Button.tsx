@@ -4,7 +4,7 @@ import { Text, TouchableOpacity, TouchableOpacityProps, View } from 'react-nativ
 type ButtonProps = {
   title: string;
   variant?: 'primary' | 'secondary';
-  icon?: ReactNode; // Icon prop yahan hona chahiye
+  icon?: ReactNode;  
 } & TouchableOpacityProps;
 
 export const Button = forwardRef<View, ButtonProps>(
@@ -18,8 +18,7 @@ export const Button = forwardRef<View, ButtonProps>(
         ref={ref}
         activeOpacity={0.7}
         {...touchableProps} 
-        // flex-row aur items-center zaruri hai icon ko text ke sath dikhane ke liye
-        className={`flex-row items-center justify-center rounded-2xl p-4 w-full ${
+         className={`flex-row items-center justify-center rounded-2xl p-4 w-full ${
           isDisabled 
             ? 'bg-[#E5E7EB]' 
             : isSecondary 
@@ -27,8 +26,7 @@ export const Button = forwardRef<View, ButtonProps>(
               : 'bg-[#F6163C]'
         } ${touchableProps.className}`}
       >
-        {/* --- YAHAN ICON RENDER HOGA --- */}
-        {icon && (
+         {icon && (
           <View className="mr-2">
             {icon}
           </View>

@@ -10,7 +10,7 @@ import { useVerifyOtp } from '@/hooks/useAuth';
 export default function OtpScreen() {
   const router = useRouter();
   const { email } = useLocalSearchParams();
-  const verifyMutation = useVerifyOtp();
+  const {mutate: verifyMutation, isPending} = useVerifyOtp();
 
   const [timer, setTimer] = useState(60);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -43,7 +43,7 @@ export default function OtpScreen() {
   const isOtpComplete = otp.every((digit) => digit !== '');
 
   const handleVerify = () => {
-    console.log("DEBUG: Email from params:", handleVerify);
+    console.log("DEBUG: Email from params:", email);
     const otpString = otp.join('');
 
     if (otpString.length < 6) return;
@@ -60,7 +60,7 @@ export default function OtpScreen() {
     };
     console.log('🚀 Mutating with:', finalPayload);
 
-    verifyMutation.mutate(finalPayload, {
+    verifyMutation(finalPayload, {
       onSuccess: (data) => {
         console.log('✅ Screen Level Success:', data);
        },
@@ -80,7 +80,7 @@ export default function OtpScreen() {
   return (
     <Container>
       {/* ---LOADING OVERLAY --- */}
-      {verifyMutation.isPending && (
+      {isPending && (
         <View
           className="absolute inset-0 z-50 items-center justify-center"
           style={{ backgroundColor: 'rgba(255, 255, 255, 0.8)' }}>
@@ -152,9 +152,9 @@ export default function OtpScreen() {
 
           <View className="mb-4 mt-auto pt-10">
             <Button
-              title={verifyMutation.isPending ? 'Verifying...' : 'Continue'}
+              title={isPending ? 'Verifying...' : 'Continue'}
               onPress={handleVerify}
-              disabled={!isOtpComplete || verifyMutation.isPending}
+              disabled={!isOtpComplete || isPending}
             />
           </View>
         </View>

@@ -1,31 +1,49 @@
- import { View, Text, TextInput, TouchableOpacity } from 'react-native';
+import React from 'react';
+import { View, Text, TextInput, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-const OnBoarding2_Details = () => {
+ 
+interface OnBoarding2DetailsProps {
+  onBack: () => void;
+}
+ 
+const OnBoarding2_Details = ({ onBack }: OnBoarding2DetailsProps) => {
   return (
     <View className="flex-1 bg-white">
-      <Text className="text-[24px] font-bold text-[#1C1C1C]  font-sans mb-6">Add your location details</Text>
+      <Text className="text-[24px] font-bold text-[#1C1C1C] mb-6">Add your location details</Text>
 
       {/* Selected Location Card */}
       <View className="flex-row items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 mb-6">
         <View className="flex-1 pr-4">
           <Text className="font-bold text-slate-900">CP67 Mall Mohali</Text>
-          <Text className="text-slate-500 text-xs mt-1" numberOfLines={1}>International Airport Road, Sector 67, Mohali...</Text>
+          <Text className="text-slate-500 text-xs mt-1" numberOfLines={1}>
+            International Airport Road, Sector 67, Mohali...
+          </Text>
         </View>
-        <TouchableOpacity className="bg-white px-3 py-1 rounded-full border border-slate-200">
+        
+        {/* 3. Change button par onBack connect kiya */}
+        <TouchableOpacity 
+          onPress={onBack}
+          activeOpacity={0.7}
+          className="bg-white px-3 py-1 rounded-full border border-slate-200"
+        >
           <Text className="text-slate-500 text-xs font-bold">Change</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Form Fields */}
+      {/* Form Fields - Design same rakha hai */}
       <View className="space-y-5">
         <View>
           <Text className="text-[#697281] text-sm font-normal mb-2 ml-1">Address details*</Text>
-          <TextInput placeholder="Building Name" className="h-14 border border-slate-200 rounded-2xl px-4 bg-white" />
+          <TextInput 
+            placeholder="Building Name" 
+            placeholderTextColor="#94A3B8"
+            className="h-14 border border-slate-200 rounded-2xl px-4 bg-white text-slate-900" 
+          />
         </View>
 
         <View>
-          <Text className="text-[#697281] text-sm font-normal  mb-2 ml-1 mt-3">City</Text>
+          <Text className="text-[#697281] text-sm font-normal mb-2 ml-1 mt-3">City</Text>
           <View className="h-14 border border-slate-200 rounded-2xl px-4 flex-row items-center justify-between bg-white">
             <Text className="text-slate-900">Mohali</Text>
             <Ionicons name="chevron-down" size={18} color="#64748B" />
@@ -42,7 +60,12 @@ const OnBoarding2_Details = () => {
 
         <View>
           <Text className="text-[#697281] text-sm font-normal mb-2 ml-1 mt-3">Pincode</Text>
-          <TextInput placeholder="160067" keyboardType="numeric" className="h-14 border border-slate-200 rounded-2xl px-4 bg-white" />
+          <TextInput 
+            placeholder="160067" 
+            placeholderTextColor="#94A3B8"
+            keyboardType="numeric" 
+            className="h-14 border border-slate-200 rounded-2xl px-4 bg-white text-slate-900" 
+          />
         </View>
       </View>
     </View>

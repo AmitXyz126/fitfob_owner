@@ -1,173 +1,158 @@
- import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import React, { useState, useRef } from 'react';
+import { View, Text, Image, TouchableOpacity } from 'react-native';
+import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 
-const OnBoarding2_Part2 = () => {
-   const [region, setRegion] = useState({
+const GOOGLE_API_KEY = 'YOUR_GOOGLE_API_KEY'; 
+
+ interface OnBoarding2Props {
+  onConfirm: () => void;
+}
+
+ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
+  const [region, setRegion] = useState({
     latitude: 30.6791,
     longitude: 76.7303,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
+    latitudeDelta: 0.005,
+    longitudeDelta: 0.005,
   });
 
-   const [locationInfo, setLocationInfo] = useState({
-    name: "CP67 Mall Mohali",
-    address: "International Airport Road, Sector 67, Sahibzada Ajit Singh Nagar, Punjab 160062, India.(CP67 Mall)"
+  const [locationInfo, setLocationInfo] = useState({
+    name: 'CP67 Mall Mohali',
+    address: 'International Airport Road, Sector 67, Punjab',
   });
 
   const mapRef = useRef<MapView>(null);
+  const autoCompleteRef = useRef<any>(null);
 
-   const handleLocationSelect = (data: any, details: any = null) => {
-    if (details) {
-      const { lat, lng } = details.geometry.location;
-      
-      const newRegion = {
-        latitude: lat,
-        longitude: lng,
-        latitudeDelta: 0.005,
-        longitudeDelta: 0.005,
-      };
+  const getAddressFromCoords = async (lat: number, lng: number) => {
+    try {
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_API_KEY}`
+      );
+      const data = await response.json();
+      if (data.results.length > 0) {
+        const address = data.results[0].formatted_address;
+        const name = data.results[0].address_components[1]?.long_name || 'Selected Location';
 
-      setRegion(newRegion);
-      mapRef.current?.animateToRegion(newRegion, 1000);
-
-      // Card update logic
-      setLocationInfo({
-        name: data.structured_formatting?.main_text || "Selected Location",
-        address: details.formatted_address
-      });
+        autoCompleteRef.current?.setAddressText(address);
+        setLocationInfo({ name, address });
+      }
+    } catch (error) {
+      console.error('Reverse Geocode Error:', error);
     }
   };
 
-  return (
-    <View style={{ flex: 1, backgroundColor: 'white' }}>
-      <Text className="text-[26px] font-bold text-slate-900 mb-4">
-        Fill your location
-      </Text>
+  const onRegionChangeComplete = (newRegion: any) => {
+    setRegion(newRegion);
+    getAddressFromCoords(newRegion.latitude, newRegion.longitude);
+  };
 
-      {/* --- SEARCH BAR (Google Autocomplete) --- */}
-      <View style={styles.searchWrapper}>
+  return (
+    <View className="flex-1 bg-white px-1">
+      <Text className="mb-4 font-bold text-[26px] text-slate-900">Fill your location</Text>
+
+      {/* --- SEARCH BAR --- */}
+      <View className="relative z-[100] mb-4">
         <GooglePlacesAutocomplete
-          placeholder="Search Location"
+          ref={autoCompleteRef}
+          placeholder="Search for your gym area..."
           fetchDetails={true}
-          onPress={handleLocationSelect}
-          query={{
-            key: 'YOUR_GOOGLE_API_KEY',  
-            language: 'en',
+          onPress={(data, details = null) => {
+            if (details) {
+              const { lat, lng } = details.geometry.location;
+              const newRegion = {
+                latitude: lat,
+                longitude: lng,
+                latitudeDelta: 0.005,
+                longitudeDelta: 0.005,
+              };
+              mapRef.current?.animateToRegion(newRegion, 1000);
+              setLocationInfo({
+                name: data.structured_formatting?.main_text || 'Selected',
+                address: details.formatted_address,
+              });
+            }
           }}
+          query={{ key: GOOGLE_API_KEY, language: 'en' }}
           renderRightButton={() => (
-            <View style={{ justifyContent: 'center', paddingRight: 10 }}>
-              <Ionicons name="search-outline" size={22} color="#94A3B8" />
-            </View>
+            <TouchableOpacity className="absolute right-0 h-[56px] justify-center pr-4">
+              <Ionicons name="search" size={20} color="#94A3B8" />
+            </TouchableOpacity>
           )}
           styles={{
             container: { flex: 0 },
-            textInput: styles.searchTextInput,
-            listView: styles.searchListView,
+            textInput: {
+              height: 56,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: '#E2E8F0',
+              paddingLeft: 16,
+              paddingRight: 45,
+              color: '#475569',
+              fontSize: 15,
+            },
+            listView: { backgroundColor: 'white', zIndex: 1000, elevation: 5, borderRadius: 12 },
           }}
         />
       </View>
 
       {/* --- MAP SECTION --- */}
-      <View style={styles.mapContainer}>
+      <View className="relative z-10 h-[420px] w-full overflow-hidden rounded-3xl border border-slate-200 bg-gray-100">
         <MapView
           ref={mapRef}
           provider={PROVIDER_GOOGLE}
-          style={styles.map} 
+          style={{ width: '100%', height: '100%' }}
           initialRegion={region}
-        >
-          <Marker coordinate={{ latitude: region.latitude, longitude: region.longitude }}>
-             <Image 
-                source={{ uri: 'https://cdn-icons-png.flaticon.com/512/684/684908.png' }} 
-                style={{ width: 40, height: 40 }} 
-                tintColor="#F6163C"
-             />
-          </Marker>
-        </MapView>
+          onRegionChangeComplete={onRegionChangeComplete}
+        />
 
-        <TouchableOpacity style={styles.currentLocBtn}>
+        <View className="absolute left-1/2 top-1/2 -ml-5 -mt-10 items-center justify-center" pointerEvents="none">
+          <Image
+            source={{ uri: 'https://cdn-icons-png.flaticon.com/512/684/684908.png' }}
+            className="h-10 w-10"
+            tintColor="#F6163C"
+          />
+          <View className="mt-[-2px] h-2 w-2 rounded-full bg-black/20" />
+        </View>
+
+        <TouchableOpacity className="absolute bottom-4 right-4 flex-row items-center rounded-xl bg-white px-3 py-2 shadow-lg" style={{ elevation: 5 }}>
           <MaterialIcons name="my-location" size={18} color="#F6163C" />
-          <Text style={{ marginLeft: 5, fontWeight: '600', color: '#64748B', fontSize: 12 }}>
-            Current Location
-          </Text>
+          <Text className="ml-1 font-semibold text-[12px] text-slate-500">Current Location</Text>
         </TouchableOpacity>
       </View>
 
-      {/* --- ADDRESS DETAILS CARD (Dynamic Data) --- */}
-      <View className="mt-4 p-4 border border-slate-100 rounded-3xl bg-white shadow-sm shadow-slate-200">
-        <View className="flex-row justify-between items-start mb-2">
-          <View className="flex-row items-center flex-1">
-             <View className="bg-red-50 p-2 rounded-full mr-2">
-                <MaterialIcons name="location-on" size={20} color="#F6163C" />
-             </View>
-             <Text className="font-bold text-slate-900 text-[16px] flex-1" numberOfLines={1}>
-               {locationInfo.name}
-             </Text>
+      {/* --- INFO CARD --- */}
+      <View className="mt-4 rounded-[24px] border border-slate-100 bg-white p-5 shadow-sm shadow-slate-300">
+        <View className="mb-2 flex-row items-center justify-between">
+          <View className="flex-1 flex-row items-center pr-2">
+            <View className="mr-2 rounded-full bg-red-50 p-1.5">
+              <MaterialIcons name="location-on" size={18} color="#F6163C" />
+            </View>
+            <Text className="font-bold text-[16px] text-slate-800" numberOfLines={1}>
+              {locationInfo.name}
+            </Text>
           </View>
-          <TouchableOpacity className="bg-slate-100 px-3 py-1 rounded-full">
-            <Text className="text-slate-500 text-xs font-bold">Change</Text>
+
+          <TouchableOpacity onPress={() => autoCompleteRef.current?.focus()} className="rounded-full bg-slate-100 px-3 py-1.5">
+            <Text className="font-semibold text-[12px] text-slate-500">Change</Text>
           </TouchableOpacity>
         </View>
-        
-        <Text className="text-slate-400 text-[13px] leading-5 ml-10">
+
+        <Text className="mb-4 ml-8 text-[13px] leading-5 text-slate-500" numberOfLines={3}>
           {locationInfo.address}
         </Text>
+
+         <TouchableOpacity
+          onPress={onConfirm}
+          activeOpacity={0.8}
+          className="w-full items-center justify-center rounded-xl bg-[#F6163C] py-4">
+          <Text className="font-bold text-[16px] text-white">Confirm & Proceed</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  searchWrapper: {
-    zIndex: 100,  
-    marginBottom: 16,
-  },
-  searchTextInput: {
-    height: 56,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 16,
-    fontSize: 15,
-    color: '#475569',
-    backgroundColor: '#FFFFFF',
-  },
-  searchListView: {
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    marginTop: 5,
-    backgroundColor: 'white',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-  },
-  mapContainer: {
-    height: 350,
-    width: '100%',
-    borderRadius: 24,
-    overflow: 'hidden',
-    position: 'relative',
-    zIndex: 1,
-  },
-  map: { flex: 1 },
-  currentLocBtn: {
-    position: 'absolute',
-    bottom: 15,
-    right: 15,
-    backgroundColor: 'white',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-  }
-});
 
 export default OnBoarding2_Part2;

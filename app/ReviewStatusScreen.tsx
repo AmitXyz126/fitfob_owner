@@ -4,11 +4,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { Button } from '@/components/Button';
 import { router } from 'expo-router';
 
-export default function ReviewStatusScreen() {
+export default function ReviewStatusScreen({navigation}:any) {
   return (
     <Container style={{ flex: 1 }}>
       {/* Back Button */}
-      <TouchableOpacity className="ml-2 mt-5 p-2">
+    <TouchableOpacity 
+        className="ml-2 mt-5 p-2 w-10" 
+        onPress={() => navigation.goBack()} 
+        activeOpacity={0.7}
+      >
         <Ionicons name="chevron-back" size={24} color="#CBD5E1" />
       </TouchableOpacity>
 
@@ -32,7 +36,7 @@ export default function ReviewStatusScreen() {
       </View>
 
       <View className="mb-6 px-6">
-        <Button title="Done" onPress={() => router.replace('/OnBoarding5')} />
+        <Button title="Done" onPress={() => router.replace('/Completed')} />
       </View>
     </Container>
   );
