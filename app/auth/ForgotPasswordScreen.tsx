@@ -1,22 +1,27 @@
- import React from 'react';
-import { View, Text, TextInput,  } from 'react-native';
+import React from 'react';
+import { View, Text, TextInput, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
- import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/Button';
 import { Container } from '@/components/Container';
 import { KeyboardAwareScrollView } from '@pietile-native-kit/keyboard-aware-scrollview';
+ import { useForgotSendOtp } from '@/hooks/useAuth';
 
-// 1. Validation Schema
-const forgotPasswordSchema = z.object({
-  email: z.string().min(1, 'Email or Phone is required'),
+ const forgotPasswordSchema = z.object({
+  email: z.string()
+    .min(1, 'Email is required')
+    .email('Please enter a valid email address'),
 });
 
 type ForgotFormData = z.infer<typeof forgotPasswordSchema>;
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
+  
+  // --- ADDED: Mutation Hook ---
+  const { mutate: sendOtp, isPending } = useForgotSendOtp();
 
   const {
     control,
@@ -28,24 +33,37 @@ export default function ForgotPasswordScreen() {
   });
 
   const onSubmit = (data: ForgotFormData) => {
-    console.log('🚀 Redirecting to Verify Screen for:', data.email);
- 
-    router.push({
-      pathname: '/auth/VerifyCode',  
-      params: { email: data.email }
-    });
+    // --- FIXED: Hook call with proper navigation on success ---
+    sendOtp(
+      { identifier: data.email.toLowerCase().trim() }, 
+      {
+        onSuccess: () => {
+          router.push({
+            pathname: '/auth/VerifyCode',  
+            params: { email: data.email.toLowerCase().trim() }
+          });
+        },
+      }
+    );
   };
 
   return (
     <Container>
+      {/* --- LOADING OVERLAY --- */}
+      {isPending && (
+        <View
+          className="absolute inset-0 z-50 items-center justify-center"
+          style={{ backgroundColor: 'rgba(255, 255, 255, 0.7)' }}>
+          <ActivityIndicator size="large" color="#F6163C" />
+        </View>
+      )}
+
       <KeyboardAwareScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ flexGrow: 1 }}
         keyboardShouldPersistTaps="handled"
       >
         <View className="flex-1 ">
-        
-
           {/* Title Section */}
           <View className="mt-8">
             <Text 
@@ -65,7 +83,7 @@ export default function ForgotPasswordScreen() {
           {/* Input Section */}
           <View className="mt-10">
             <Text className="mb-2 ml-1 text-sm text-slate-400 font-medium">
-              Email or Phone number
+              Email Address
             </Text>
             <Controller
               control={control}
@@ -85,6 +103,7 @@ export default function ForgotPasswordScreen() {
                     className="h-full text-slate-900 text-base"
                     autoCapitalize="none"
                     keyboardType="email-address"
+                    editable={!isPending} 
                   />
                 </View>
               )}
@@ -102,8 +121,9 @@ export default function ForgotPasswordScreen() {
           {/* Action Button */}
           <View className="mb-6">
             <Button
-              title="Reset Password"
+              title={isPending ? "Sending..." : "Reset Password"}
               onPress={handleSubmit(onSubmit)}
+              disabled={isPending}
             />
           </View>
         </View>

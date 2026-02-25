@@ -18,12 +18,17 @@ import { useSignupRequest } from '@/hooks/useAuth';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import Toast from 'react-native-toast-message';
 
 WebBrowser.maybeCompleteAuthSession();
 
 const signupSchema = z
   .object({
-    identifier: z.string().min(1, 'Email/Phone is required').email('Invalid email format'),
+    identifier: z.string().min(1, 'Email or Phone is required').refine((val) => {
+      const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+      const isPhone = /^\+?[0-9]{10,15}$/.test(val);
+      return isEmail || isPhone;
+    }, 'Please enter a valid email or phone number'),
     password: z.string().min(6, 'Password must be at least 6 characters'),
     confirmPassword: z.string().min(1, 'Please confirm your password'),
   })
@@ -59,26 +64,51 @@ export default function SignUp() {
       identifier: data.identifier.toLowerCase().trim(),
       password: data.password,
       confirmPassword: data.confirmPassword,
-      role: 'ClubOwner', 
+      role: 'Client', // Reverted to Client as per working Postman example
     };
+
     signupMutation.mutate(payload, {
-      onSuccess: (response) => {
+      onSuccess: (responseData) => {
+        console.log('✅ Signup Success:', responseData);
+
+        if (!responseData?.signupToken) {
+          Toast.show({
+            type: 'error',
+            text1: 'Critical Error',
+            text2: 'Session token not received. Please try again.',
+          });
+          return;
+        }
+
+        Toast.show({
+          type: 'success',
+          text1: 'OTP Sent!',
+          text2: responseData.message || 'Please check your email/phone.',
+        });
+
         router.push({
           pathname: '/auth/OtpScreen',
-          params: { email: data.identifier },
+          params: { 
+            email: payload.identifier, 
+            signupToken: responseData.signupToken 
+          },
         });
       },
       onError: (error: any) => {
-        const serverMessage =
-          error?.response?.data?.error?.message || error?.response?.data?.message || '';
+        const serverMessage = error?.response?.data?.message || error?.response?.data?.error?.message || error?.message;
 
-        if (serverMessage.toLowerCase().includes('already exists')) {
-          setError('identifier', {
-            type: 'manual',
-            message: 'This email is already registered',
+        if (error.message.includes('502') || error.message.toLowerCase().includes('network error')) {
+          Toast.show({
+            type: 'error',
+            text1: 'Server Error',
+            text2: 'Bad Gateway (502) or Network Error.',
           });
         } else {
-          alert(serverMessage || 'Signup failed');
+          Toast.show({
+            type: 'error',
+            text1: 'Signup Failed',
+            text2: serverMessage || 'Something went wrong. Please try again.',
+          });
         }
       },
     });
@@ -142,7 +172,7 @@ export default function SignUp() {
                     value={value}
                     editable={!isLoading}
                     className="h-full text-darkText"
-                    keyboardType="email-address"
+                    keyboardType="default"
                     autoCapitalize="none"
                   />
                 </View>

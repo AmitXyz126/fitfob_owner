@@ -204,7 +204,7 @@ const EditClubDetails = () => {
         </ScrollView>
 
         {/* BOTTOM BUTTONS */}
-        <View className="flex-row gap-3 border-t border-slate-100 bg-white px-6 py-4">
+        <View className="flex-row gap-3   bg-white px-6 py-4">
           <View className="flex-1">
             <Button title={'Save Changes'} onPress={() => Alert.alert('Success', 'Details updated!')} />
           </View>

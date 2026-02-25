@@ -95,9 +95,9 @@ const ClubPhotosScreen = () => {
         <View className="mt-6">
           <Text className="font-bold text-gray-800">Tips for high quality photos</Text>
           <View className="mt-3">
-            <Text className="text-xs text-gray-500 mb-1">• Upload exactly 6 photos to showcase all facilities.</Text>
-            <Text className="text-xs text-gray-500 mb-1">• High-quality images attract more members.</Text>
-            <Text className="text-xs text-gray-500">• Cover gym area, reception, and changing rooms.</Text>
+            <Text className="text-xs text-[#697281] font-sans font-normal leading-4 mb-1">• Upload exactly 6 photos to showcase all facilities.</Text>
+            <Text className="text-xs text-[#697281] font-sans font-normal leading-4 mb-1">• High-quality images attract more members.</Text>
+            <Text className="text-xs text-[#697281] font-sans font-normal leading-4 mb-1">• Cover gym area, reception, and changing rooms.</Text>
           </View>
         </View>
       </ScrollView>

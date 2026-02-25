@@ -1,8 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const storageAPI = {
-  // Data save karne ke liye (Login ke time)
-  setItem: async (key: string, value: string, ttlMinutes?: number) => {
+   setItem: async (key: string, value: string, ttlMinutes?: number) => {
     try {
       await AsyncStorage.setItem(key, value);
     } catch (e) {
@@ -10,8 +9,7 @@ export const storageAPI = {
     }
   },
 
-  // Data wapas nikalne ke liye (App open hote waqt)
-  getItem: async (key: string) => {
+   getItem: async (key: string) => {
     try {
       const value = await AsyncStorage.getItem(key);
       return value;
@@ -21,8 +19,7 @@ export const storageAPI = {
     }
   },
 
-  // Data delete karne ke liye (Logout ke time)
-  removeItem: async (key: string) => {
+   removeItem: async (key: string) => {
     try {
       await AsyncStorage.removeItem(key);
     } catch (e) {
