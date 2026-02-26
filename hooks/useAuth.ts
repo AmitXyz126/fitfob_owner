@@ -16,9 +16,6 @@ import Toast from 'react-native-toast-message';
 export const useSignupRequest = () => {
   return useMutation({
     mutationFn: signupStep1Api,
-    onError: (error: any) => {
-      console.error('❌ Signup Error:', error.response?.data || error.message);
-    },
   });
 };
 
@@ -110,7 +107,7 @@ export const useLoginRequest = () => {
         };
 
         setUser(userWithToken, true);
-        router.replace('/(tabs)');
+        router.replace('/onBoardingScreen/OnBoardingStep');
       }
     },
     onError: (error: any) => {

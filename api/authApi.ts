@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { ENDPOINTS } from './endpoint';
+ 
 
 const api = axios.create({
   headers: {
@@ -7,6 +8,7 @@ const api = axios.create({
     Accept: 'application/json',
   },
 });
+// Auth API Functions 
 
 // 1. Signup
 export const signupStep1Api = async (payload: any) => {
@@ -21,12 +23,11 @@ export const signupStep1Api = async (payload: any) => {
 
 // 2. Resend OTP
 
-// --- FIXED: Added signupToken in payload ---
 export const resendOtpApi = async (payload: { identifier: string; signupToken: string }) => {
   try {
     const response = await api.post(ENDPOINTS.RESENDOTP, {
       identifier: payload.identifier.toLowerCase().trim(),
-      signupToken: payload.signupToken, 
+      signupToken: payload.signupToken,
     });
     return response.data;
   } catch (error: any) {
@@ -42,7 +43,6 @@ export const verifyOtpApi = async (payload: any) => {
       identifier: payload.identifier.toLowerCase().trim(),
       otp: payload.otp.toString(),
       signupToken: payload.signupToken,
-
     });
 
     const response = await api.post(ENDPOINTS.VERIFY_OTP, {
@@ -75,6 +75,9 @@ export const loginUserApi = async (payload: any) => {
   }
 };
 
+
+// Forgot password APIs Flow 
+
 // 1. Send OTP (Forgot Password)
 export const forgotSendOtpApi = async (payload: { identifier: string }) => {
   const response = await api.post(ENDPOINTS.FORGOT_SEND_OTP, {
@@ -100,13 +103,13 @@ export const forgotVerifyOtpApi = async (payload: { identifier: string; otp: str
 
   const response = await api.post(ENDPOINTS.FORGOT_VERIFY_OTP, {
     identifier: payload.identifier.toLowerCase().trim(),
-    otp: String(payload.otp).trim(),  
+    otp: String(payload.otp).trim(),
   });
   return response.data;
 };
 
 // 4. set Password
- 
+
 export const resetPasswordApi = async (payload: any) => {
   try {
     const finalPayload = {

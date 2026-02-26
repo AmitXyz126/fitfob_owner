@@ -1,16 +1,42 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useState } from 'react';
+import React, { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Image } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { Container } from '../Container';
 
-const OnBoarding1 = () => {
-  const [clubName, setClubName] = useState('Lois');
-  const [ownerName, setOwnerName] = useState('Rohan Mehta');
+const OnBoarding1 = forwardRef(({ initialData }: any, ref) => {
+  // Hardcoded values hata kar empty string kar di hain
+  const [clubName, setClubName] = useState('');
+  const [ownerName, setOwnerName] = useState('');
   const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('Loisbecket@gmail.com');
+  const [email, setEmail] = useState('');
   const [image, setImage] = useState<string | null>(null);
+
+  // Jab bhi initialData change ho (backend se aaye ya parent se), state update karo
+  useEffect(() => {
+    if (initialData) {
+      setClubName(initialData.clubName || '');
+      setOwnerName(initialData.ownerName || '');
+      setPhone(initialData.phoneNumber || '');
+      setEmail(initialData.email || '');
+      // Agar backend se image URL aa raha hai
+      if (initialData.logoUrl) {
+        setImage(initialData.logoUrl);
+      }
+    }
+  }, [initialData]);
+
+  useImperativeHandle(ref, () => ({
+    getFormData: () => {
+      return {
+        clubName,
+        ownerName,
+        phone,
+        email,
+        image, 
+      };
+    },
+  }));
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -28,7 +54,7 @@ const OnBoarding1 = () => {
     <>
       <Text className="mb-8 font-bold text-[24px] text-[#1C1C1C]">Fill your club details</Text>
 
-       <View className="mb-10 items-center">
+      <View className="mb-10 items-center">
         <TouchableOpacity onPress={pickImage} activeOpacity={0.8} className="relative">
           <View
             style={{ borderStyle: 'dashed' }}
@@ -37,21 +63,17 @@ const OnBoarding1 = () => {
               <Image source={{ uri: image }} className="h-full w-full" />
             ) : (
               <View className="items-center justify-center">
-                {/* Custom placeholder icon using Ionicons */}
                 <Ionicons name="images-outline" size={48} color="#FFC1C1" />
               </View>
             )}
           </View>
-          {/* Red Camera Floating Button */}
           <View className="absolute bottom-1 right-2 h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-[#F6163C]">
             <MaterialIcons name="photo-camera" size={18} color="white" />
           </View>
         </TouchableOpacity>
       </View>
 
-      {/* INPUT SECTION */}
       <View className="space-y-4">
-        {/* GYM/CLUB NAME */}
         <View>
           <Text className="mb-2 ml-1 font-medium text-[13px] text-slate-500">Gym/ Club Name</Text>
           <TextInput
@@ -65,7 +87,6 @@ const OnBoarding1 = () => {
 
         <Text className="mb-2 mt-4 font-bold text-[16px] text-[#1C1C1C]">Owner’s details</Text>
 
-        {/* OWNER NAME */}
         <View>
           <Text className="mb-2 ml-1 font-medium text-[13px] text-slate-500">Owner’s name</Text>
           <TextInput
@@ -77,9 +98,10 @@ const OnBoarding1 = () => {
           />
         </View>
 
-        {/* PHONE NUMBER */}
         <View>
-          <Text className="mb-2 ml-1 mt-4 font-medium text-[13px] text-slate-500">Phone Number</Text>
+          <Text className="mb-2 ml-1 mt-4 font-medium text-[13px] text-slate-500">
+            Phone Number
+          </Text>
           <View className="h-14 w-full flex-row items-center rounded-xl border border-slate-200 bg-white px-3">
             <View className="mr-3 h-6 flex-row items-center border-r border-slate-200 pr-3">
               <Image
@@ -100,7 +122,6 @@ const OnBoarding1 = () => {
           </View>
         </View>
 
-        {/* EMAIL ADDRESS */}
         <View className="mb-6 mt-4">
           <Text className="mb-2 ml-1 font-medium text-[13px] text-slate-500">Email Address</Text>
           <TextInput
@@ -115,6 +136,6 @@ const OnBoarding1 = () => {
       </View>
     </>
   );
-};
+});
 
 export default OnBoarding1;

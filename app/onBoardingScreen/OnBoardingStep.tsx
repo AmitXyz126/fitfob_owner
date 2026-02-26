@@ -5,12 +5,13 @@ import OnBoarding2_Part2 from '@/components/screen/OnBoarding2';
 import OnBoarding2_Details from '@/components/screen/OnBoarding2_Details';
 import OnBoarding3 from '@/components/screen/OnBoarding3';
 import OnBoarding4 from '@/components/screen/OnBoarding4';
-import OnBoarding4_List from '@/components/screen/OnBoarding4_List'; 
+import OnBoarding4_List from '@/components/screen/OnBoarding4_List';
 import OnBoarding5 from '@/components/screen/OnBoarding5';
 import { KeyboardAwareScrollView } from '@pietile-native-kit/keyboard-aware-scrollview';
 import { useRouter } from 'expo-router';
-import { useState, useRef } from 'react';  
+import { useState, useRef, useEffect } from 'react'; // useEffect add kiya sync ke liye
 import { TouchableOpacity, View } from 'react-native';
+import { useUserDetail } from '@/hooks/useUserDetail';
 
 export default function OnBoardingStep() {
   const router = useRouter();
@@ -18,9 +19,41 @@ export default function OnBoardingStep() {
   const [subStep, setSubStep] = useState(1);
   const totalSteps = 5;
 
+  const onboarding1Ref = useRef<any>(null);
   const onboarding4Ref = useRef<any>(null);
 
+  // userData fetch kiya taaki current status pata chale
+  const { submitStep1, userData } = useUserDetail();
+
+  // --- Sync Logic: Agar backend pe step aage hai toh wahi dikhao ---
+  useEffect(() => {
+    if (userData?.currentStep && userData.currentStep > 1) {
+      setStep(userData.currentStep);
+    }
+  }, [userData]);
+
   const handleNext = () => {
+    // --- STEP 1: API HIT LOGIC ---
+    if (step === 1) {
+      const data = onboarding1Ref.current?.getFormData();
+
+      // Fix: Agar currentStep already > 1 hai, toh API hit mat karo, seedha aage badho
+      // Isse "Invalid step order" error nahi aayega
+      if (userData?.currentStep > 1) {
+        setStep(2);
+        setSubStep(1);
+        return;
+      }
+
+      submitStep1.mutate(data, {
+        onSuccess: () => {
+          setStep(2);
+          setSubStep(1);
+        },
+      });
+      return;
+    }
+
     // --- Step 2 Logic ---
     if (step === 2 && subStep === 1) {
       setSubStep(2);
@@ -30,15 +63,14 @@ export default function OnBoardingStep() {
     // --- Step 4 Logic ---
     if (step === 4) {
       if (subStep === 1) {
-         onboarding4Ref.current?.openModal();
+        onboarding4Ref.current?.openModal();
       } else {
-         setStep(5);
+        setStep(5);
         setSubStep(1);
       }
       return;
     }
 
-    // General Navigation
     if (step < totalSteps) {
       setStep(step + 1);
       setSubStep(1);
@@ -56,7 +88,6 @@ export default function OnBoardingStep() {
 
   return (
     <Container>
-      {/* 1. Progress Bar */}
       <View className="ios:mt-1 mt-4 flex-row justify-between bg-white pb-4 ">
         {[1, 2, 3, 4, 5].map((item) => {
           let bgColor =
@@ -84,38 +115,36 @@ export default function OnBoardingStep() {
         contentContainerStyle={{ flexGrow: 1 }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
-        
         <View className="mt-5 flex-1">
-          {step === 1 && <OnBoarding1 />}
-          
-          {step === 2 && (
-            subStep === 1 
-              ? <OnBoarding2_Part2 onConfirm={handleNext} /> 
-              : <OnBoarding2_Details onBack={() => setSubStep(1)} />
-          )}
-          
+          {/* initialData pass kiya taaki saved data dikhe */}
+          {step === 1 && <OnBoarding1 ref={onboarding1Ref} initialData={userData} />}
+
+          {step === 2 &&
+            (subStep === 1 ? (
+              <OnBoarding2_Part2 onConfirm={handleNext} />
+            ) : (
+              <OnBoarding2_Details onBack={() => setSubStep(1)} />
+            ))}
+
           {step === 3 && <OnBoarding3 />}
-          
-          {/* Step 4: Scanner OR List View */}
-          {step === 4 && (
-            subStep === 1 ? (
-              <OnBoarding4 
-                ref={onboarding4Ref} 
-                 onUploadDone={() => setSubStep(2)} 
-                onUploadSuccess={() => setSubStep(2)} 
+
+          {step === 4 &&
+            (subStep === 1 ? (
+              <OnBoarding4
+                ref={onboarding4Ref}
+                onUploadDone={() => setSubStep(2)}
+                onUploadSuccess={() => setSubStep(2)}
               />
             ) : (
               <OnBoarding4_List onAddMore={() => setSubStep(1)} />
-            )
-          )}
+            ))}
 
           {step === 5 && <OnBoarding5 />}
         </View>
 
-        {/* Bottom Button Logic */}
         {!(step === 2 && subStep === 1) && (
           <View className="bg-white pb-8 pt-4 ">
-            <Button title={getButtonTitle()} onPress={handleNext} />
+            <Button title={getButtonTitle()} onPress={handleNext} loading={submitStep1.isPending} />
           </View>
         )}
       </KeyboardAwareScrollView>

@@ -2,8 +2,7 @@ import axios from 'axios';
 import { useAuthStore } from '@/store/useAuthStore';
 
 const apiInstance = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_URL,
-  timeout: 30000,
+ 
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',

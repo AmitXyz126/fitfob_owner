@@ -4,7 +4,8 @@ import { Text, TouchableOpacity, TouchableOpacityProps, View } from 'react-nativ
 type ButtonProps = {
   title: string;
   variant?: 'primary' | 'secondary';
-  icon?: ReactNode;  
+  icon?: ReactNode; 
+  loading?: boolean; 
 } & TouchableOpacityProps;
 
 export const Button = forwardRef<View, ButtonProps>(

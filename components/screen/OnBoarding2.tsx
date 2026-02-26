@@ -1,8 +1,10 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, Image, TouchableOpacity } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react'; // useEffect add kiya
+import { View, Text, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
 import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+import * as Location from 'expo-location'; // Location import kiya
+import { useUserDetail } from '@/hooks/useUserDetail';
 
 const GOOGLE_API_KEY = 'YOUR_GOOGLE_API_KEY'; 
 
@@ -11,6 +13,9 @@ const GOOGLE_API_KEY = 'YOUR_GOOGLE_API_KEY';
 }
 
  const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
+  const { submitStep2 } = useUserDetail();
+
+  // 1. Initial Region (Default placeholder)
   const [region, setRegion] = useState({
     latitude: 30.6791,
     longitude: 76.7303,
@@ -18,13 +23,43 @@ const GOOGLE_API_KEY = 'YOUR_GOOGLE_API_KEY';
     longitudeDelta: 0.005,
   });
 
+  / 
   const [locationInfo, setLocationInfo] = useState({
-    name: 'CP67 Mall Mohali',
-    address: 'International Airport Road, Sector 67, Punjab',
+    name: 'Fetching location...',
+    address: 'Please wait...',
   });
 
   const mapRef = useRef<MapView>(null);
   const autoCompleteRef = useRef<any>(null);
+
+  // --- CURRENT LOCATION FETCH LOGIC ---
+  const getCurrentLocation = async () => {
+    let { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      setLocationInfo({ name: 'Permission Denied', address: 'Please enable location' });
+      return;
+    }
+
+    let location = await Location.getCurrentPositionAsync({});
+    const { latitude, longitude } = location.coords;
+
+    const newRegion = {
+      latitude,
+      longitude,
+      latitudeDelta: 0.005,
+      longitudeDelta: 0.005,
+    };
+
+    setRegion(newRegion);
+    mapRef.current?.animateToRegion(newRegion, 1000);
+    // Address nikalne ke liye function call kiya
+    getAddressFromCoords(latitude, longitude);
+  };
+
+  // Screen load hote hi location uthao
+  useEffect(() => {
+    getCurrentLocation();
+  }, []);
 
   const getAddressFromCoords = async (lat: number, lng: number) => {
     try {
@@ -34,7 +69,8 @@ const GOOGLE_API_KEY = 'YOUR_GOOGLE_API_KEY';
       const data = await response.json();
       if (data.results.length > 0) {
         const address = data.results[0].formatted_address;
-        const name = data.results[0].address_components[1]?.long_name || 'Selected Location';
+       
+        const name = data.results[0].address_components[1]?.long_name || 'Current Location';
 
         autoCompleteRef.current?.setAddressText(address);
         setLocationInfo({ name, address });
@@ -42,6 +78,19 @@ const GOOGLE_API_KEY = 'YOUR_GOOGLE_API_KEY';
     } catch (error) {
       console.error('Reverse Geocode Error:', error);
     }
+  };
+
+  const handleConfirm = () => {
+    const payload = {
+      latitude: region.latitude.toString(),
+      longitude: region.longitude.toString(),
+    };
+
+    submitStep2.mutate(payload, {
+      onSuccess: () => {
+        onConfirm();
+      },
+    });
   };
 
   const onRegionChangeComplete = (newRegion: any) => {
@@ -117,7 +166,11 @@ const GOOGLE_API_KEY = 'YOUR_GOOGLE_API_KEY';
           <View className="mt-[-2px] h-2 w-2 rounded-full bg-black/20" />
         </View>
 
-        <TouchableOpacity className="absolute bottom-4 right-4 flex-row items-center rounded-xl bg-white px-3 py-2 shadow-lg" style={{ elevation: 5 }}>
+        {/* Current Location Button ko functional banaya */}
+        <TouchableOpacity 
+          onPress={getCurrentLocation}
+          className="absolute bottom-4 right-4 flex-row items-center rounded-xl bg-white px-3 py-2 shadow-lg" 
+          style={{ elevation: 5 }}>
           <MaterialIcons name="my-location" size={18} color="#F6163C" />
           <Text className="ml-1 font-semibold text-[12px] text-slate-500">Current Location</Text>
         </TouchableOpacity>
@@ -145,10 +198,15 @@ const GOOGLE_API_KEY = 'YOUR_GOOGLE_API_KEY';
         </Text>
 
          <TouchableOpacity
-          onPress={onConfirm}
+          onPress={handleConfirm}
+          disabled={submitStep2.isPending}
           activeOpacity={0.8}
-          className="w-full items-center justify-center rounded-xl bg-[#F6163C] py-4">
-          <Text className="font-bold text-[16px] text-white">Confirm & Proceed</Text>
+          className="w-full flex-row items-center justify-center rounded-xl bg-[#F6163C] py-4">
+          {submitStep2.isPending ? (
+            <ActivityIndicator color="white" size="small" />
+          ) : (
+            <Text className="font-bold text-[16px] text-white">Confirm & Proceed</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>

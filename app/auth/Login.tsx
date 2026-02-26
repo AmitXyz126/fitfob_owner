@@ -13,6 +13,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useLoginRequest } from '@/hooks/useAuth';
+import Toast from 'react-native-toast-message';
 
 // 1. Validation Schema
 const loginSchema = z.object({
@@ -42,33 +43,59 @@ export default function Login() {
     defaultValues: { identifier: '', password: '' },
   });
 
-  const onSubmit = (data: LoginFormData) => {
-    console.log(data, "login payload")
-    loginMutation.mutate(data, {
-      onSuccess: (response) => {
-        router.replace('/onBoardingScreen/OnBoardingStep'); 
-      },
-      onError: (error: any) => {
-        const serverMsg = error?.response?.data?.error?.message || "Something went wrong";
-        
-        if (serverMsg.toLowerCase().includes("password")) {
-          setError('password', { 
-            type: 'manual', 
-            message: 'Invalid password'  
-          });
-        } 
-        else if (serverMsg.toLowerCase().includes("identifier") || serverMsg.toLowerCase().includes("user")) {
-          setError('identifier', { 
-            type: 'manual', 
-            message: 'This email is not registered' 
-          });
-        } 
-        else {
-          alert(serverMsg);
-        }
-      },
-    });
-  };
+ 
+
+const onSubmit = (data: LoginFormData) => {
+  loginMutation.mutate(data, {
+    onSuccess: (response) => {
+      Toast.show({
+        type: 'success',
+        text1: 'Login Successful',
+        text2: 'Welcome back! 👋',
+      });
+      router.replace('/onBoardingScreen/OnBoardingStep');
+    },
+    onError: (error: any) => {
+      const serverMsg = error?.response?.data?.error?.message || "Something went wrong";
+      const status = error?.response?.status;
+
+      // 1.  incorrect password
+      if (status === 401 || serverMsg.toLowerCase().includes("password")) {
+        setError('password', { 
+          type: 'manual', 
+          message: 'Incorrect password! Please try again.' 
+        });
+        Toast.show({
+          type: 'error',
+          text1: 'Authentication Failed',
+          text2: 'The password you entered is incorrect. 🔑',
+        });
+      } 
+      
+    
+      else if (status === 404 || serverMsg.toLowerCase().includes("user") || serverMsg.toLowerCase().includes("identifier")) {
+        setError('identifier', { 
+          type: 'manual', 
+          message: 'Email/Phone is not registered. Please sign up first.' 
+        });
+        Toast.show({
+          type: 'error',
+          text1: 'User Not Found',
+          text2: 'Please check your email or sign up. ✉️',
+        });
+      } 
+      
+      // 3. Generic Error (Network/Server Down)
+      else {
+        Toast.show({
+          type: 'error',
+          text1: 'Connection Error',
+          text2: serverMsg,
+        });
+      }
+    },
+  });
+};
 
   return (
     <Container>
@@ -79,7 +106,7 @@ export default function Login() {
           style={{ backgroundColor: 'rgba(255, 255, 255, 0.8)' }}
         >
           <View className="items-center justify-center p-8 bg-white rounded-3xl  border border-[#CCCECE]">
-            <ActivityIndicator size="large" color=" " />
+            <ActivityIndicator size="large" color="#F6163C" />
             <Text className="mt-4 font-bold text-lg text-slate-900">Logging In</Text>
             <Text className="text-slate-400 mt-1">Authenticating your account...</Text>
           </View>

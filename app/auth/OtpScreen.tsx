@@ -29,7 +29,7 @@ export default function OtpScreen() {
   }, [timer]);
 
   const handleChange = (text: string, index: number) => {
-    // Only allow numbers
+ 
     const cleanText = text.replace(/[^0-9]/g, '');
 
     // Support for Paste / Auto-fill (if more than 1 digit is entered)

@@ -9,4 +9,12 @@ export const ENDPOINTS = {
   FORGOT_RESEND_OTP: `${BASE_URL}/api/auth/resend-reset-otp`,
   FORGOT_VERIFY_OTP: `${BASE_URL}/api/auth/verify-otp`,
   FORGOT_SET_PASSWORD: `${BASE_URL}/api/auth/reset-password`,
+
+  // Onboarding Flow
+  GET_ONBOARDING_STATUS: `${BASE_URL}/api/pending-club-owner/me`,
+  STEP_1: `${BASE_URL}/api/pending-club-owner/club-owner-details`,
+  STEP_2: `${BASE_URL}/api/pending-club-owner/map-location`,
+  STEP_3: `${BASE_URL}/api/pending-club-owner/address-details`,
+  STEP_4: `${BASE_URL}/api/pending-club-owner/configure-club`,
+  STEP_5: `${BASE_URL}/api/pending-club-owner/upload-club-photos`,
 };
