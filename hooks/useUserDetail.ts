@@ -1,81 +1,40 @@
-import api from '@/api/apiInstance';
-import { ENDPOINTS } from '@/api/endpoint';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { userDetailsApi } from '@/api/userDetailsApi';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
 
-// --- 1. API Object ---
-export const userDetailsApi = {
-  getMe: async () => {
-    const response = await api.get(ENDPOINTS.GET_ONBOARDING_STATUS);
-    return response.data;
-  },
-
-  saveStep1: async (id: number, data: any) => {
-    const formData = new FormData();
-    
-    formData.append('clubName', data.clubName);
-    formData.append('ownerName', data.ownerName);
-    formData.append('phoneNumber', data.phone); 
-    formData.append('email', data.email);
-    formData.append('pendingClubOwnerId', id.toString());
-
-    // Logo (Image) handling
-    if (data.image) {
-      const uriParts = data.image.split('.');
-      const fileType = uriParts[uriParts.length - 1];
-
-      formData.append('logo', {
-        uri: data.image,
-        name: `logo.${fileType}`,
-        type: `image/${fileType}`,
-      } as any);
-    }
-
-    const response = await api.post(ENDPOINTS.STEP_1, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return response.data;
-  },
-
-  // --- STEP 2 API ADDED ---
-  saveStep2: async (id: number, data: { latitude: string; longitude: string }) => {
-    const payload = {
-      pendingClubOwnerId: id,
-      latitude: data.latitude,
-      longitude: data.longitude,
-    };
-    const response = await api.post(ENDPOINTS.STEP_2, payload);
-    return response.data;
-  },
-};
 
 // --- 2. Custom Hook ---
 export const useUserDetail = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  // Onboarding Status Query (ID fetch karne ke liye)
   const { data: userData, isLoading: isFetchingStatus } = useQuery({
     queryKey: ['club-owner-me'],
     queryFn: userDetailsApi.getMe,
   });
 
-  // Step 1 Save Mutation
+const uploadFileOnly = useMutation({
+    mutationFn: (file: any) => userDetailsApi.simpleUpload(file),
+    onSuccess: (id) => {
+      console.log("Uploaded ID:", id);
+      Toast.show({ type: 'success', text1: 'File Uploaded!', text2: `ID: ${id}` });
+    },
+    onError: (error: any) => {
+      Toast.show({ type: 'error', text1: 'Upload Failed' });
+    }
+  });
+
   const submitStep1 = useMutation({
     mutationFn: (formData: any) => {
-      if (!userData?.id) {
-        throw new Error("User ID not found!");
-      }
-      return userDetailsApi.saveStep1(userData.id, formData);
+      const id = userData?.id || userData?.pendingClubOwnerId;
+      if (!id) throw new Error('User ID not found!');
+      return userDetailsApi.saveStep1(id, formData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
-      Toast.show({ 
-        type: 'success', 
-        text1: 'Step 1 Saved! ✅' 
-      });
-      router.push('/onBoardingScreen/OnBoardingStep');
+      Toast.show({ type: 'success', text1: 'Step 1 Saved! ✅' });
     },
     onError: (error: any) => {
       Toast.show({
@@ -86,34 +45,93 @@ export const useUserDetail = () => {
     },
   });
 
-  // --- STEP 2 MUTATION ADDED ---
   const submitStep2 = useMutation({
     mutationFn: (locationData: { latitude: string; longitude: string }) => {
-      if (!userData?.id) {
-        throw new Error("User ID not found!");
-      }
-      return userDetailsApi.saveStep2(userData.id, locationData);
+      const id = userData?.id || userData?.pendingClubOwnerId;
+      if (!id) throw new Error('User ID not found!');
+      return userDetailsApi.saveStep2(id, locationData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
-      Toast.show({ 
-        type: 'success', 
-        text1: 'Location Saved! 📍' 
-      });
+      Toast.show({ type: 'success', text1: 'Location Saved! 📍' });
+    },
+  });
+
+  const submitStep3 = useMutation({
+    mutationFn: (addressData: {
+      clubAddress: string;
+      city: string;
+      state: string;
+      pincode: string;
+    }) => {
+      const id = userData?.id || userData?.pendingClubOwnerId;
+      if (!id) throw new Error('User ID not found!');
+      return userDetailsApi.saveStep3(id, addressData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
+      Toast.show({ type: 'success', text1: 'Address Details Saved! 🏠' });
     },
     onError: (error: any) => {
       Toast.show({
         type: 'error',
-        text1: 'Step 2 Error',
-        text2: error.response?.data?.message || 'Failed to save location',
+        text1: 'Step 3 Error',
+        text2: error.response?.data?.message || 'Failed to save address',
       });
     },
   });
 
-  return { 
-    userData, 
-    isFetchingStatus, 
+  const submitStep4 = useMutation({
+    mutationFn: (configData: any) => {
+      const id = userData?.id || userData?.pendingClubOwnerId;
+      if (!id) throw new Error('User ID not found!');
+      return userDetailsApi.configureClub(id, configData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
+      Toast.show({ type: 'success', text1: 'Club Configured! ⚙️' });
+    },
+    onError: (error: any) => {
+      Toast.show({
+        type: 'error',
+        text1: 'Step 4 Error',
+        text2: error.response?.data?.message || 'Failed to configure club',
+      });
+    },
+  });
+
+  // Mutation for Step 5
+  const uploadDoc = useMutation({
+    mutationFn: ({ name, file }: { name: string; file: any }) => 
+      userDetailsApi.uploadGovtDoc(name, file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
+      Toast.show({ type: 'success', text1: 'Document Uploaded! 📄' });
+    },
+    onError: (error: any) => {
+      Toast.show({ type: 'error', text1: 'Upload Failed', text2: error.response?.data?.message });
+    }
+  });
+
+  // Mutation for Step 6 (Finalizing Step 4 in UI)
+  const confirmDocs = useMutation({
+    mutationFn: userDetailsApi.confirmGovtDocs,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
+      Toast.show({ type: 'success', text1: 'All documents confirmed! ✅' });
+    }
+  });
+
+  return {
+    uploadFileOnly,
+    userData,
+    isFetchingStatus,
     submitStep1,
-    submitStep2 // Exporting Step 2
+    submitStep2,
+    submitStep3,
+    submitStep4,
+    uploadDoc,
+    confirmDocs
+
   };
 };

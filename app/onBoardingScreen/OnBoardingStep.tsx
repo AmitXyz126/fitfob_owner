@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Button } from '@/components/Button';
 import { Container } from '@/components/Container';
 import OnBoarding1 from '@/components/screen/OnBoarding1';
@@ -9,9 +10,10 @@ import OnBoarding4_List from '@/components/screen/OnBoarding4_List';
 import OnBoarding5 from '@/components/screen/OnBoarding5';
 import { KeyboardAwareScrollView } from '@pietile-native-kit/keyboard-aware-scrollview';
 import { useRouter } from 'expo-router';
-import { useState, useRef, useEffect } from 'react'; // useEffect add kiya sync ke liye
+import { useState, useRef, useEffect } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 import { useUserDetail } from '@/hooks/useUserDetail';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function OnBoardingStep() {
   const router = useRouter();
@@ -20,47 +22,54 @@ export default function OnBoardingStep() {
   const totalSteps = 5;
 
   const onboarding1Ref = useRef<any>(null);
+  const onboarding2DetailsRef = useRef<any>(null);
+  const onboarding3Ref = useRef<any>(null);
   const onboarding4Ref = useRef<any>(null);
 
-  // userData fetch kiya taaki current status pata chale
-  const { submitStep1, userData } = useUserDetail();
+  const { submitStep1, submitStep2, submitStep3, submitStep4, userData } = useUserDetail();
 
-  // --- Sync Logic: Agar backend pe step aage hai toh wahi dikhao ---
+  const isLoading = submitStep1.isPending || submitStep3.isPending || submitStep4.isPending;
+
   useEffect(() => {
-    if (userData?.currentStep && userData.currentStep > 1) {
-      setStep(userData.currentStep);
-    }
-  }, [userData]);
-
-  const handleNext = () => {
-    // --- STEP 1: API HIT LOGIC ---
-    if (step === 1) {
-      const data = onboarding1Ref.current?.getFormData();
-
-      // Fix: Agar currentStep already > 1 hai, toh API hit mat karo, seedha aage badho
-      // Isse "Invalid step order" error nahi aayega
-      if (userData?.currentStep > 1) {
-        setStep(2);
-        setSubStep(1);
-        return;
+    const syncSteps = async () => {
+      if (userData?.currentStep && step === 1 && userData.currentStep > 1) {
+        setStep(userData.currentStep);
+        if (userData.currentStep === 2) {
+          const savedData = await AsyncStorage.getItem('@onboarding_step2_details');
+          if (savedData) setSubStep(2);
+        }
       }
+    };
+    syncSteps();
+  }, [step, userData?.currentStep]);
 
-      submitStep1.mutate(data, {
-        onSuccess: () => {
-          setStep(2);
-          setSubStep(1);
-        },
-      });
+
+
+  const handleNext = async () => {
+    // --- STEP 1 ---
+    if (step === 1) {
+      onboarding1Ref.current?.handleSave();
       return;
     }
 
-    // --- Step 2 Logic ---
-    if (step === 2 && subStep === 1) {
-      setSubStep(2);
+    // --- STEP 2 ---
+    if (step === 2) {
+      if (subStep === 1) {
+        setSubStep(2);
+      
+      } else {
+        onboarding2DetailsRef.current?.handleSave();
+      }
       return;
     }
 
-    // --- Step 4 Logic ---
+    // --- STEP 3 ---
+    if (step === 3) {
+      onboarding3Ref.current?.handleSave();
+      return;
+    }
+
+    // --- STEP 4 ---
     if (step === 4) {
       if (subStep === 1) {
         onboarding4Ref.current?.openModal();
@@ -71,6 +80,7 @@ export default function OnBoardingStep() {
       return;
     }
 
+    // --- FINAL ---
     if (step < totalSteps) {
       setStep(step + 1);
       setSubStep(1);
@@ -82,12 +92,14 @@ export default function OnBoardingStep() {
   const getButtonTitle = () => {
     if (step === 5) return 'Submit';
     if (step === 2 && subStep === 2) return 'Confirm & Proceed';
+    if (step === 3) return 'Save & Continue';
     if (step === 4) return subStep === 1 ? 'Upload Document' : 'Next Step';
     return 'Next';
   };
 
   return (
     <Container>
+      {/* Progress Bar */}
       <View className="ios:mt-1 mt-4 flex-row justify-between bg-white pb-4 ">
         {[1, 2, 3, 4, 5].map((item) => {
           let bgColor =
@@ -96,13 +108,12 @@ export default function OnBoardingStep() {
               : item < step
                 ? 'bg-[#FFC1C1] h-3'
                 : 'border h-3 border-gray-200';
-
           return (
             <TouchableOpacity
               key={item}
               onPress={() => item < step && setStep(item)}
               activeOpacity={0.7}
-              disabled={item >= step}
+              disabled={item >= step || isLoading}
               className="mx-1 flex-1 justify-center">
               <View className={`w-full rounded-full ${bgColor}`} />
             </TouchableOpacity>
@@ -116,21 +127,39 @@ export default function OnBoardingStep() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
         <View className="mt-5 flex-1">
-          {/* initialData pass kiya taaki saved data dikhe */}
           {step === 1 && <OnBoarding1 ref={onboarding1Ref} initialData={userData} />}
 
           {step === 2 &&
             (subStep === 1 ? (
               <OnBoarding2_Part2 onConfirm={handleNext} />
             ) : (
-              <OnBoarding2_Details onBack={() => setSubStep(1)} />
+              <OnBoarding2_Details
+                ref={onboarding2DetailsRef}
+                onBack={() => {
+                  setStep(2);
+                  setSubStep(1);
+                }}
+                onNext={() => {
+                  setStep(3);
+                  setSubStep(1);
+                }}
+              />
             ))}
 
-          {step === 3 && <OnBoarding3 />}
+          {step === 3 && (
+            <OnBoarding3
+              ref={onboarding3Ref}
+              onNext={() => {
+                setStep(4);
+                setSubStep(1);
+              }}
+            />
+          )}
 
           {step === 4 &&
             (subStep === 1 ? (
               <OnBoarding4
+              
                 ref={onboarding4Ref}
                 onUploadDone={() => setSubStep(2)}
                 onUploadSuccess={() => setSubStep(2)}
@@ -144,7 +173,12 @@ export default function OnBoardingStep() {
 
         {!(step === 2 && subStep === 1) && (
           <View className="bg-white pb-8 pt-4 ">
-            <Button title={getButtonTitle()} onPress={handleNext} loading={submitStep1.isPending} />
+            <Button
+              title={getButtonTitle()}
+              onPress={handleNext}
+              loading={isLoading}
+              disabled={isLoading}
+            />
           </View>
         )}
       </KeyboardAwareScrollView>

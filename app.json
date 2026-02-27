@@ -43,7 +43,7 @@
       "bundleIdentifier": "com.xyzstudio.fitfob",
       "googleServicesFile": "./GoogleService-Info.plist",
       "config": {
-        "googleMapsApiKey": ""
+        "googleMapsApiKey": "AIzaSyB7liTs6ffq-vFE9VZH5rjbQ_ttSSFSb4o"
       }
     },
     "android": {

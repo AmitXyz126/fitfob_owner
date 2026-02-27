@@ -1,47 +1,59 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useUserDetail } from '@/hooks/useUserDetail'; 
 
 interface Props {
   onAddMore: () => void;
 }
 
 export default function OnBoarding4_List({ onAddMore }: Props) {
-  // Mock data as per your UI image
-  const uploadedDocs = [
-    { id: '1', title: 'Google-certificate.pdf', time: 'Aug 12, 2025, 01:43 PM' },
-    { id: '2', title: 'Google-certificate.pdf', time: 'Aug 12, 2025, 01:43 PM' },
-  ];
+  // Real data fetching from your hook
+  const { userData } = useUserDetail();
+ 
+  const uploadedDocs = userData?.governmentDocuments || [];
 
   return (
     <View className="flex-1 bg-white ">
       <Text className="mb-6 font-bold text-2xl text-[#111827]">Add Govt Document</Text>
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
-        {uploadedDocs.map((item) => (
-          <View
-            key={item.id}
-            className="mb-3 flex-row items-center rounded-[20px] bg-[#F3F4F6] p-4">
-            {/* PDF Icon Container */}
-            <View className="items-center justify-center rounded-xl bg-white p-2 shadow-sm">
-              <Ionicons name="document-text-outline" size={28} color="#6B7280" />
-              <Text className="mt-[-4px] font-bold text-[8px] text-gray-500">PDF</Text>
-            </View>
+        {uploadedDocs.length > 0 ? (
+          uploadedDocs.map((item: any) => (
+            <View
+              key={item.id || item._id}
+              className="mb-3 flex-row items-center rounded-[20px] bg-[#F3F4F6] p-4">
+              {/* PDF Icon Container */}
+              <View className="items-center justify-center rounded-xl bg-white p-2 shadow-sm">
+                <Ionicons name="document-text-outline" size={28} color="#6B7280" />
+                <Text className="mt-[-4px] font-bold text-[8px] text-gray-500">
+                  {item.fileType?.includes('pdf') ? 'PDF' : 'IMG'}
+                </Text>
+              </View>
 
-            {/* Document Info */}
-            <View className="ml-4 flex-1">
-              <Text className="font-semibold text-base text-[#374151]" numberOfLines={1}>
-                {item.title}
-              </Text>
-              <View className="mt-1 flex-row items-center">
-                <View className="mr-1 rounded-full bg-[#10B981] p-[2px]">
-                  <Ionicons name="checkmark" size={10} color="white" />
+              {/* Document Info */}
+              <View className="ml-4 flex-1">
+                <Text className="font-semibold text-base text-[#374151]" numberOfLines={1}>
+                  {item.documentName || 'Untitled Document'}
+                </Text>
+                <View className="mt-1 flex-row items-center">
+                  <View className="mr-1 rounded-full bg-[#10B981] p-[2px]">
+                    <Ionicons name="checkmark" size={10} color="white" />
+                  </View>
+                  <Text className="text-xs text-gray-400">
+                    Uploaded:{' '}
+                    {item.createdAt ? new Date(item.createdAt).toLocaleString() : 'Just now'}
+                  </Text>
                 </View>
-                <Text className="text-xs text-gray-400">Uploaded: {item.time}</Text>
               </View>
             </View>
+          ))
+        ) : (
+          /* Empty State if no docs */
+          <View className="items-center py-10">
+            <Text className="text-gray-400">No documents uploaded yet.</Text>
           </View>
-        ))}
+        )}
 
         {/* Add Upload More Button */}
         <TouchableOpacity

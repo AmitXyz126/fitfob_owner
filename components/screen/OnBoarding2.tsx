@@ -1,21 +1,25 @@
-import React, { useState, useRef, useEffect } from 'react'; // useEffect add kiya
-import { View, Text, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import React, { useState, useRef, useEffect, useCallback } from 'react'; 
+import { View, Text, Image, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
-import * as Location from 'expo-location'; // Location import kiya
+import * as Location from 'expo-location'; 
 import { useUserDetail } from '@/hooks/useUserDetail';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const GOOGLE_API_KEY = 'YOUR_GOOGLE_API_KEY'; 
+const GOOGLE_API_KEY = 'AIzaSyB7liTs6ffq-vFE9VZH5rjbQ_ttSSFSb4o'; 
+const STORAGE_KEY_MAP = '@onboarding_step2_map_data';
 
- interface OnBoarding2Props {
+interface OnBoarding2Props {
   onConfirm: () => void;
 }
 
- const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
+const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
   const { submitStep2 } = useUserDetail();
+  const [isLocalLoaded, setIsLocalLoaded] = useState(false);
+  const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
 
-  // 1. Initial Region (Default placeholder)
   const [region, setRegion] = useState({
     latitude: 30.6791,
     longitude: 76.7303,
@@ -23,7 +27,6 @@ const GOOGLE_API_KEY = 'YOUR_GOOGLE_API_KEY';
     longitudeDelta: 0.005,
   });
 
-  / 
   const [locationInfo, setLocationInfo] = useState({
     name: 'Fetching location...',
     address: 'Please wait...',
@@ -31,56 +34,83 @@ const GOOGLE_API_KEY = 'YOUR_GOOGLE_API_KEY';
 
   const mapRef = useRef<MapView>(null);
   const autoCompleteRef = useRef<any>(null);
+  const isMoving = useRef(false);
 
-  // --- CURRENT LOCATION FETCH LOGIC ---
+  // --- 1. Load Saved Data on Mount ---
+  useEffect(() => {
+    const loadSavedMap = async () => {
+      try {
+        const savedData = await AsyncStorage.getItem(STORAGE_KEY_MAP);
+        if (savedData) {
+          const parsed = JSON.parse(savedData);
+          setRegion(parsed.region);
+          setLocationInfo(parsed.locationInfo);
+          setTimeout(() => {
+            autoCompleteRef.current?.setAddressText(parsed.locationInfo.address);
+            mapRef.current?.animateToRegion(parsed.region, 500);
+          }, 500);
+        } else {
+          await getCurrentLocation();
+        }
+      } catch (e) {
+        console.log("Error loading map storage", e);
+      } finally {
+        setIsLocalLoaded(true);
+      }
+    };
+    loadSavedMap();
+  }, []);
+
+  // --- 2. Reverse Geocode with validation ---
+  const getAddressFromCoords = async (lat: number, lng: number) => {
+    if (!lat || !lng) return;
+    
+    setIsReverseGeocoding(true);
+    try {
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_API_KEY}`
+      );
+      const data = await response.json();
+      if (data.results && data.results.length > 0) {
+        const address = data.results[0].formatted_address;
+        const name = data.results[0].address_components[1]?.long_name || 'Selected Location';
+        
+        autoCompleteRef.current?.setAddressText(address);
+        setLocationInfo({ name, address });
+        
+        // Auto-save to local storage
+        AsyncStorage.setItem(STORAGE_KEY_MAP, JSON.stringify({ 
+          region: { ...region, latitude: lat, longitude: lng }, 
+          locationInfo: { name, address } 
+        }));
+      }
+    } catch (error) {
+      console.error('Reverse Geocode Error:', error);
+    } finally {
+      setIsReverseGeocoding(false);
+    }
+  };
+
   const getCurrentLocation = async () => {
     let { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      setLocationInfo({ name: 'Permission Denied', address: 'Please enable location' });
-      return;
-    }
+    if (status !== 'granted') return;
 
     let location = await Location.getCurrentPositionAsync({});
-    const { latitude, longitude } = location.coords;
-
     const newRegion = {
-      latitude,
-      longitude,
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
       latitudeDelta: 0.005,
       longitudeDelta: 0.005,
     };
 
     setRegion(newRegion);
     mapRef.current?.animateToRegion(newRegion, 1000);
-    // Address nikalne ke liye function call kiya
-    getAddressFromCoords(latitude, longitude);
-  };
-
-  // Screen load hote hi location uthao
-  useEffect(() => {
-    getCurrentLocation();
-  }, []);
-
-  const getAddressFromCoords = async (lat: number, lng: number) => {
-    try {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_API_KEY}`
-      );
-      const data = await response.json();
-      if (data.results.length > 0) {
-        const address = data.results[0].formatted_address;
-       
-        const name = data.results[0].address_components[1]?.long_name || 'Current Location';
-
-        autoCompleteRef.current?.setAddressText(address);
-        setLocationInfo({ name, address });
-      }
-    } catch (error) {
-      console.error('Reverse Geocode Error:', error);
-    }
+    getAddressFromCoords(newRegion.latitude, newRegion.longitude);
   };
 
   const handleConfirm = () => {
+    if (isReverseGeocoding) return; // Wait if still fetching address
+
     const payload = {
       latitude: region.latitude.toString(),
       longitude: region.longitude.toString(),
@@ -90,19 +120,29 @@ const GOOGLE_API_KEY = 'YOUR_GOOGLE_API_KEY';
       onSuccess: () => {
         onConfirm();
       },
+      onError: (err) => {
+        console.log("Mutation Error:", err);
+        Alert.alert("Error", "Failed to save location. Please try again.");
+      }
     });
   };
 
   const onRegionChangeComplete = (newRegion: any) => {
-    setRegion(newRegion);
-    getAddressFromCoords(newRegion.latitude, newRegion.longitude);
+    // Check if movement is significant to avoid infinite loops
+    const latDiff = Math.abs(region.latitude - newRegion.latitude);
+    const lngDiff = Math.abs(region.longitude - newRegion.longitude);
+
+    if (isLocalLoaded && (latDiff > 0.0001 || lngDiff > 0.0001)) {
+      setRegion(newRegion);
+      getAddressFromCoords(newRegion.latitude, newRegion.longitude);
+    }
   };
 
   return (
     <View className="flex-1 bg-white px-1">
       <Text className="mb-4 font-bold text-[26px] text-slate-900">Fill your location</Text>
 
-      {/* --- SEARCH BAR --- */}
+      {/* Google Places Autocomplete */}
       <View className="relative z-[100] mb-4">
         <GooglePlacesAutocomplete
           ref={autoCompleteRef}
@@ -117,38 +157,27 @@ const GOOGLE_API_KEY = 'YOUR_GOOGLE_API_KEY';
                 latitudeDelta: 0.005,
                 longitudeDelta: 0.005,
               };
+              setRegion(newRegion);
               mapRef.current?.animateToRegion(newRegion, 1000);
-              setLocationInfo({
+              const info = {
                 name: data.structured_formatting?.main_text || 'Selected',
                 address: details.formatted_address,
-              });
+              };
+              setLocationInfo(info);
+              AsyncStorage.setItem(STORAGE_KEY_MAP, JSON.stringify({ region: newRegion, locationInfo: info }));
             }
           }}
           query={{ key: GOOGLE_API_KEY, language: 'en' }}
-          renderRightButton={() => (
-            <TouchableOpacity className="absolute right-0 h-[56px] justify-center pr-4">
-              <Ionicons name="search" size={20} color="#94A3B8" />
-            </TouchableOpacity>
-          )}
           styles={{
             container: { flex: 0 },
-            textInput: {
-              height: 56,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: '#E2E8F0',
-              paddingLeft: 16,
-              paddingRight: 45,
-              color: '#475569',
-              fontSize: 15,
-            },
-            listView: { backgroundColor: 'white', zIndex: 1000, elevation: 5, borderRadius: 12 },
+            textInput: { height: 56, borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', paddingLeft: 16, color: '#475569' },
+            listView: { backgroundColor: 'white', zIndex: 1000, elevation: 5 },
           }}
         />
       </View>
 
-      {/* --- MAP SECTION --- */}
-      <View className="relative z-10 h-[420px] w-full overflow-hidden rounded-3xl border border-slate-200 bg-gray-100">
+      {/* Map View */}
+      <View className="relative z-10 h-[400px] w-full overflow-hidden rounded-3xl border border-slate-200 bg-gray-100">
         <MapView
           ref={mapRef}
           provider={PROVIDER_GOOGLE}
@@ -156,57 +185,35 @@ const GOOGLE_API_KEY = 'YOUR_GOOGLE_API_KEY';
           initialRegion={region}
           onRegionChangeComplete={onRegionChangeComplete}
         />
-
+        {/* Custom Marker Pin */}
         <View className="absolute left-1/2 top-1/2 -ml-5 -mt-10 items-center justify-center" pointerEvents="none">
-          <Image
-            source={{ uri: 'https://cdn-icons-png.flaticon.com/512/684/684908.png' }}
-            className="h-10 w-10"
-            tintColor="#F6163C"
-          />
-          <View className="mt-[-2px] h-2 w-2 rounded-full bg-black/20" />
+          <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/684/684908.png' }} className="h-10 w-10" tintColor="#F6163C" />
         </View>
 
-        {/* Current Location Button ko functional banaya */}
-        <TouchableOpacity 
-          onPress={getCurrentLocation}
-          className="absolute bottom-4 right-4 flex-row items-center rounded-xl bg-white px-3 py-2 shadow-lg" 
-          style={{ elevation: 5 }}>
+        <TouchableOpacity onPress={getCurrentLocation} className="absolute bottom-4 right-4 flex-row items-center rounded-xl bg-white px-3 py-2 shadow-lg">
           <MaterialIcons name="my-location" size={18} color="#F6163C" />
           <Text className="ml-1 font-semibold text-[12px] text-slate-500">Current Location</Text>
         </TouchableOpacity>
       </View>
 
-      {/* --- INFO CARD --- */}
-      <View className="mt-4 rounded-[24px] border border-slate-100 bg-white p-5 shadow-sm shadow-slate-300">
+      {/* Location Details Card */}
+      <View className="mt-4 rounded-[24px] border border-slate-100 bg-white p-5 shadow-sm">
         <View className="mb-2 flex-row items-center justify-between">
-          <View className="flex-1 flex-row items-center pr-2">
+          <View className="flex-1 flex-row items-center">
             <View className="mr-2 rounded-full bg-red-50 p-1.5">
               <MaterialIcons name="location-on" size={18} color="#F6163C" />
             </View>
-            <Text className="font-bold text-[16px] text-slate-800" numberOfLines={1}>
-              {locationInfo.name}
-            </Text>
+            <Text className="font-bold text-[16px] text-slate-800" numberOfLines={1}>{locationInfo.name}</Text>
           </View>
-
-          <TouchableOpacity onPress={() => autoCompleteRef.current?.focus()} className="rounded-full bg-slate-100 px-3 py-1.5">
-            <Text className="font-semibold text-[12px] text-slate-500">Change</Text>
-          </TouchableOpacity>
         </View>
 
-        <Text className="mb-4 ml-8 text-[13px] leading-5 text-slate-500" numberOfLines={3}>
-          {locationInfo.address}
-        </Text>
+        <Text className="mb-4 ml-8 text-[13px] text-slate-500" numberOfLines={2}>{locationInfo.address}</Text>
 
-         <TouchableOpacity
+        <TouchableOpacity
           onPress={handleConfirm}
-          disabled={submitStep2.isPending}
-          activeOpacity={0.8}
-          className="w-full flex-row items-center justify-center rounded-xl bg-[#F6163C] py-4">
-          {submitStep2.isPending ? (
-            <ActivityIndicator color="white" size="small" />
-          ) : (
-            <Text className="font-bold text-[16px] text-white">Confirm & Proceed</Text>
-          )}
+          disabled={submitStep2.isPending || isReverseGeocoding}
+          className={`w-full flex-row items-center justify-center rounded-xl py-4 ${submitStep2.isPending || isReverseGeocoding ? 'bg-slate-300' : 'bg-[#F6163C]'}`}>
+          {submitStep2.isPending ? <ActivityIndicator color="white" /> : <Text className="font-bold text-white">Confirm & Proceed</Text>}
         </TouchableOpacity>
       </View>
     </View>
