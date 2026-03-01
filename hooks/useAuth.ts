@@ -69,7 +69,7 @@ export const useVerifyOtp = () => {
 
         console.log('🚀 User Data Saved. Redirecting to Dashboard...');
 
-        router.replace('/(tabs)');
+        router.replace('/auth/Login');
       } else {
         console.warn('⚠️ API Success but missing fields in response:', data);
 
