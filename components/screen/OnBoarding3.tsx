@@ -17,7 +17,7 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
   // --- NEW STATE FOR CLUB CATEGORY ---
   const [clubCategory, setClubCategory] = useState('Luxury');
   const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const categoryOptions = ['Luxury', 'Premium', 'Standard'];
+  const categoryOptions = ['Luxury', 'Premium', 'Basic'];
 
   const [fitnessTypes, setFitnessTypes] = useState(['Gym']);
   const [amenities, setAmenities] = useState(['Parking', 'Wi-Fi']);

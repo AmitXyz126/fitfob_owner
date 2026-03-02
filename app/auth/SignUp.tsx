@@ -133,7 +133,7 @@ export default function SignUp() {
       identifier: data.identifier.toLowerCase().trim(),
       password: data.password,
       confirmPassword: data.confirmPassword,
-      role: 'Client',
+      role: 'ClubOwner',
     };
 
     signupMutation(payload, {

@@ -1,30 +1,25 @@
 import api from './apiInstance';
 import { ENDPOINTS } from './endpoint';
 
+export interface PhotoFile {
+  uri: string;
+  name: string;
+  type: string;
+}
+
 export const userDetailsApi = {
-
-  simpleUpload: async (file: any) => {
+  simpleUpload: async (file: File) => {
     const formData = new FormData();
-    
-    // File preparation
-    const fileToUpload = {
-      uri: file.uri || file,
-      name: file.name || 'upload.jpg',
-      type: file.type || 'image/jpeg',
-    };
-    
-    formData.append('file', fileToUpload as any);
-
-    const response = await api.post('/api/upload/', formData, {
+    formData.append('files', file);
+    const response = await api.post(ENDPOINTS.UPLOADFILE, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
 
     // Return only the ID from response
-    return response.data.id; 
-  }, 
-
+    return response.data;
+  },
 
   getMe: async () => {
     const response = await api.get(ENDPOINTS.GET_ONBOARDING_STATUS);
@@ -37,11 +32,9 @@ export const userDetailsApi = {
     formData.append('ownerName', data.ownerName);
     formData.append('phoneNumber', data.phone);
     formData.append('email', data.email);
-    
 
     if (data.image) {
-      
-      const uriParts = data.image
+      const uriParts = data.image.split('.');
       const fileType = uriParts[uriParts.length - 1];
       formData.append('logo', {
         uri: data.image,
@@ -58,21 +51,21 @@ export const userDetailsApi = {
 
   saveStep2: async (id: number, data: { latitude: string; longitude: string }) => {
     const payload = {
-       latitude: String(data.latitude),
+      latitude: String(data.latitude),
       longitude: String(data.longitude),
     };
     const response = await api.post(ENDPOINTS.STEP_2, payload);
     return response.data;
   },
-    saveStep3: async (
+  saveStep3: async (
     id: number,
     data: { clubAddress: string; city: string; state: string; pincode: string }
   ) => {
     const payload = {
-      clubAddress: data.clubAddress,  
+      clubAddress: data.clubAddress,
       city: data.city,
       state: data.state,
-      pincode:data.pincode,  
+      pincode: data.pincode,
     };
     const response = await api.post(ENDPOINTS.STEP_3, payload);
     return response.data;
@@ -92,29 +85,66 @@ export const userDetailsApi = {
     return response.data;
   },
   // STEP 5: Document Upload (Multipart)
+
   uploadGovtDoc: async (docName: string, fileData: any) => {
     const formData = new FormData();
+
     formData.append('documentName', docName);
-    
-    // File structure handling
+
     const fileToUpload = {
-      uri: fileData.uri || fileData, 
+      uri: fileData.uri,
       name: fileData.name || 'document.jpg',
       type: fileData.type || 'image/jpeg',
     };
-    
+
     formData.append('file', fileToUpload as any);
 
+    console.log('Sending Payload:', docName, fileToUpload.uri);
+
     const response = await api.post(ENDPOINTS.Step_5, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        Accept: 'application/json',
+      },
     });
+
     return response.data;
   },
-
   // STEP 6: Confirm All Docs
   confirmGovtDocs: async () => {
     const response = await api.post(ENDPOINTS.Step_6, {});
     return response.data;
   },
+
+  getDocuments: async () => {
+    const response = await api.get(ENDPOINTS.Get);
+    return response.data;
+  },
+
+
+
+  uploadClubPhotos: async (photos: any[]) => {
+    const formData = new FormData();
+
+    photos.forEach((photo, index) => {
+      // React Native requires the { uri, name, type } structure to recognize a file
+      formData.append('clubPhotos', {
+        uri: photo.uri,
+        name: photo.name || `photo_${index}_${Date.now()}.jpg`,
+        type: photo.type || 'image/jpeg',
+      } as any);
+    });
+
+    // We MUST override the global 'application/json' default from apiInstance
+    const response = await api.post(ENDPOINTS.STEP_7, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        Accept: 'application/json',
+      },
+      // IMPORTANT: Prevent Axios from trying to serialize FormData into JSON
+      transformRequest: (data) => data,
+    });
+
+    return response.data;
+  },
 };
- 

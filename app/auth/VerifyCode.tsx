@@ -12,7 +12,7 @@ export default function OtpScreen() {
   const { email } = useLocalSearchParams();
 
    const { mutate: resendOtp, isPending: isResending } = useForgotResendOtp();
-  const { mutate: verifyOtp, isPending: isVerifying } = useForgotVerifyOtp();
+const { mutate: verifyOtp, isPending: isVerifying } = useForgotVerifyOtp();
 
   const [timer, setTimer] = useState(60);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);

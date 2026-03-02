@@ -12,6 +12,7 @@ import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUserDetail } from '@/hooks/useUserDetail';
+import { userDetailsApi } from '@/api/userDetailsApi';
 
 const STORAGE_KEY_STEP1 = '@onboarding_step1_data';
 
@@ -24,6 +25,7 @@ const OnBoarding1 = forwardRef(({ initialData }: any, ref) => {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [image, setImage] = useState<string | null>(null);
+  const [LogoId, setLogoId] = useState();
   const [isImageLoading, setIsImageLoading] = useState(false);
 
   useEffect(() => {
@@ -75,13 +77,12 @@ const OnBoarding1 = forwardRef(({ initialData }: any, ref) => {
       if (!email.trim() || !emailRegex.test(email))
         return Alert.alert('Required', 'Enter a valid email address');
 
-       
       const payload = {
         clubName: clubName.trim(),
         ownerName: ownerName.trim(),
         phoneNumber: phone.trim(),
         email: email.trim(),
-        logoUrl: image,
+        logo: LogoId,
       };
 
       // 3. API Call with Loading handled by isSubmitting
@@ -98,23 +99,50 @@ const OnBoarding1 = forwardRef(({ initialData }: any, ref) => {
     },
   }));
 
-  const pickImage = async () => {
-    if (isSubmitting) return;
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') return;
+ const pickImage = async () => {
+  if (isSubmitting) return;
+  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (status !== 'granted') return;
 
-    setIsImageLoading(true);
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.5,
-    });
+  setIsImageLoading(true);
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsEditing: true,
+    aspect: [1, 1],
+    quality: 0.5,
+  });
 
-    if (!result.canceled) setImage(result.assets[0].uri);
+  if (result.canceled || !result.assets.length) {
     setIsImageLoading(false);
+    return;
+  }
+
+  const asset = result.assets[0];
+  const fileToUpload: any = {
+    uri: asset.uri,
+    name: asset.fileName || `upload.${asset.uri.split('.').pop()}`,
+    type: asset.type || 'image/jpeg',
   };
 
+  try {
+    const response = await userDetailsApi.simpleUpload(fileToUpload);
+
+ 
+    if (response && Array.isArray(response) && response.length > 0) {
+      const uploadedFile = response[0];  
+      setLogoId(uploadedFile.id); 
+      setImage(asset.uri);
+      console.log("Success! Image ID:", uploadedFile.id);
+    } else {
+      throw new Error("Invalid response format");
+    }
+  } catch (error) {
+    console.error("Upload Error:", error);
+    Alert.alert('Upload Failed', 'Unable to upload image. Please try again.');
+  } finally {
+    setIsImageLoading(false);
+  }
+};
   return (
     <>
       <Text className="mb-8 font-bold text-[24px] text-[#1C1C1C]">Fill your club details</Text>

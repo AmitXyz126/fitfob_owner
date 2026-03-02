@@ -25,10 +25,26 @@ export default function OnBoardingStep() {
   const onboarding2DetailsRef = useRef<any>(null);
   const onboarding3Ref = useRef<any>(null);
   const onboarding4Ref = useRef<any>(null);
+  // --- FIX 1: Step 5 ke liye Ref add ki ---
+  const onboarding5Ref = useRef<any>(null);
 
-  const { submitStep1, submitStep2, submitStep3, submitStep4, userData } = useUserDetail();
+  const {
+    submitStep1,
+    submitStep2,
+    submitStep3,
+    submitStep4,
+    submitStep7,
+    confirmDocs,
+    userData,
+  } = useUserDetail();
 
-  const isLoading = submitStep1.isPending || submitStep3.isPending || submitStep4.isPending;
+  // Yahan check kar lena agar Step 5 ki koi pending state hai toh usey bhi add kar sakte ho
+  const isLoading =
+    submitStep1.isPending ||
+    submitStep3.isPending ||
+    submitStep4.isPending ||
+    submitStep7.isPending ||
+    confirmDocs.isPending;
 
   useEffect(() => {
     const syncSteps = async () => {
@@ -41,46 +57,46 @@ export default function OnBoardingStep() {
       }
     };
     syncSteps();
-  }, [step, userData?.currentStep]);
-
-
+  }, [userData?.currentStep]);
 
   const handleNext = async () => {
-    // --- STEP 1 ---
     if (step === 1) {
       onboarding1Ref.current?.handleSave();
       return;
     }
-
-    // --- STEP 2 ---
     if (step === 2) {
       if (subStep === 1) {
         setSubStep(2);
-      
       } else {
         onboarding2DetailsRef.current?.handleSave();
       }
       return;
     }
-
-    // --- STEP 3 ---
     if (step === 3) {
       onboarding3Ref.current?.handleSave();
       return;
     }
-
-    // --- STEP 4 ---
     if (step === 4) {
       if (subStep === 1) {
         onboarding4Ref.current?.openModal();
       } else {
-        setStep(5);
-        setSubStep(1);
+        // Step 4 done, now confirm documents before moving to Step 5
+        confirmDocs.mutate(undefined, {
+          onSuccess: () => {
+            setStep(5);
+            setSubStep(1);
+          },
+        });
       }
       return;
     }
+    // --- FIX 2: Step 5 ka Submit trigger ---
+    if (step === 5) {
+      // Yeh OnBoarding5 component ke andar handleUpload function ko call karega
+      onboarding5Ref.current?.handleUpload();
+      return;
+    }
 
-    // --- FINAL ---
     if (step < totalSteps) {
       setStep(step + 1);
       setSubStep(1);
@@ -90,7 +106,7 @@ export default function OnBoardingStep() {
   };
 
   const getButtonTitle = () => {
-    if (step === 5) return 'Submit';
+    if (step === 5) return 'Submit Photos'; // Title update
     if (step === 2 && subStep === 2) return 'Confirm & Proceed';
     if (step === 3) return 'Save & Continue';
     if (step === 4) return subStep === 1 ? 'Upload Document' : 'Next Step';
@@ -111,9 +127,12 @@ export default function OnBoardingStep() {
           return (
             <TouchableOpacity
               key={item}
-              onPress={() => item < step && setStep(item)}
+              onPress={() => {
+                setStep(item);
+                setSubStep(1);
+              }}
               activeOpacity={0.7}
-              disabled={item >= step || isLoading}
+              disabled={item > step || isLoading} 
               className="mx-1 flex-1 justify-center">
               <View className={`w-full rounded-full ${bgColor}`} />
             </TouchableOpacity>
@@ -159,7 +178,6 @@ export default function OnBoardingStep() {
           {step === 4 &&
             (subStep === 1 ? (
               <OnBoarding4
-              
                 ref={onboarding4Ref}
                 onUploadDone={() => setSubStep(2)}
                 onUploadSuccess={() => setSubStep(2)}
@@ -168,11 +186,12 @@ export default function OnBoardingStep() {
               <OnBoarding4_List onAddMore={() => setSubStep(1)} />
             ))}
 
-          {step === 5 && <OnBoarding5 />}
+          {/* --- FIX 3: Ref pass kiya OnBoarding5 ko --- */}
+          {step === 5 && <OnBoarding5 ref={onboarding5Ref} initialData={userData} />}
         </View>
 
         {!(step === 2 && subStep === 1) && (
-          <View className="bg-white pb-8 pt-4 ">
+          <View className="bg-white pb-8 pt-4 px-4">
             <Button
               title={getButtonTitle()}
               onPress={handleNext}
