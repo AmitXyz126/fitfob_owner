@@ -1,6 +1,6 @@
 /* eslint-disable react/no-unescaped-entities */
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Image, ActivityIndicator } from 'react-native'; 
+import { View, Text, TextInput, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Button } from '@/components/Button';
@@ -14,6 +14,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useLoginRequest } from '@/hooks/useAuth';
 import Toast from 'react-native-toast-message';
+import { useAuthStore } from '@/store/useAuthStore';
 
 // 1. Validation Schema
 const loginSchema = z.object({
@@ -25,9 +26,9 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const router = useRouter();
-  const loginMutation = useLoginRequest(); 
+  const loginMutation = useLoginRequest();
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);  
+  const [rememberMe, setRememberMe] = useState(false);
 
   // Loading state shortcut
   const isLoading = loginMutation.isPending;
@@ -43,66 +44,84 @@ export default function Login() {
     defaultValues: { identifier: '', password: '' },
   });
 
- 
 
-const onSubmit = (data: LoginFormData) => {
-  loginMutation.mutate(data, {
-    onSuccess: (response) => {
-      Toast.show({
-        type: 'success',
-        text1: 'Login Successful',
-        text2: 'Welcome back! 👋',
-      });
-      router.replace('/onBoardingScreen/OnBoardingStep');
-    },
-    onError: (error: any) => {
-      const serverMsg = error?.response?.data?.error?.message || "Something went wrong";
-      const status = error?.response?.status;
+  const { setUser } = useAuthStore();
+  const onSubmit = (data: LoginFormData) => {
+    loginMutation.mutate(data, {
+      onSuccess: async (response) => {
+        Toast.show({
+          type: 'success',
+          text1: 'Login Successful',
+          text2: 'Welcome back! 👋',
+        });
 
-      // 1.  incorrect password
-      if (status === 401 || serverMsg.toLowerCase().includes("password")) {
-        setError('password', { 
-          type: 'manual', 
-          message: 'Incorrect password! Please try again.' 
+        const userData = response.user;
+
+       
+        await setUser({
+          ...userData,
+          token: response.jwt,
         });
-        Toast.show({
-          type: 'error',
-          text1: 'Authentication Failed',
-          text2: 'The password you entered is incorrect. 🔑',
-        });
-      } 
+
       
-    
-      else if (status === 404 || serverMsg.toLowerCase().includes("user") || serverMsg.toLowerCase().includes("identifier")) {
-        setError('identifier', { 
-          type: 'manual', 
-          message: 'Email/Phone is not registered. Please sign up first.' 
-        });
-        Toast.show({
-          type: 'error',
-          text1: 'User Not Found',
-          text2: 'Please check your email or sign up. ✉️',
-        });
-      } 
-      
-      // 3. Generic Error (Network/Server Down)
-      else {
-        Toast.show({
-          type: 'error',
-          text1: 'Connection Error',
-          text2: serverMsg,
-        });
-      }
-    },
-  });
-};
+        if (!userData.isVerified) {
+          router.push('/onBoardingScreen/OnBoardingStep');
+        } else {
+          router.push('/(tabs)');
+        }
+      },
+
+      onError: (error: any) => {
+        const serverMsg =
+          error?.response?.data?.error?.message || "Something went wrong";
+        const status = error?.response?.status;
+
+        if (status === 401 || serverMsg.toLowerCase().includes("password")) {
+          setError('password', {
+            type: 'manual',
+            message: 'Incorrect password! Please try again.'
+          });
+
+          Toast.show({
+            type: 'error',
+            text1: 'Authentication Failed',
+            text2: 'The password you entered is incorrect. 🔑',
+          });
+
+        } else if (
+          status === 404 ||
+          serverMsg.toLowerCase().includes("user") ||
+          serverMsg.toLowerCase().includes("identifier")
+        ) {
+
+          setError('identifier', {
+            type: 'manual',
+            message: 'Email/Phone is not registered. Please sign up first.'
+          });
+
+          Toast.show({
+            type: 'error',
+            text1: 'User Not Found',
+            text2: 'Please check your email or sign up. ✉️',
+          });
+
+        } else {
+          Toast.show({
+            type: 'error',
+            text1: 'Connection Error',
+            text2: serverMsg,
+          });
+        }
+      },
+    });
+  };
 
   return (
     <Container>
       {/* --- FULL SCREEN LOADING OVERLAY --- */}
       {isLoading && (
-        <View 
-          className="absolute inset-0 z-50 items-center justify-center" 
+        <View
+          className="absolute inset-0 z-50 items-center justify-center"
           style={{ backgroundColor: 'rgba(255, 255, 255, 0.8)' }}
         >
           <View className="items-center justify-center p-8 bg-white rounded-3xl  border border-[#CCCECE]">
@@ -116,9 +135,9 @@ const onSubmit = (data: LoginFormData) => {
       <KeyboardAwareScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-         pointerEvents={isLoading ? 'none' : 'auto'}
+        pointerEvents={isLoading ? 'none' : 'auto'}
         contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
-        
+
         {/* Header Section */}
         <View className="mt-12 items-center">
           <Image
@@ -185,9 +204,9 @@ const onSubmit = (data: LoginFormData) => {
 
           {/* Remember Me & Forgot Password Row */}
           <View className="flex-row items-center justify-between px-1 mt-3">
-            <TouchableOpacity 
+            <TouchableOpacity
               disabled={isLoading}
-              onPress={() => setRememberMe(!rememberMe)} 
+              onPress={() => setRememberMe(!rememberMe)}
               className="flex-row items-center"
             >
               <View className={`h-5 w-5 rounded border items-center justify-center ${rememberMe ? 'bg-[#F6163C] border-[#F6163C]' : 'border-slate-300'}`}>
@@ -221,12 +240,12 @@ const onSubmit = (data: LoginFormData) => {
 
         {/* Social Buttons */}
         <View className="mb-6 flex-row justify-between mt-2">
-            <TouchableOpacity disabled={isLoading} className="h-14 flex-[0.47] items-center justify-center rounded-2xl bg-[#F2F2F2]">
-              <Image source={require('../../assets/images/Google.png')} className="h-6 w-6" />
-            </TouchableOpacity>
-            <TouchableOpacity disabled={isLoading} className="h-14 flex-[0.47] items-center justify-center rounded-2xl bg-[#F2F2F2]">
-              <Image source={require('../../assets/images/Facebook.png')} className="h-6 w-6" />
-            </TouchableOpacity>
+          <TouchableOpacity disabled={isLoading} className="h-14 flex-[0.47] items-center justify-center rounded-2xl bg-[#F2F2F2]">
+            <Image source={require('../../assets/images/Google.png')} className="h-6 w-6" />
+          </TouchableOpacity>
+          <TouchableOpacity disabled={isLoading} className="h-14 flex-[0.47] items-center justify-center rounded-2xl bg-[#F2F2F2]">
+            <Image source={require('../../assets/images/Facebook.png')} className="h-6 w-6" />
+          </TouchableOpacity>
         </View>
 
         {/* Footer */}

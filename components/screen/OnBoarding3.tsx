@@ -249,7 +249,7 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
 
         <View className="mb-6">
           <Text className="mb-2 ml-1 font-sans text-sm font-normal text-[#697281]">Amenities</Text>
-          {['Parking', 'Wi-Fi', 'Showers', 'AC', 'Trainers'].map((item) => (
+          {['Parking', 'Wi-Fi', 'Showers', 'AC', 'Trainers','Pool','Restrooms', 'Breakfast'].map((item) => (
             <CheckboxItem
               key={item}
               label={item}

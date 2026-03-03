@@ -13,7 +13,7 @@ import { useRouter } from 'expo-router';
 import { useState, useRef, useEffect } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 import { useUserDetail } from '@/hooks/useUserDetail';
- 
+
 export default function OnBoardingStep() {
   const router = useRouter();
   const [step, setStep] = useState(1);
@@ -27,7 +27,7 @@ export default function OnBoardingStep() {
   const onboarding1Ref = useRef<any>(null);
   const onboarding2DetailsRef = useRef<any>(null);
   const onboarding3Ref = useRef<any>(null);
-  const onboarding4Ref = useRef<any>(null); 
+  const onboarding4Ref = useRef<any>(null);
   const onboarding5Ref = useRef<any>(null);
 
   const {
@@ -45,7 +45,7 @@ export default function OnBoardingStep() {
     if (userData && !isDataSynced) {
       setFormData(userData);
       setIsDataSynced(true);
-      
+
       // Auto-navigation based on server state only on initial mount
       if (userData.currentStep && userData.currentStep > 1) {
         setStep(userData.currentStep);
@@ -157,8 +157,8 @@ export default function OnBoardingStep() {
 
           {step === 2 &&
             (subStep === 1 ? (
-              <OnBoarding2_Part2 
-                onConfirm={() => setSubStep(2)} 
+              <OnBoarding2_Part2
+                onConfirm={() => setSubStep(2)}
               />
             ) : (
               <OnBoarding2_Details
