@@ -48,27 +48,14 @@ export default function Login() {
   const { setUser } = useAuthStore();
   const onSubmit = (data: LoginFormData) => {
     loginMutation.mutate(data, {
-      onSuccess: async (response) => {
+      onSuccess: () => {
         Toast.show({
           type: 'success',
           text1: 'Login Successful',
           text2: 'Welcome back! 👋',
         });
 
-        const userData = response.user;
-
        
-        await setUser({
-          ...userData,
-          token: response.jwt,
-        });
-
-      
-        if (!userData.isVerified) {
-          router.push('/onBoardingScreen/OnBoardingStep');
-        } else {
-          router.push('/(tabs)');
-        }
       },
 
       onError: (error: any) => {

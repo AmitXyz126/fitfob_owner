@@ -57,7 +57,7 @@ const RECENT_CHECKINS = [
   },
 ];
 
-export default function HomeScreen() {
+ const HomeScreen =() => {
   const router = useRouter();
   return (
     <Container style={{ paddingBottom: 0 }}>
@@ -227,3 +227,5 @@ export default function HomeScreen() {
     </Container>
   );
 }
+
+export default HomeScreen;

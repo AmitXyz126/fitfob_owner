@@ -21,7 +21,7 @@ export const useSignupRequest = () => {
 
 export const useResendOtp = () => {
   return useMutation({
-    mutationFn: resendOtpApi, 
+    mutationFn: resendOtpApi,
     onSuccess: (data) => {
       console.log('✅ OTP Resent Successfully:', data);
       Toast.show({
@@ -51,7 +51,7 @@ export const useVerifyOtp = () => {
   return useMutation({
     mutationFn: verifyOtpApi,
     onSuccess: (data) => {
-       if (data && data.jwt && data.user) {
+      if (data && data.jwt && data.user) {
         console.log('✅ OTP Verified. Finalizing User Session...');
 
         const userWithToken = {
@@ -107,7 +107,13 @@ export const useLoginRequest = () => {
         };
 
         setUser(userWithToken, true);
-        router.replace('/onBoardingScreen/OnBoardingStep');
+        console.log(userWithToken, 'usr Data');
+        
+        if (!userWithToken.isVerified) {
+          router.replace('/onBoardingScreen/OnBoardingStep');
+        } else {
+          router.replace('/(tabs)');
+        }
       }
     },
     onError: (error: any) => {

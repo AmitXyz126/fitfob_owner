@@ -34,7 +34,7 @@ export const userDetailsApi = {
     formData.append('phoneNumber', data.phone);
     formData.append('email', data.email);
 
-    // ✅ SAFE ANDROID VERSION
+    // SAFE ANDROID VERSION
 
     if (data.logo?.uri) {
       formData.append('logo', {
