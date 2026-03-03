@@ -33,8 +33,7 @@ export default function ForgotPasswordScreen() {
   });
 
   const onSubmit = (data: ForgotFormData) => {
-    // --- FIXED: Hook call with proper navigation on success ---
-    sendOtp(
+     sendOtp(
       { identifier: data.email.toLowerCase().trim() }, 
       {
         onSuccess: () => {

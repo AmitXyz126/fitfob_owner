@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { userDetailsApi, PhotoFile } from '@/api/userDetailsApi';
+ import { userDetailsApi } from '@/api/userdetailsApi';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';

@@ -125,22 +125,19 @@ export const userDetailsApi = {
     const formData = new FormData();
 
     photos.forEach((photo, index) => {
-      // React Native requires the { uri, name, type } structure to recognize a file
-      formData.append('clubPhotos', {
+       formData.append('clubPhotos', {
         uri: photo.uri,
         name: photo.name || `photo_${index}_${Date.now()}.jpg`,
         type: photo.type || 'image/jpeg',
       } as any);
     });
 
-    // We MUST override the global 'application/json' default from apiInstance
-    const response = await api.post(ENDPOINTS.STEP_7, formData, {
+     const response = await api.post(ENDPOINTS.STEP_7, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
         Accept: 'application/json',
       },
-      // IMPORTANT: Prevent Axios from trying to serialize FormData into JSON
-      transformRequest: (data) => data,
+       transformRequest: (data) => data,
     });
 
     return response.data;
