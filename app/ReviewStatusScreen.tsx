@@ -4,15 +4,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { Button } from '@/components/Button';
 import { router } from 'expo-router';
 
-export default function ReviewStatusScreen({navigation}:any) {
+export default function ReviewStatusScreen({ navigation }: any) {
   return (
     <Container style={{ flex: 1 }}>
       {/* Back Button */}
-    <TouchableOpacity 
-        className="ml-2 mt-5 p-2 w-10" 
-        onPress={() => navigation.goBack()} 
-        activeOpacity={0.7}
-      >
+      {/* Back Button */}
+      <TouchableOpacity
+        className="ml-2 mt-5 w-10 p-2"
+        onPress={() => {
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace('/');
+          }
+        }}
+        activeOpacity={0.7}>
         <Ionicons name="chevron-back" size={24} color="#CBD5E1" />
       </TouchableOpacity>
 

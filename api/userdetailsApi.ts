@@ -28,24 +28,24 @@ export const userDetailsApi = {
 
   saveStep1: async (id: number, data: any) => {
     const formData = new FormData();
+
     formData.append('clubName', data.clubName);
     formData.append('ownerName', data.ownerName);
     formData.append('phoneNumber', data.phone);
     formData.append('email', data.email);
 
-    if (data.image) {
-      const uriParts = data.image.split('.');
-      const fileType = uriParts[uriParts.length - 1];
+    // ✅ SAFE ANDROID VERSION
+
+    if (data.logo?.uri) {
       formData.append('logo', {
-        uri: data.image,
-        name: `logo.${fileType}`,
-        type: `image/${fileType}`,
+        uri: data.logo.uri,
+        name: data.logo.name || `upload_${Date.now()}.jpg`,
+        type: data.logo.type || 'image/jpeg',
       } as any);
     }
 
-    const response = await api.post(ENDPOINTS.STEP_1, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    const response = await api.post(ENDPOINTS.STEP_1, formData);
+
     return response.data;
   },
 
@@ -120,8 +120,6 @@ export const userDetailsApi = {
     const response = await api.get(ENDPOINTS.Get);
     return response.data;
   },
-
-
 
   uploadClubPhotos: async (photos: any[]) => {
     const formData = new FormData();

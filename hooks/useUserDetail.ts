@@ -8,8 +8,7 @@ export const useUserDetail = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  // 1. Yahan refetch aur isRefetching ko add kiya
-  const {
+   const {
     data: userData,
     isLoading: isFetchingStatus,
     refetch,

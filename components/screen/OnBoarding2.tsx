@@ -9,14 +9,16 @@ import { useUserDetail } from '@/hooks/useUserDetail';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const GOOGLE_API_KEY = 'AIzaSyB7liTs6ffq-vFE9VZH5rjbQ_ttSSFSb4o'; 
-const STORAGE_KEY_MAP = '@onboarding_step2_map_data';
+// Removed global STORAGE_KEY_MAP to use user-specific key inside component
 
 interface OnBoarding2Props {
   onConfirm: () => void;
 }
 
 const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
-  const { submitStep2 } = useUserDetail();
+  const { userData, submitStep2 } = useUserDetail();
+  const userId = userData?.id || userData?.pendingClubOwnerId;
+  const STORAGE_KEY = `@onboarding_step2_map_data_${userId || 'guest'}`;
   const [isLocalLoaded, setIsLocalLoaded] = useState(false);
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
 
@@ -36,21 +38,40 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
   const autoCompleteRef = useRef<any>(null);
   const isMoving = useRef(false);
 
+  const [isInitialized, setIsInitialized] = useState(false);
+
   // --- 1. Load Saved Data on Mount ---
   useEffect(() => {
     const loadSavedMap = async () => {
       try {
-        const savedData = await AsyncStorage.getItem(STORAGE_KEY_MAP);
-        if (savedData) {
-          const parsed = JSON.parse(savedData);
-          setRegion(parsed.region);
-          setLocationInfo(parsed.locationInfo);
-          setTimeout(() => {
-            autoCompleteRef.current?.setAddressText(parsed.locationInfo.address);
-            mapRef.current?.animateToRegion(parsed.region, 500);
-          }, 500);
-        } else {
-          await getCurrentLocation();
+        // Priority 1: Server data from userData
+        if (userData?.latitude && userData?.longitude) {
+          const lat = parseFloat(userData.latitude);
+          const lng = parseFloat(userData.longitude);
+          const newRegion = {
+            latitude: lat,
+            longitude: lng,
+            latitudeDelta: 0.005,
+            longitudeDelta: 0.005,
+          };
+          setRegion(newRegion);
+          getAddressFromCoords(lat, lng);
+          setIsInitialized(true);
+        } else if (!isInitialized) {
+          // Priority 2: Local Storage Draft
+          const savedData = await AsyncStorage.getItem(STORAGE_KEY);
+          if (savedData) {
+            const parsed = JSON.parse(savedData);
+            setRegion(parsed.region);
+            setLocationInfo(parsed.locationInfo);
+            setTimeout(() => {
+              autoCompleteRef.current?.setAddressText(parsed.locationInfo.address);
+              mapRef.current?.animateToRegion(parsed.region, 500);
+            }, 500);
+          } else {
+            await getCurrentLocation();
+          }
+          setIsInitialized(true);
         }
       } catch (e) {
         console.log("Error loading map storage", e);
@@ -59,7 +80,7 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
       }
     };
     loadSavedMap();
-  }, []);
+  }, [STORAGE_KEY, userData, isInitialized]);
 
   // --- 2. Reverse Geocode with validation ---
   const getAddressFromCoords = async (lat: number, lng: number) => {
@@ -79,7 +100,7 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
         setLocationInfo({ name, address });
         
         // Auto-save to local storage
-        AsyncStorage.setItem(STORAGE_KEY_MAP, JSON.stringify({ 
+        AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ 
           region: { ...region, latitude: lat, longitude: lng }, 
           locationInfo: { name, address } 
         }));
@@ -117,7 +138,8 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
     };
 
     submitStep2.mutate(payload, {
-      onSuccess: () => {
+      onSuccess: async () => {
+        await AsyncStorage.removeItem(STORAGE_KEY);
         onConfirm();
       },
       onError: (err) => {
@@ -164,7 +186,7 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
                 address: details.formatted_address,
               };
               setLocationInfo(info);
-              AsyncStorage.setItem(STORAGE_KEY_MAP, JSON.stringify({ region: newRegion, locationInfo: info }));
+              AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ region: newRegion, locationInfo: info }));
             }
           }}
           query={{ key: GOOGLE_API_KEY, language: 'en' }}

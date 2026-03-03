@@ -5,15 +5,18 @@ import { useUserDetail } from '@/hooks/useUserDetail';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface OnBoarding2DetailsProps {
+  initialData?: any;
   onBack: () => void;
   onNext?: () => void;
 }
 
-const STORAGE_KEY = '@onboarding_step2_details';
+// Removed global STORAGE_KEY to use user-specific key inside component
 
 const OnBoarding2_Details = forwardRef((props: OnBoarding2DetailsProps, ref) => {
-  const { onBack, onNext } = props;
+  const { onBack, onNext, initialData } = props;
   const { submitStep3, userData } = useUserDetail();
+  const userId = userData?.id || userData?.pendingClubOwnerId;
+  const STORAGE_KEY = `@onboarding_step2_details_${userId || 'guest'}`;
 
   const [formData, setFormData] = useState({
     clubAddress: '',
@@ -22,43 +25,44 @@ const OnBoarding2_Details = forwardRef((props: OnBoarding2DetailsProps, ref) => 
     pincode: '',
   });
 
-  const [isLocalLoaded, setIsLocalLoaded] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
+  // 1. Initialize logic
   useEffect(() => {
-    const loadSavedData = async () => {
-      try {
-        const savedData = await AsyncStorage.getItem(STORAGE_KEY);
-        if (savedData) {
-          setFormData(JSON.parse(savedData));
+    const initData = async () => {
+      // Priority 1: initialData (from Parent/API)
+      const data = initialData || userData;
+
+      if (data && (data.clubAddress || data.pincode)) {
+        setFormData({
+          clubAddress: data.clubAddress || '',
+          city: data.city || 'Mohali',
+          state: data.state || 'Punjab',
+          pincode: data.pincode || '',
+        });
+        setIsInitialized(true);
+      } else if (!isInitialized) {
+        // Priority 2: Local Storage Draft (only if no server data yet)
+        try {
+          const savedData = await AsyncStorage.getItem(STORAGE_KEY);
+          if (savedData) {
+            setFormData(JSON.parse(savedData));
+          }
+        } catch (error) {
+          console.error('Error loading local data:', error);
+        } finally {
+          setIsInitialized(true);
         }
-      } catch (error) {
-        console.error('Error loading local data:', error);
-      } finally {
-        setIsLocalLoaded(true);
       }
     };
-    loadSavedData();
-  }, []);
+    initData();
+  }, [initialData, userData, isInitialized, STORAGE_KEY]);
 
-  
-
-  useEffect(() => {
-    if (isLocalLoaded && userData) {
-      setFormData((prev) => ({
-        ...prev,
-        clubAddress: userData.clubAddress || prev.clubAddress,
-        city: userData.city || prev.city,
-        state: userData.state || prev.state,
-        pincode: userData.pincode || prev.pincode,
-      }));
-    }
-    
-  }, [userData, isLocalLoaded]);
-
+  // 2. Draft backup
   useEffect(() => {
     const saveData = async () => {
       try {
-        if (isLocalLoaded) {
+        if (isInitialized) {
           await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
         }
       } catch (error) {
@@ -66,9 +70,10 @@ const OnBoarding2_Details = forwardRef((props: OnBoarding2DetailsProps, ref) => 
       }
     };
     saveData();
-  }, [formData, isLocalLoaded]);
+  }, [formData, isInitialized, STORAGE_KEY]);
 
   useImperativeHandle(ref, () => ({
+    getFormData: () => formData,
     handleSave: () => {
       // Validation
       if (!formData.clubAddress.trim() || !formData.pincode.trim()) {

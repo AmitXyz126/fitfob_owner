@@ -272,7 +272,7 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
           <Text className="font-semibold text-xs text-gray-400">Document Info</Text>
           {scanStatus === 'success' && (
             <TouchableOpacity onPress={resetScanner}>
-              <Text className="font-bold text-xs text-[#F6163C]">Retake / Clear</Text>
+              <Text className="font-bold text-xs text-[#F6163C]">Retake--Clear</Text>
             </TouchableOpacity>
           )}
         </View>

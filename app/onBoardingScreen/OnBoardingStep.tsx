@@ -21,11 +21,14 @@ export default function OnBoardingStep() {
   const [subStep, setSubStep] = useState(1);
   const totalSteps = 5;
 
+  // --- 1. Centralized Parent State ---
+  const [formData, setFormData] = useState<any>({});
+  const [isDataSynced, setIsDataSynced] = useState(false);
+
   const onboarding1Ref = useRef<any>(null);
   const onboarding2DetailsRef = useRef<any>(null);
   const onboarding3Ref = useRef<any>(null);
-  const onboarding4Ref = useRef<any>(null);
-  // --- FIX 1: Step 5 ke liye Ref add ki ---
+  const onboarding4Ref = useRef<any>(null); 
   const onboarding5Ref = useRef<any>(null);
 
   const {
@@ -38,7 +41,23 @@ export default function OnBoardingStep() {
     userData,
   } = useUserDetail();
 
-  // Yahan check kar lena agar Step 5 ki koi pending state hai toh usey bhi add kar sakte ho
+  // --- 2. Sync Global State with API Once ---
+  useEffect(() => {
+    if (userData && !isDataSynced) {
+      setFormData(userData);
+      setIsDataSynced(true);
+      
+      // Auto-navigation based on server state only on initial mount
+      if (userData.currentStep && userData.currentStep > 1) {
+        setStep(userData.currentStep);
+      }
+    }
+  }, [userData, isDataSynced]);
+
+  const updateFormData = (newData: any) => {
+    setFormData((prev: any) => ({ ...prev, ...newData }));
+  };
+
   const isLoading =
     submitStep1.isPending ||
     submitStep3.isPending ||
@@ -46,21 +65,10 @@ export default function OnBoardingStep() {
     submitStep7.isPending ||
     confirmDocs.isPending;
 
-  useEffect(() => {
-    const syncSteps = async () => {
-      if (userData?.currentStep && step === 1 && userData.currentStep > 1) {
-        setStep(userData.currentStep);
-        if (userData.currentStep === 2) {
-          const savedData = await AsyncStorage.getItem('@onboarding_step2_details');
-          if (savedData) setSubStep(2);
-        }
-      }
-    };
-    syncSteps();
-  }, [userData?.currentStep]);
-
   const handleNext = async () => {
     if (step === 1) {
+      const data = onboarding1Ref.current?.getFormData();
+      if (data) updateFormData(data);
       onboarding1Ref.current?.handleSave();
       return;
     }
@@ -68,11 +76,15 @@ export default function OnBoardingStep() {
       if (subStep === 1) {
         setSubStep(2);
       } else {
+        const data = onboarding2DetailsRef.current?.getFormData();
+        if (data) updateFormData(data);
         onboarding2DetailsRef.current?.handleSave();
       }
       return;
     }
     if (step === 3) {
+      const data = onboarding3Ref.current?.getFormData();
+      if (data) updateFormData(data);
       onboarding3Ref.current?.handleSave();
       return;
     }
@@ -80,7 +92,6 @@ export default function OnBoardingStep() {
       if (subStep === 1) {
         onboarding4Ref.current?.openModal();
       } else {
-        // Step 4 done, now confirm documents before moving to Step 5
         confirmDocs.mutate(undefined, {
           onSuccess: () => {
             setStep(5);
@@ -90,23 +101,14 @@ export default function OnBoardingStep() {
       }
       return;
     }
-    // --- FIX 2: Step 5 ka Submit trigger ---
     if (step === 5) {
-      // Yeh OnBoarding5 component ke andar handleUpload function ko call karega
       onboarding5Ref.current?.handleUpload();
       return;
-    }
-
-    if (step < totalSteps) {
-      setStep(step + 1);
-      setSubStep(1);
-    } else {
-      router.replace('/ReviewStatusScreen');
     }
   };
 
   const getButtonTitle = () => {
-    if (step === 5) return 'Submit Photos'; // Title update
+    if (step === 5) return 'Submit Photos';
     if (step === 2 && subStep === 2) return 'Confirm & Proceed';
     if (step === 3) return 'Save & Continue';
     if (step === 4) return subStep === 1 ? 'Upload Document' : 'Next Step';
@@ -132,7 +134,7 @@ export default function OnBoardingStep() {
                 setSubStep(1);
               }}
               activeOpacity={0.7}
-              disabled={item > step || isLoading} 
+              disabled={item > (userData?.currentStep || 1) && item > step}
               className="mx-1 flex-1 justify-center">
               <View className={`w-full rounded-full ${bgColor}`} />
             </TouchableOpacity>
@@ -146,18 +148,24 @@ export default function OnBoardingStep() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
         <View className="mt-5 flex-1">
-          {step === 1 && <OnBoarding1 ref={onboarding1Ref} initialData={userData} />}
+          {step === 1 && (
+            <OnBoarding1
+              ref={onboarding1Ref}
+              initialData={formData}
+              onNext={() => setStep(2)}
+            />
+          )}
 
           {step === 2 &&
             (subStep === 1 ? (
-              <OnBoarding2_Part2 onConfirm={handleNext} />
+              <OnBoarding2_Part2 
+                onConfirm={() => setSubStep(2)} 
+              />
             ) : (
               <OnBoarding2_Details
                 ref={onboarding2DetailsRef}
-                onBack={() => {
-                  setStep(2);
-                  setSubStep(1);
-                }}
+                initialData={formData}
+                onBack={() => setSubStep(1)}
                 onNext={() => {
                   setStep(3);
                   setSubStep(1);
@@ -168,6 +176,7 @@ export default function OnBoardingStep() {
           {step === 3 && (
             <OnBoarding3
               ref={onboarding3Ref}
+              initialData={formData}
               onNext={() => {
                 setStep(4);
                 setSubStep(1);
@@ -186,8 +195,7 @@ export default function OnBoardingStep() {
               <OnBoarding4_List onAddMore={() => setSubStep(1)} />
             ))}
 
-          {/* --- FIX 3: Ref pass kiya OnBoarding5 ko --- */}
-          {step === 5 && <OnBoarding5 ref={onboarding5Ref} initialData={userData} />}
+          {step === 5 && <OnBoarding5 ref={onboarding5Ref} initialData={formData} />}
         </View>
 
         {!(step === 2 && subStep === 1) && (

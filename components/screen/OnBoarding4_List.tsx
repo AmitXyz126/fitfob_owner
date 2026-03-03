@@ -1,5 +1,12 @@
 import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useUserDetail } from '@/hooks/useUserDetail';
 import { useIsFocused } from '@react-navigation/native';
@@ -27,14 +34,14 @@ export default function OnBoarding4_List({ onAddMore }: Props) {
       className="mb-3 flex-row items-center rounded-[20px] bg-[#F3F4F6] p-4">
       <View className="items-center justify-center rounded-xl bg-white p-2 shadow-sm">
         <Ionicons name="document-text-outline" size={28} color="#6B7280" />
-        <Text className="mt-[-4px] font-bold text-[8px] text-gray-500 uppercase">
+        <Text className="mt-[-4px] font-bold text-[8px] uppercase text-gray-500">
           {item?.fileType?.includes('pdf') ? 'PDF' : 'IMG'}
         </Text>
       </View>
 
       <View className="ml-4 flex-1">
         <Text className="font-semibold text-base text-[#374151]" numberOfLines={1}>
-          {item?.documentName || 'Untitled Document'}
+          {item?.documentName || item?.name || 'Untitled Document'}
         </Text>
         <View className="mt-1 flex-row items-center">
           <View className="mr-1 rounded-full bg-[#10B981] p-[2px]">
@@ -64,7 +71,9 @@ export default function OnBoarding4_List({ onAddMore }: Props) {
       <FlatList
         data={docList}
         renderItem={renderItem}
-        keyExtractor={(item, index) => item?.id?.toString() || item?._id?.toString() || index.toString()}
+        keyExtractor={(item, index) =>
+          item?.id?.toString() || item?._id?.toString() || index.toString()
+        }
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 20 }}
         ListEmptyComponent={

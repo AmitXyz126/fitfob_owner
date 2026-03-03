@@ -1,18 +1,25 @@
 /* eslint-disable no-unused-expressions */
-import React, { useState, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Platform, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import LineGradient from '../lineGradient/LineGradient';
 import { useUserDetail } from '@/hooks/useUserDetail';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Props interface for TypeScript safety
 interface OnBoarding3Props {
+  initialData?: any;
   onNext?: () => void;
 }
 
+// Removed global STORAGE_KEY_STEP3 to use user-specific key inside component
+
 const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
-  const { submitStep4} = useUserDetail();
+  const { initialData, } = props;
+  const { submitStep4, userData } = useUserDetail();
+  const userId = userData?.id || userData?.pendingClubOwnerId;
+  const STORAGE_KEY = `@onboarding_step3_data_${userId || 'guest'}`;
 
   // --- NEW STATE FOR CLUB CATEGORY ---
   const [clubCategory, setClubCategory] = useState('Luxury');
@@ -29,6 +36,74 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
   const [weekdayRange, setWeekdayRange] = useState('Monday to Friday');
   const [weekendRange, setWeekendRange] = useState('Saturday & Sunday');
   const [showDayModal, setShowDayModal] = useState<'weekday' | 'weekend' | null>(null);
+
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // 1. Initial Load from initialData (Parent/API) or Local Storage
+  useEffect(() => {
+    const initData = async () => {
+      // Priority 1: initialData (from Parent/API)
+      const data = initialData || userData;
+      
+      if (data && data.clubCategory) {
+        setClubCategory(data.clubCategory);
+        setFitnessTypes(data.services || []);
+        setAmenities(data.facilities || []);
+        if (data.openingTime) {
+          const [h, m] = data.openingTime.split(':');
+          setStartTime(new Date().setHours(parseInt(h), parseInt(m)));
+        }
+        if (data.closingTime) {
+          const [h, m] = data.closingTime.split(':');
+          setEndTime(new Date().setHours(parseInt(h), parseInt(m)));
+        }
+        setWeekdayRange(data.weekday || 'Monday to Friday');
+        setWeekendRange(data.weekend || 'Saturday & Sunday');
+        setIsInitialized(true);
+      } else if (!isInitialized) {
+        // Priority 2: Local Storage Draft (only if no server data yet)
+        const saved = await AsyncStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setClubCategory(parsed.clubCategory || 'Luxury');
+          setFitnessTypes(parsed.fitnessTypes || ['Gym']);
+          setAmenities(parsed.amenities || ['Parking', 'Wi-Fi']);
+          setStartTime(parsed.startTime || new Date().setHours(5, 0));
+          setEndTime(parsed.endTime || new Date().setHours(22, 0));
+          setWeekdayRange(parsed.weekdayRange || 'Monday to Friday');
+          setWeekendRange(parsed.weekendRange || 'Saturday & Sunday');
+        }
+        setIsInitialized(true);
+      }
+    };
+    initData();
+  }, [initialData, userData, isInitialized, STORAGE_KEY]);
+
+  // 2. Draft backup
+  useEffect(() => {
+    if (isInitialized) {
+      const draft = {
+        clubCategory,
+        fitnessTypes,
+        amenities,
+        startTime,
+        endTime,
+        weekdayRange,
+        weekendRange,
+      };
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+    }
+  }, [
+    clubCategory,
+    fitnessTypes,
+    amenities,
+    startTime,
+    endTime,
+    weekdayRange,
+    weekendRange,
+    isInitialized,
+    STORAGE_KEY,
+  ]);
 
   const weekdayOptions = [
     'Monday to Friday',
@@ -64,6 +139,15 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
 
   // --- FIXED: EXPOSE SAVE METHOD WITH SUCCESS CALLBACK ---
   useImperativeHandle(ref, () => ({
+    getFormData: () => ({
+      clubCategory,
+      fitnessTypes,
+      amenities,
+      startTime,
+      endTime,
+      weekdayRange,
+      weekendRange,
+    }),
     handleSave: () => {
       const payload = {
         clubCategory: clubCategory, // Category added here
@@ -77,7 +161,8 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
 
       // Mutate with onSuccess handler
       submitStep4.mutate(payload as any, {
-        onSuccess: () => {
+        onSuccess: async () => {
+          await AsyncStorage.removeItem(STORAGE_KEY);
           props.onNext && props.onNext();
         },
         onError: (err) => {
