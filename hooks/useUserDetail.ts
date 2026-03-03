@@ -133,7 +133,7 @@ export const useUserDetail = () => {
 
       Toast.show({ type: 'success', text1: successMessage });
 
-      router.replace('/ReviewStatusScreen');
+      router.replace('/Completed');
     },
     onError: (error: any) => {
       console.error('Step 7 Mutation Error:', error);

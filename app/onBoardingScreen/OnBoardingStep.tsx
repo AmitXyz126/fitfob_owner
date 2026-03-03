@@ -13,8 +13,7 @@ import { useRouter } from 'expo-router';
 import { useState, useRef, useEffect } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 import { useUserDetail } from '@/hooks/useUserDetail';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
+ 
 export default function OnBoardingStep() {
   const router = useRouter();
   const [step, setStep] = useState(1);

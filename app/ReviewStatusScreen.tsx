@@ -3,8 +3,19 @@ import { Container } from '@/components/Container';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '@/components/Button';
 import { router } from 'expo-router';
+import { useAuthStore } from '@/store/useAuthStore';
+import { useEffect } from 'react';
 
 export default function ReviewStatusScreen({ navigation }: any) {
+  const { user, } = useAuthStore();
+
+  const isVerified = user?.isVerified;
+
+  useEffect(() => {
+    if (isVerified) {
+      router.replace('/(tabs)');
+    }
+  }, [isVerified]);
   return (
     <Container style={{ flex: 1 }}>
       {/* Back Button */}
@@ -42,7 +53,13 @@ export default function ReviewStatusScreen({ navigation }: any) {
       </View>
 
       <View className="mb-6 px-6">
-        <Button title="Done" onPress={() => router.replace('/Completed')} />
+        <Button
+          title="Refresh Status"
+          
+          onPress={() => {
+            if (isVerified) router.replace('/(tabs)');
+          }}
+        />{' '}
       </View>
     </Container>
   );
