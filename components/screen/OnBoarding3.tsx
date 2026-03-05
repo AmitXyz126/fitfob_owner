@@ -13,10 +13,8 @@ interface OnBoarding3Props {
   onNext?: () => void;
 }
 
-// Removed global STORAGE_KEY_STEP3 to use user-specific key inside component
-
 const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
-  const { initialData, } = props;
+  const { initialData } = props;
   const { submitStep4, userData } = useUserDetail();
   const userId = userData?.id || userData?.pendingClubOwnerId;
   const STORAGE_KEY = `@onboarding_step3_data_${userId || 'guest'}`;
@@ -44,7 +42,7 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
     const initData = async () => {
       // Priority 1: initialData (from Parent/API)
       const data = initialData || userData;
-      
+
       if (data && data.clubCategory) {
         setClubCategory(data.clubCategory);
         setFitnessTypes(data.services || []);
@@ -150,7 +148,7 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
     }),
     handleSave: () => {
       const payload = {
-        clubCategory: clubCategory, // Category added here
+        clubCategory: clubCategory,
         services: fitnessTypes,
         facilities: amenities,
         openingTime: formatTimeForApi(startTime),
@@ -237,26 +235,30 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
           <Text className="mb-2 ml-1 font-sans text-sm font-normal text-[#697281]">
             Type of Fitness club
           </Text>
-          {['Gym', 'Yoga', 'Pilates', 'Dance', 'Other'].map((item) => (
-            <CheckboxItem
-              key={item}
-              label={item}
-              isSelected={fitnessTypes.includes(item)}
-              onPress={() => toggleSelection(item, fitnessTypes, setFitnessTypes)}
-            />
-          ))}
+          {['Gym', 'Yoga', 'Pilates', 'Dance', 'Kickboxing', 'Zumba', 'Climbing', 'Spin'].map(
+            (item) => (
+              <CheckboxItem
+                key={item}
+                label={item}
+                isSelected={fitnessTypes.includes(item)}
+                onPress={() => toggleSelection(item, fitnessTypes, setFitnessTypes)}
+              />
+            )
+          )}
         </View>
 
         <View className="mb-6">
           <Text className="mb-2 ml-1 font-sans text-sm font-normal text-[#697281]">Amenities</Text>
-          {['Parking', 'Wi-Fi', 'Showers', 'AC', 'Trainers','Pool','Restrooms', 'Breakfast'].map((item) => (
-            <CheckboxItem
-              key={item}
-              label={item}
-              isSelected={amenities.includes(item)}
-              onPress={() => toggleSelection(item, amenities, setAmenities)}
-            />
-          ))}
+          {['Parking', 'Wi-Fi', 'Showers', 'AC', 'Trainers', 'Pool', 'Restrooms', 'Breakfast'].map(
+            (item) => (
+              <CheckboxItem
+                key={item}
+                label={item}
+                isSelected={amenities.includes(item)}
+                onPress={() => toggleSelection(item, amenities, setAmenities)}
+              />
+            )
+          )}
         </View>
 
         <View className="mb-10">

@@ -130,7 +130,7 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
   };
 
   const handleConfirm = () => {
-    if (isReverseGeocoding) return; // Wait if still fetching address
+    if (isReverseGeocoding) return;  
 
     const payload = {
       latitude: region.latitude.toString(),

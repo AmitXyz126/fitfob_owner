@@ -21,33 +21,41 @@ export const userDetailsApi = {
     return response.data;
   },
 
-  getMe: async () => {
+   getMe: async () => {
     const response = await api.get(ENDPOINTS.GET_ONBOARDING_STATUS);
     return response.data;
   },
 
-  saveStep1: async (id: number, data: any) => {
-    const formData = new FormData();
+saveStep1: async (id: number, data: any) => {
+  const formData = new FormData();
 
-    formData.append('clubName', data.clubName);
-    formData.append('ownerName', data.ownerName);
-    formData.append('phoneNumber', data.phone);
-    formData.append('email', data.email);
+  formData.append('clubName', data.clubName);
+  formData.append('ownerName', data.ownerName);
+  formData.append('phoneNumber', data.phone);
+  formData.append('email', data.email);
 
-    // SAFE ANDROID VERSION
+  if (data.logo?.uri) {
+    const file = {
+      uri: data.logo.uri,
+      name: data.logo.name || `logo_${Date.now()}.jpg`,
+      type: data.logo.type || 'image/jpeg',
+    };
 
-    if (data.logo?.uri) {
-      formData.append('logo', {
-        uri: data.logo.uri,
-        name: data.logo.name || `upload_${Date.now()}.jpg`,
-        type: data.logo.type || 'image/jpeg',
-      } as any);
+    formData.append('logo', file as any);
+  }
+
+  const response = await api.post(
+    ENDPOINTS.STEP_1,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
     }
+  );
 
-    const response = await api.post(ENDPOINTS.STEP_1, formData);
-
-    return response.data;
-  },
+  return response.data;
+},
 
   saveStep2: async (id: number, data: { latitude: string; longitude: string }) => {
     const payload = {

@@ -46,8 +46,7 @@ export default function OnBoardingStep() {
       setFormData(userData);
       setIsDataSynced(true);
 
-      // Auto-navigation based on server state only on initial mount
-      if (userData.currentStep && userData.currentStep > 1) {
+       if (userData.currentStep && userData.currentStep > 1) {
         setStep(userData.currentStep);
       }
     }
@@ -56,6 +55,7 @@ export default function OnBoardingStep() {
   const updateFormData = (newData: any) => {
     setFormData((prev: any) => ({ ...prev, ...newData }));
   };
+
 
   const isLoading =
     submitStep1.isPending ||
@@ -198,7 +198,7 @@ export default function OnBoardingStep() {
         </View>
 
         {!(step === 2 && subStep === 1) && (
-          <View className="bg-white pb-8 pt-4 px-4">
+          <View className="bg-white pb-8 pt-4 ">
             <Button
               title={getButtonTitle()}
               onPress={handleNext}

@@ -35,7 +35,7 @@ export const useUserDetail = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
-      Toast.show({ type: 'success', text1: 'Step 1 Saved! ✅' });
+      // Toast.show({ type: 'success', text1: 'Step 1 Saved! ✅' });
     },
     onError: (error: any) => {
       Toast.show({
@@ -54,7 +54,7 @@ export const useUserDetail = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
-      Toast.show({ type: 'success', text1: 'Location Saved! 📍' });
+      // Toast.show({ type: 'success', text1: 'Location Saved! 📍' });
     },
   });
 
@@ -71,7 +71,7 @@ export const useUserDetail = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
-      Toast.show({ type: 'success', text1: 'Address Details Saved! 🏠' });
+      // Toast.show({ type: 'success', text1: 'Address Details Saved! 🏠' });
     },
     onError: (error: any) => {
       Toast.show({
@@ -90,7 +90,7 @@ export const useUserDetail = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
-      Toast.show({ type: 'success', text1: 'Club Configured! ⚙️' });
+      // Toast.show({ type: 'success', text1: 'Club Configured! ⚙️' });
     },
     onError: (error: any) => {
       Toast.show({
@@ -107,7 +107,7 @@ export const useUserDetail = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
       queryClient.invalidateQueries({ queryKey: ['club-owner-docs'] });
-      Toast.show({ type: 'success', text1: 'Document Uploaded! 📄' });
+      // Toast.show({ type: 'success', text1: 'Document Uploaded! 📄' });
     },
     onError: (error: any) => {
       Toast.show({ type: 'error', text1: 'Upload Failed', text2: error.response?.data?.message });
@@ -119,7 +119,7 @@ export const useUserDetail = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
       queryClient.invalidateQueries({ queryKey: ['club-owner-docs'] });
-      Toast.show({ type: 'success', text1: 'All documents confirmed! ✅' });
+      // Toast.show({ type: 'success', text1: 'All documents confirmed! ✅' });
     },
   });
 
@@ -131,7 +131,7 @@ export const useUserDetail = () => {
 
       const successMessage = data?.message || 'Club Owner profile created successfully! 📸';
 
-      Toast.show({ type: 'success', text1: successMessage });
+      // Toast.show({ type: 'success', text1: successMessage });
 
       router.replace('/Completed');
     },

@@ -22,8 +22,7 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
   const router = useRouter();
   const [images, setImages] = useState<(string | null)[]>(Array(6).fill(null));
 
-  // Use hook to get mutations and latest data
-  const { userData, submitStep7 } = useUserDetail();
+   const { userData, submitStep7 } = useUserDetail();
   const isLoading = submitStep7.isPending;
 
   // Effect to populate images from initialData (userData)
@@ -91,8 +90,7 @@ const handleUploadLogic = () => {
     .map((uri, index) => {
       if (!uri) return null;
 
-      // Skip already uploaded images (http URLs)
-      if (uri.startsWith('http')) return null;
+       if (uri.startsWith('http')) return null;
 
       return {
         uri,
@@ -111,7 +109,7 @@ const handleUploadLogic = () => {
 };
 
   return (
-    <View className="flex-1 bg-white p-4">
+    <View className="flex-1 bg-white ">
       {isLoading && (
         <View className="absolute inset-0 z-50 items-center justify-center bg-white/50">
           <ActivityIndicator size="large" color="#F6163C" />

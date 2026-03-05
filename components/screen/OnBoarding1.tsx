@@ -99,10 +99,11 @@ const OnBoarding1 = forwardRef(({ initialData, onNext }: any, ref) => {
       }
 
       const asset = result.assets[0];
+
       const fileToUpload = {
         uri: asset.uri,
-        name: asset.fileName ? asset.fileName : `photo_${Date.now()}.jpg`,
-        type: asset.mimeType ? asset.mimeType : 'image/jpeg',
+        name: asset.fileName || `photo_${Date.now()}.jpg`,
+        type: asset.mimeType || 'image/jpeg',
       };
 
       setImage(asset.uri);

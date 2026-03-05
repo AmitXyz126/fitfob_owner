@@ -17,7 +17,7 @@ const OnBoarding2_Details = forwardRef((props: OnBoarding2DetailsProps, ref) => 
   const { submitStep3, userData } = useUserDetail();
   const userId = userData?.id || userData?.pendingClubOwnerId;
   const STORAGE_KEY = `@onboarding_step2_details_${userId || 'guest'}`;
-
+const STORAGE_KEY_MAP = `@onboarding_step2_map_data_${userId || 'guest'}`;
   const [formData, setFormData] = useState({
     clubAddress: '',
     city: 'Mohali',
@@ -33,6 +33,10 @@ const OnBoarding2_Details = forwardRef((props: OnBoarding2DetailsProps, ref) => 
       // Priority 1: initialData (from Parent/API)
       const data = initialData || userData;
 
+      const saveData = await AsyncStorage.getItem(STORAGE_KEY_MAP);
+      if (saveData) {
+        console.log(JSON.parse(saveData), 'map Data fghjk');
+      }
       if (data && (data.clubAddress || data.pincode)) {
         setFormData({
           clubAddress: data.clubAddress || '',
@@ -42,10 +46,10 @@ const OnBoarding2_Details = forwardRef((props: OnBoarding2DetailsProps, ref) => 
         });
         setIsInitialized(true);
       } else if (!isInitialized) {
-        // Priority 2: Local Storage Draft (only if no server data yet)
         try {
           const savedData = await AsyncStorage.getItem(STORAGE_KEY);
           if (savedData) {
+            console.log(JSON.parse(savedData), 'map Data');
             setFormData(JSON.parse(savedData));
           }
         } catch (error) {
@@ -94,7 +98,7 @@ const OnBoarding2_Details = forwardRef((props: OnBoarding2DetailsProps, ref) => 
         pincode: formData.pincode.trim().toString(),
       };
 
-       console.log("Submitting Step 3 Payload:", payload);
+      console.log('Submitting Step 3 Payload:', payload);
 
       if (!payload) {
         Alert.alert('Error', 'Owner ID not found. Please restart the app.');
@@ -109,7 +113,7 @@ const OnBoarding2_Details = forwardRef((props: OnBoarding2DetailsProps, ref) => 
         onError: (error: any) => {
           // Error handling
           Alert.alert('API Failed', error?.response?.data?.message || 'Something went wrong');
-        }
+        },
       });
     },
   }));
