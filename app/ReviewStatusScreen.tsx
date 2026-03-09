@@ -49,7 +49,7 @@ export default function ReviewStatusScreen() {
           if (router.canGoBack()) {
             router.back();
           } else {
-            router.replace('/');
+            router.replace('/auth/Login');
           }
         }}
         activeOpacity={0.7}>
@@ -76,7 +76,12 @@ export default function ReviewStatusScreen() {
       </View>
 
       <View className="mb-6">
-        <Button title="Done" onPress={refreshStatus} />
+        <TouchableOpacity
+          onPress={() => router.replace('/auth/Login')}
+          activeOpacity={0.8}
+          className="h-16 w-full items-center justify-center rounded-2xl bg-[#F6163C]">
+          <Text className="font-bold text-[16px] text-white">Done</Text>
+        </TouchableOpacity>
       </View>
     </Container>
   );

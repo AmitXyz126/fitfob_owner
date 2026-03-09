@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import { Button } from '@/components/Button';
 import { Container } from '@/components/Container';
@@ -13,12 +14,14 @@ import { useRouter } from 'expo-router';
 import { useState, useRef, useEffect } from 'react';
 import { TouchableOpacity, View } from 'react-native';
 import { useUserDetail } from '@/hooks/useUserDetail';
+import { useAuthStore } from '@/store/useAuthStore';
 
 export default function OnBoardingStep() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [subStep, setSubStep] = useState(1);
   const totalSteps = 5;
+  const { user } = useAuthStore();
 
   // --- 1. Centralized Parent State ---
   const [formData, setFormData] = useState<any>({});
@@ -37,25 +40,58 @@ export default function OnBoardingStep() {
     submitStep4,
     submitStep7,
     confirmDocs,
-    userData,
+    profileStatus,
   } = useUserDetail();
 
   // --- 2. Sync Global State with API Once ---
   useEffect(() => {
-    if (userData && !isDataSynced) {
-      setFormData(userData);
+    if (!profileStatus) return;
+
+    if (!isDataSynced) {
+      setFormData(profileStatus);
       setIsDataSynced(true);
 
-       if (userData.currentStep && userData.currentStep > 1) {
-        setStep(userData.currentStep);
+      if (profileStatus.currentStep && profileStatus.currentStep > 1) {
+        setStep(profileStatus.currentStep);
       }
     }
-  }, [userData, isDataSynced]);
+  }, [profileStatus]);
+
+  //  useEffect
+  useEffect(() => {
+    if (!user) return;
+    if (!profileStatus) return;
+    console.log(user, 'user data');
+    console.log(profileStatus, 'profile status');
+    const { status } = profileStatus;
+
+    if (status === 'completed') {
+      if (user.verification_status === 'rejected') {
+        router.replace('/RejectRequestScreen');
+        return;
+      }
+
+      if (user.verification_status === 'pending') {
+        router.replace('/ReviewStatusScreen');
+        return;
+      }
+
+      if (user.verification_status === 'approved') {
+        router.replace('/(tabs)');
+        return;
+      }
+    } else if (status === 'draft') {
+      if (!isDataSynced) {
+        setStep(profileStatus?.currentStep || 1);
+      }
+    } else {
+      router.replace('/onBoardingScreen/OnBoardingStep');
+    }
+  }, [user, profileStatus]);
 
   const updateFormData = (newData: any) => {
     setFormData((prev: any) => ({ ...prev, ...newData }));
   };
-
 
   const isLoading =
     submitStep1.isPending ||
@@ -129,11 +165,13 @@ export default function OnBoardingStep() {
             <TouchableOpacity
               key={item}
               onPress={() => {
-                setStep(item);
-                setSubStep(1);
+                if (item <= (profileStatus?.currentStep || step)) {
+                  setStep(item);
+                  setSubStep(1);
+                }
               }}
               activeOpacity={0.7}
-              disabled={item > (userData?.currentStep || 1) && item > step}
+              disabled={item > (profileStatus?.currentStep || 1) && item > step}
               className="mx-1 flex-1 justify-center">
               <View className={`w-full rounded-full ${bgColor}`} />
             </TouchableOpacity>
@@ -148,18 +186,12 @@ export default function OnBoardingStep() {
         showsVerticalScrollIndicator={false}>
         <View className="mt-5 flex-1">
           {step === 1 && (
-            <OnBoarding1
-              ref={onboarding1Ref}
-              initialData={formData}
-              onNext={() => setStep(2)}
-            />
+            <OnBoarding1 ref={onboarding1Ref} initialData={formData} onNext={() => setStep(2)} />
           )}
 
           {step === 2 &&
             (subStep === 1 ? (
-              <OnBoarding2_Part2
-                onConfirm={() => setSubStep(2)}
-              />
+              <OnBoarding2_Part2 onConfirm={() => setSubStep(2)} />
             ) : (
               <OnBoarding2_Details
                 ref={onboarding2DetailsRef}
@@ -188,7 +220,11 @@ export default function OnBoardingStep() {
               <OnBoarding4
                 ref={onboarding4Ref}
                 onUploadDone={() => setSubStep(2)}
-                onUploadSuccess={() => setSubStep(2)}
+                onUploadSuccess={() => {
+                  if (subStep === 1) {
+                    setSubStep(2);
+                  }
+                }}
               />
             ) : (
               <OnBoarding4_List onAddMore={() => setSubStep(1)} />

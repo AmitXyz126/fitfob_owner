@@ -1,23 +1,23 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useState, useRef, useEffect, useCallback } from 'react'; 
+/* eslint-disable react-hooks/exhaustive-deps */
+import React, { useState, useRef, useEffect } from 'react'; 
 import { View, Text, Image, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+// Removed PROVIDER_GOOGLE, added UrlTile
+import MapView, { UrlTile } from 'react-native-maps';
+import { MaterialIcons } from '@expo/vector-icons';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import * as Location from 'expo-location'; 
 import { useUserDetail } from '@/hooks/useUserDetail';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const GOOGLE_API_KEY = 'AIzaSyB7liTs6ffq-vFE9VZH5rjbQ_ttSSFSb4o'; 
-// Removed global STORAGE_KEY_MAP to use user-specific key inside component
 
 interface OnBoarding2Props {
   onConfirm: () => void;
 }
 
 const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
-  const { userData, submitStep2 } = useUserDetail();
-  const userId = userData?.id || userData?.pendingClubOwnerId;
+  const { profileStatus, submitStep2 } = useUserDetail();
+  const userId = profileStatus?.id || profileStatus?.pendingClubOwnerId;
   const STORAGE_KEY = `@onboarding_step2_map_data_${userId || 'guest'}`;
   const [isLocalLoaded, setIsLocalLoaded] = useState(false);
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
@@ -36,18 +36,15 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
 
   const mapRef = useRef<MapView>(null);
   const autoCompleteRef = useRef<any>(null);
-  const isMoving = useRef(false);
-
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // --- 1. Load Saved Data on Mount ---
+  // --- 1. Load Saved Data (Flow Unchanged) ---
   useEffect(() => {
     const loadSavedMap = async () => {
       try {
-        // Priority 1: Server data from userData
-        if (userData?.latitude && userData?.longitude) {
-          const lat = parseFloat(userData.latitude);
-          const lng = parseFloat(userData.longitude);
+        if (profileStatus?.latitude && profileStatus?.longitude) {
+          const lat = parseFloat(profileStatus.latitude);
+          const lng = parseFloat(profileStatus.longitude);
           const newRegion = {
             latitude: lat,
             longitude: lng,
@@ -58,7 +55,6 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
           getAddressFromCoords(lat, lng);
           setIsInitialized(true);
         } else if (!isInitialized) {
-          // Priority 2: Local Storage Draft
           const savedData = await AsyncStorage.getItem(STORAGE_KEY);
           if (savedData) {
             const parsed = JSON.parse(savedData);
@@ -80,12 +76,11 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
       }
     };
     loadSavedMap();
-  }, [STORAGE_KEY, userData, isInitialized]);
+  }, [STORAGE_KEY, profileStatus, isInitialized]);
 
-  // --- 2. Reverse Geocode with validation ---
+  // --- 2. Reverse Geocode (Flow Unchanged) ---
   const getAddressFromCoords = async (lat: number, lng: number) => {
     if (!lat || !lng) return;
-    
     setIsReverseGeocoding(true);
     try {
       const response = await fetch(
@@ -95,11 +90,8 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
       if (data.results && data.results.length > 0) {
         const address = data.results[0].formatted_address;
         const name = data.results[0].address_components[1]?.long_name || 'Selected Location';
-        
         autoCompleteRef.current?.setAddressText(address);
         setLocationInfo({ name, address });
-        
-        // Auto-save to local storage
         AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ 
           region: { ...region, latitude: lat, longitude: lng }, 
           locationInfo: { name, address } 
@@ -143,14 +135,12 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
         onConfirm();
       },
       onError: (err) => {
-        console.log("Mutation Error:", err);
         Alert.alert("Error", "Failed to save location. Please try again.");
       }
     });
   };
 
   const onRegionChangeComplete = (newRegion: any) => {
-    // Check if movement is significant to avoid infinite loops
     const latDiff = Math.abs(region.latitude - newRegion.latitude);
     const lngDiff = Math.abs(region.longitude - newRegion.longitude);
 
@@ -164,7 +154,6 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
     <View className="flex-1 bg-white px-1">
       <Text className="mb-4 font-bold text-[26px] text-slate-900">Fill your location</Text>
 
-      {/* Google Places Autocomplete */}
       <View className="relative z-[100] mb-4">
         <GooglePlacesAutocomplete
           ref={autoCompleteRef}
@@ -198,16 +187,24 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
         />
       </View>
 
-      {/* Map View */}
+      {/* Map View Section - Modified for OpenStreetMap */}
       <View className="relative z-10 h-[400px] w-full overflow-hidden rounded-3xl border border-slate-200 bg-gray-100">
         <MapView
           ref={mapRef}
-          provider={PROVIDER_GOOGLE}
+          // provider={PROVIDER_GOOGLE} is removed to use standard native engine
           style={{ width: '100%', height: '100%' }}
           initialRegion={region}
           onRegionChangeComplete={onRegionChangeComplete}
-        />
-        {/* Custom Marker Pin */}
+          mapType="none"  
+        >
+          {/* OpenStreetMap Tile Layer */}
+          <UrlTile 
+            urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+            maximumZ={19}
+            flipY={false}
+          />
+        </MapView>
+
         <View className="absolute left-1/2 top-1/2 -ml-5 -mt-10 items-center justify-center" pointerEvents="none">
           <Image source={{ uri: 'https://cdn-icons-png.flaticon.com/512/684/684908.png' }} className="h-10 w-10" tintColor="#F6163C" />
         </View>
@@ -218,7 +215,6 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
         </TouchableOpacity>
       </View>
 
-      {/* Location Details Card */}
       <View className="mt-4 rounded-[24px] border border-slate-100 bg-white p-5 shadow-sm">
         <View className="mb-2 flex-row items-center justify-between">
           <View className="flex-1 flex-row items-center">

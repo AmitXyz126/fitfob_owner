@@ -6,13 +6,14 @@ import { Button } from '@/components/Button';
 import { Container } from '@/components/Container';
 import { KeyboardAwareScrollView } from '@pietile-native-kit/keyboard-aware-scrollview';
 import { useForgotResendOtp, useForgotVerifyOtp } from '@/hooks/useAuth';
+import Toast from 'react-native-toast-message';
 
-export default function OtpScreen() {
+export default function ForgotOtpScreen() {
   const router = useRouter();
   const { email } = useLocalSearchParams();
 
-   const { mutate: resendOtp, isPending: isResending } = useForgotResendOtp();
-const { mutate: verifyOtp, isPending: isVerifying } = useForgotVerifyOtp();
+  const { mutate: resendOtp, isPending: isResending } = useForgotResendOtp();
+  const { mutate: verifyOtp, isPending: isVerifying } = useForgotVerifyOtp();
 
   const [timer, setTimer] = useState(60);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -60,49 +61,51 @@ const { mutate: verifyOtp, isPending: isVerifying } = useForgotVerifyOtp();
   const isOtpComplete = otp.every((digit) => digit !== '');
 
   const handleVerify = () => {
-    if (isOtpComplete) {
-      const otpString = otp.join('').trim();
-      const identifier = (email as string || '').toLowerCase().trim();
+    const otpString = otp.join('').trim();
+    const identifier = ((email as string) || '').toLowerCase().trim();
 
-      console.log('--- FORGOT PASSWORD VERIFY START ---');
-      console.log('Identifier:', identifier);
-      console.log('OTP:', otpString);
-      
-      verifyOtp(
-        {
-          identifier: identifier,
-          otp: otpString,
+    console.log('--- FORGOT PASSWORD VERIFY START ---');
+    console.log('Identifier:', identifier);
+    console.log('OTP:', otpString);
+
+    verifyOtp(
+      {
+        identifier: identifier,
+        otp: otpString,
+      },
+      {
+        onSuccess: (data) => {
+          console.log(data, 'Vergiy otp');
+          console.log('✅ Forgot OTP Verified. Token:', data?.resetToken);
+
+          if (data?.resetToken) {
+            // Handle reset token case
+            router.push({
+              pathname: '/auth/CreateNewPassword',
+              params: {
+                email: identifier,
+                resetToken: data.resetToken,
+              },
+            });
+          } else {
+            console.warn('⚠️ API Success but missing fields in response:', data);
+            router.replace('/auth/Login');
+          }
         },
-        {
-          onSuccess: (data) => {
-            // Robust token extraction
-            const token = 
-              data?.resetToken || 
-              data?.data?.resetToken || 
-              data?.token || 
-              data?.data?.token || 
-              data?.code;
+        onError: (error: any) => {
+          const errorData = error.response?.data;
+          const msg = errorData?.error?.message || errorData?.message || 'Verification Failed';
 
-            console.log("✅ Forgot OTP Verified. Token:", token);
+          console.error('❌ OTP Verify Error:', msg);
 
-            if (token) {
-              router.push({
-                pathname: '/auth/CreateNewPassword',
-                params: {
-                  email: identifier,
-                  resetToken: token, 
-                },
-              });
-            } else {
-               console.error("⚠️ Success but no resetToken found in response:", data);
-            }
-          },
-          onError: (error: any) => {
-             console.error('❌ Forgot Verify Error:', error.response?.data || error.message);
-          },
-        }
-      );
-    }
+          Toast.show({
+            type: 'error',
+            text1: 'Verification Failed',
+            text2: msg,
+          });
+        },
+      }
+    );
   };
 
   const handleResend = () => {

@@ -45,81 +45,37 @@ export const useResendOtp = () => {
   });
 };
 export const useVerifyOtp = () => {
-  const { setUser } = useAuthStore();
-  const router = useRouter();
-
   return useMutation({
     mutationFn: verifyOtpApi,
-    onSuccess: (data) => {
-      if (data && data.jwt && data.user) {
-        console.log('✅ OTP Verified. Finalizing User Session...');
-
-        const userWithToken = {
-          ...data.user,
-          token: data.jwt,
-        };
-
-        setUser(userWithToken, true);
-
-        Toast.show({
-          type: 'success',
-          text1: 'Verification Success ✅',
-          text2: 'Welcome to the app!',
-        });
-
-        console.log('🚀 User Data Saved. Redirecting to Dashboard...');
-
-        router.replace('/onBoardingScreen/OnBoardingStep');
-      } else {
-        console.warn('⚠️ API Success but missing fields in response:', data);
-
-        router.replace('/auth/Login');
-      }
-    },
-    onError: (error: any) => {
-      const errorData = error.response?.data;
-      const msg = errorData?.error?.message || errorData?.message || 'Verification Failed';
-
-      console.error('❌ OTP Verify Error:', msg);
-
-      Toast.show({
-        type: 'error',
-        text1: 'Verification Failed',
-        text2: msg,
-      });
-    },
+   
   });
 };
-
 export const useLoginRequest = () => {
   const { setUser } = useAuthStore();
   const router = useRouter();
+return useMutation({
+  mutationFn: loginUserApi,
+  onSuccess: (data) => {
+    if (data && data.jwt && data.user) {
+      console.log('✅ Login Success:', data.user.username);
 
-  return useMutation({
-    mutationFn: loginUserApi,
-    onSuccess: (data) => {
-      if (data && data.jwt && data.user) {
-        console.log('✅ Login Success:', data.user.username);
+      const userWithToken = {
+        ...data.user,
+        token: data.jwt,
+      };
 
-        const userWithToken = {
-          ...data.user,
-          token: data.jwt,
-        };
+      setUser(userWithToken, true);
+      console.log(userWithToken, 'usr Data');
 
-        setUser(userWithToken, true);
-        console.log(userWithToken, 'usr Data');
-        
-        if (!userWithToken.isVerified) {
-          router.replace('/onBoardingScreen/OnBoardingStep');
-        } else {
-          router.replace('/(tabs)');
-        }
-      }
-    },
-    onError: (error: any) => {
-      console.error('❌ Login Error:', error.response?.data || error.message);
-    },
-  });
+      // 🚀 Always go to onboarding flow checker
+      router.replace('/onBoardingScreen/OnBoardingStep');
+    }
+  },
+
+  onError: (error: any) => {
+    console.error('❌ Login Error:', error.response?.data || error.message);
+  },
+});
 };
 
 export const useForgotSendOtp = () => {

@@ -1,47 +1,65 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, Keyboard } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useUserDetail } from '@/hooks/useUserDetail';
+ import { useUserDetail } from '@/hooks/useUserDetail';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface OnBoarding2DetailsProps {
   initialData?: any;
   onBack: () => void;
   onNext?: () => void;
+    
 }
-
-// Removed global STORAGE_KEY to use user-specific key inside component
 
 const OnBoarding2_Details = forwardRef((props: OnBoarding2DetailsProps, ref) => {
   const { onBack, onNext, initialData } = props;
-  const { submitStep3, userData } = useUserDetail();
-  const userId = userData?.id || userData?.pendingClubOwnerId;
+  const { submitStep3, profileStatus } = useUserDetail();
+  const userId = profileStatus?.id || profileStatus?.pendingClubOwnerId;
   const STORAGE_KEY = `@onboarding_step2_details_${userId || 'guest'}`;
-const STORAGE_KEY_MAP = `@onboarding_step2_map_data_${userId || 'guest'}`;
+
   const [formData, setFormData] = useState({
     clubAddress: '',
-    city: 'Mohali',
-    state: 'Punjab',
+    city: '',  
+    state: '',
     pincode: '',
   });
 
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // 1. Initialize logic
+  // --- 1. FIXED LOGIC: Auto-parse Location from Map ---
+  useEffect(() => {
+    if (profileStatus?.address) {
+      const fullAddress = profileStatus.address;
+      const parts = fullAddress.split(',').map((p: string) => p.trim());
+ 
+      const pincodeMatch = fullAddress.match(/\b\d{6}\b/);
+      const extractedPincode = pincodeMatch ? pincodeMatch[0] : '';
+ 
+      const countryRemoved = parts.filter((p: string) => p.toLowerCase() !== 'india');
+      const statePart = countryRemoved[countryRemoved.length - 1] || '';
+      const extractedState = statePart.replace(/[0-9]/g, '').trim();  
+      const extractedCity = countryRemoved[countryRemoved.length - 2] || '';
+
+      setFormData((prev) => ({
+        ...prev,
+         city: profileStatus.city || extractedCity || prev.city,
+        state: profileStatus.state || extractedState || prev.state,
+        pincode: profileStatus.pincode || extractedPincode || prev.pincode,
+         clubAddress: prev.clubAddress || parts[0] || '',
+      }));
+    }
+  }, [profileStatus?.address]);
+
+  // --- 2. Initialize logic (Flow Unchanged) ---
   useEffect(() => {
     const initData = async () => {
-      // Priority 1: initialData (from Parent/API)
-      const data = initialData || userData;
+      const data = initialData || profileStatus;
 
-      const saveData = await AsyncStorage.getItem(STORAGE_KEY_MAP);
-      if (saveData) {
-        console.log(JSON.parse(saveData), 'map Data fghjk');
-      }
       if (data && (data.clubAddress || data.pincode)) {
         setFormData({
           clubAddress: data.clubAddress || '',
-          city: data.city || 'Mohali',
-          state: data.state || 'Punjab',
+          city: data.city || '',
+          state: data.state || '',
           pincode: data.pincode || '',
         });
         setIsInitialized(true);
@@ -49,7 +67,6 @@ const STORAGE_KEY_MAP = `@onboarding_step2_map_data_${userId || 'guest'}`;
         try {
           const savedData = await AsyncStorage.getItem(STORAGE_KEY);
           if (savedData) {
-            console.log(JSON.parse(savedData), 'map Data');
             setFormData(JSON.parse(savedData));
           }
         } catch (error) {
@@ -60,9 +77,9 @@ const STORAGE_KEY_MAP = `@onboarding_step2_map_data_${userId || 'guest'}`;
       }
     };
     initData();
-  }, [initialData, userData, isInitialized, STORAGE_KEY]);
+  }, [initialData, profileStatus, isInitialized, STORAGE_KEY]);
 
-  // 2. Draft backup
+  // --- 3. Draft backup (Flow Unchanged) ---
   useEffect(() => {
     const saveData = async () => {
       try {
@@ -79,9 +96,8 @@ const STORAGE_KEY_MAP = `@onboarding_step2_map_data_${userId || 'guest'}`;
   useImperativeHandle(ref, () => ({
     getFormData: () => formData,
     handleSave: () => {
-      // Validation
-      if (!formData.clubAddress.trim() || !formData.pincode.trim()) {
-        Alert.alert('Required', 'Please fill Building Name and Pincode');
+      if (!formData.clubAddress.trim() || !formData.pincode.trim() || !formData.city.trim()) {
+        Alert.alert('Required', 'Please fill all address details');
         return;
       }
 
@@ -90,20 +106,12 @@ const STORAGE_KEY_MAP = `@onboarding_step2_map_data_${userId || 'guest'}`;
         return;
       }
 
-      // --- FIXED: Added pendingClubOwnerId in Payload ---
       const payload = {
         clubAddress: formData.clubAddress.trim(),
-        city: formData.city,
-        state: formData.state,
+        city: formData.city.trim(),
+        state: formData.state.trim(),
         pincode: formData.pincode.trim().toString(),
       };
-
-      console.log('Submitting Step 3 Payload:', payload);
-
-      if (!payload) {
-        Alert.alert('Error', 'Owner ID not found. Please restart the app.');
-        return;
-      }
 
       submitStep3.mutate(payload, {
         onSuccess: async () => {
@@ -111,7 +119,6 @@ const STORAGE_KEY_MAP = `@onboarding_step2_map_data_${userId || 'guest'}`;
           if (onNext) onNext();
         },
         onError: (error: any) => {
-          // Error handling
           Alert.alert('API Failed', error?.response?.data?.message || 'Something went wrong');
         },
       });
@@ -125,10 +132,10 @@ const STORAGE_KEY_MAP = `@onboarding_step2_map_data_${userId || 'guest'}`;
       <View className="mb-6 flex-row items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 p-4">
         <View className="flex-1 pr-4">
           <Text className="font-bold text-slate-900" numberOfLines={1}>
-            {userData?.address || 'Selected Location'}
+            {profileStatus?.locationName || 'Selected Location'}
           </Text>
           <Text className="mt-1 text-xs text-slate-500" numberOfLines={1}>
-            {userData?.locationName || 'International Airport Road, Mohali...'}
+            {profileStatus?.address || 'Address not selected'}
           </Text>
         </View>
 
@@ -142,9 +149,9 @@ const STORAGE_KEY_MAP = `@onboarding_step2_map_data_${userId || 'guest'}`;
 
       <View className="space-y-5">
         <View>
-          <Text className="mb-2 ml-1 text-sm font-normal text-[#697281]">Address details*</Text>
+          <Text className="mb-2 ml-1 text-sm font-normal text-[#697281]">Address details (Building/Area)*</Text>
           <TextInput
-            placeholder="Building Name"
+            placeholder="Building name, Street, Landmark"
             placeholderTextColor="#94A3B8"
             value={formData.clubAddress}
             onChangeText={(text) => setFormData({ ...formData, clubAddress: text })}
@@ -153,25 +160,33 @@ const STORAGE_KEY_MAP = `@onboarding_step2_map_data_${userId || 'guest'}`;
         </View>
 
         <View>
-          <Text className="mb-2 ml-1 mt-3 text-sm font-normal text-[#697281]">City</Text>
+          <Text className="mb-2 ml-1 mt-3 text-sm font-normal text-[#697281]">City*</Text>
           <View className="h-14 flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white px-4">
-            <Text className="text-slate-900">{formData.city}</Text>
-            <Ionicons name="chevron-down" size={18} color="#64748B" />
+            <TextInput
+              placeholder="City"
+              value={formData.city}
+              onChangeText={(text) => setFormData({ ...formData, city: text })}
+              className="flex-1 text-slate-900"
+            />
           </View>
         </View>
 
         <View>
-          <Text className="mb-2 ml-1 mt-3 text-sm font-normal text-[#697281]">State</Text>
+          <Text className="mb-2 ml-1 mt-3 text-sm font-normal text-[#697281]">State*</Text>
           <View className="h-14 flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white px-4">
-            <Text className="text-slate-900">{formData.state}</Text>
-            <Ionicons name="chevron-down" size={18} color="#64748B" />
+            <TextInput
+              placeholder="State"
+              value={formData.state}
+              onChangeText={(text) => setFormData({ ...formData, state: text })}
+              className="flex-1 text-slate-900"
+            />
           </View>
         </View>
 
         <View>
-          <Text className="mb-2 ml-1 mt-3 text-sm font-normal text-[#697281]">Pincode</Text>
+          <Text className="mb-2 ml-1 mt-3 text-sm font-normal text-[#697281]">Pincode*</Text>
           <TextInput
-            placeholder="160067"
+            placeholder="160062"
             placeholderTextColor="#94A3B8"
             keyboardType="numeric"
             maxLength={6}

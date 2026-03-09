@@ -158,7 +158,7 @@ export default function SignUp() {
         });
 
         router.push({
-          pathname: '/auth/OtpScreen',
+          pathname: '/auth/SignUpOtpScreen',
           params: {
             email: payload.identifier,
             signupToken: token,

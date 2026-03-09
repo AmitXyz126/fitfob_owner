@@ -11,6 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
 const RejectRequestScreen = () => {
   // Function to handle Email
@@ -89,6 +90,7 @@ const RejectRequestScreen = () => {
       {/* Close Button - Fixed at bottom */}
       <View className="px-6 ">
         <TouchableOpacity
+        onPress={()=> router.replace('/auth/Login')}
           activeOpacity={0.8}
           className="h-16 w-full items-center justify-center rounded-2xl bg-[#F2F2F2]">
           <Text className="font-bold text-[16px] text-[#64748B]">Close</Text>

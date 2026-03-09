@@ -1,7 +1,6 @@
-/* eslint-disable react/no-unescaped-entities */
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -30,7 +29,6 @@ const newPasswordSchema = z
 type NewPasswordData = z.infer<typeof newPasswordSchema>;
 
 export default function CreateNewPassword() {
-  const router = useRouter();
   const { email, resetToken } = useLocalSearchParams();
 
   const { mutate: resetPassword, isPending } = useResetPassword();
