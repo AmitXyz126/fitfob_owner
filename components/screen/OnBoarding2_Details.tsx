@@ -1,14 +1,13 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, Keyboard } from 'react-native';
- import { useUserDetail } from '@/hooks/useUserDetail';
+import { useUserDetail } from '@/hooks/useUserDetail';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface OnBoarding2DetailsProps {
   initialData?: any;
   onBack: () => void;
   onNext?: () => void;
-    
 }
 
 const OnBoarding2_Details = forwardRef((props: OnBoarding2DetailsProps, ref) => {
@@ -19,33 +18,37 @@ const OnBoarding2_Details = forwardRef((props: OnBoarding2DetailsProps, ref) => 
 
   const [formData, setFormData] = useState({
     clubAddress: '',
-    city: '',  
+    city: '',
     state: '',
     pincode: '',
   });
 
+  const [locationInfo, setLocationInfo] = useState({
+    name: '',
+    address: '',
+  });
+
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // --- 1. FIXED LOGIC: Auto-parse Location from Map ---
-  useEffect(() => {
+   useEffect(() => {
     if (profileStatus?.address) {
       const fullAddress = profileStatus.address;
       const parts = fullAddress.split(',').map((p: string) => p.trim());
- 
+
       const pincodeMatch = fullAddress.match(/\b\d{6}\b/);
       const extractedPincode = pincodeMatch ? pincodeMatch[0] : '';
- 
+
       const countryRemoved = parts.filter((p: string) => p.toLowerCase() !== 'india');
       const statePart = countryRemoved[countryRemoved.length - 1] || '';
-      const extractedState = statePart.replace(/[0-9]/g, '').trim();  
+      const extractedState = statePart.replace(/[0-9]/g, '').trim();
       const extractedCity = countryRemoved[countryRemoved.length - 2] || '';
 
       setFormData((prev) => ({
         ...prev,
-         city: profileStatus.city || extractedCity || prev.city,
+        city: profileStatus.city || extractedCity || prev.city,
         state: profileStatus.state || extractedState || prev.state,
         pincode: profileStatus.pincode || extractedPincode || prev.pincode,
-         clubAddress: prev.clubAddress || parts[0] || '',
+        clubAddress: prev.clubAddress || parts[0] || '',
       }));
     }
   }, [profileStatus?.address]);
@@ -55,6 +58,33 @@ const OnBoarding2_Details = forwardRef((props: OnBoarding2DetailsProps, ref) => 
     const initData = async () => {
       const data = initialData || profileStatus;
 
+      //  MAP SCREEN SE SAVED LOCATION LOAD
+      const savedMap = await AsyncStorage.getItem(
+        `@onboarding_step2_map_data_${userId || 'guest'}`
+      );
+
+      if (savedMap) {
+        const parsed = JSON.parse(savedMap);
+
+        if (parsed?.locationInfo) {
+          setFormData({
+            clubAddress: parsed.locationInfo.clubAddress || '',
+            city: parsed.locationInfo.city || '',
+            state: parsed.locationInfo.state || '',
+            pincode: parsed.locationInfo.pincode || '',
+          });
+
+          setLocationInfo({
+            name: parsed.locationInfo.name || 'Selected Location',
+            address: parsed.locationInfo.address || '',
+          });
+
+          setIsInitialized(true);
+          return;
+        }
+      }
+
+      //  existing logic
       if (data && (data.clubAddress || data.pincode)) {
         setFormData({
           clubAddress: data.clubAddress || '',
@@ -76,6 +106,7 @@ const OnBoarding2_Details = forwardRef((props: OnBoarding2DetailsProps, ref) => 
         }
       }
     };
+
     initData();
   }, [initialData, profileStatus, isInitialized, STORAGE_KEY]);
 
@@ -132,10 +163,10 @@ const OnBoarding2_Details = forwardRef((props: OnBoarding2DetailsProps, ref) => 
       <View className="mb-6 flex-row items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 p-4">
         <View className="flex-1 pr-4">
           <Text className="font-bold text-slate-900" numberOfLines={1}>
-            {profileStatus?.locationName || 'Selected Location'}
+            {locationInfo?.name || 'Selected Location'}
           </Text>
           <Text className="mt-1 text-xs text-slate-500" numberOfLines={1}>
-            {profileStatus?.address || 'Address not selected'}
+            {locationInfo?.address || 'Address not selected'}
           </Text>
         </View>
 
@@ -149,7 +180,9 @@ const OnBoarding2_Details = forwardRef((props: OnBoarding2DetailsProps, ref) => 
 
       <View className="space-y-5">
         <View>
-          <Text className="mb-2 ml-1 text-sm font-normal text-[#697281]">Address details (Building/Area)*</Text>
+          <Text className="mb-2 ml-1 text-sm font-normal text-[#697281]">
+            Address details (Building/Area)*
+          </Text>
           <TextInput
             placeholder="Building name, Street, Landmark"
             placeholderTextColor="#94A3B8"
