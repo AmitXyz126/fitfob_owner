@@ -15,9 +15,18 @@ interface OnBoarding3Props {
 
 const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
   const { initialData } = props;
-  const { submitStep4, userData } = useUserDetail();
-  const userId = userData?.id || userData?.pendingClubOwnerId;
-  const STORAGE_KEY = `@onboarding_step3_data_${userId || 'guest'}`;
+  const { submitStep4, profileStatus } = useUserDetail();
+  const userId = profileStatus?.id || profileStatus?.pendingClubOwnerId;
+  const STORAGE_KEY = userId ? `@onboarding_step3_data_${userId}` : null;
+  const saveDraft = async (data: any) => {
+    if (!STORAGE_KEY) return;
+
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (e) {
+      console.log('Draft save error', e);
+    }
+  };
 
   // --- NEW STATE FOR CLUB CATEGORY ---
   const [clubCategory, setClubCategory] = useState('Luxury');
@@ -35,63 +44,57 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
   const [weekendRange, setWeekendRange] = useState('Saturday & Sunday');
   const [showDayModal, setShowDayModal] = useState<'weekday' | 'weekend' | null>(null);
 
-  const [isInitialized, setIsInitialized] = useState(false);
+  // const [isInitialized, setIsInitialized] = useState(false);
 
   // 1. Initial Load from initialData (Parent/API) or Local Storage
-  useEffect(() => {
-    const initData = async () => {
-      // Priority 1: initialData (from Parent/API)
-      const data = initialData || userData;
+useEffect(() => {
+  if (!STORAGE_KEY) return;
 
-      if (data && data.clubCategory) {
-        setClubCategory(data.clubCategory);
-        setFitnessTypes(data.services || []);
-        setAmenities(data.facilities || []);
-        if (data.openingTime) {
-          const [h, m] = data.openingTime.split(':');
-          setStartTime(new Date().setHours(parseInt(h), parseInt(m)));
-        }
-        if (data.closingTime) {
-          const [h, m] = data.closingTime.split(':');
-          setEndTime(new Date().setHours(parseInt(h), parseInt(m)));
-        }
-        setWeekdayRange(data.weekday || 'Monday to Friday');
-        setWeekendRange(data.weekend || 'Saturday & Sunday');
-        setIsInitialized(true);
-      } else if (!isInitialized) {
-        // Priority 2: Local Storage Draft (only if no server data yet)
-        const saved = await AsyncStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          setClubCategory(parsed.clubCategory || 'Luxury');
-          setFitnessTypes(parsed.fitnessTypes || ['Gym']);
-          setAmenities(parsed.amenities || ['Parking', 'Wi-Fi']);
-          setStartTime(parsed.startTime || new Date().setHours(5, 0));
-          setEndTime(parsed.endTime || new Date().setHours(22, 0));
-          setWeekdayRange(parsed.weekdayRange || 'Monday to Friday');
-          setWeekendRange(parsed.weekendRange || 'Saturday & Sunday');
-        }
-        setIsInitialized(true);
+  const initData = async () => {
+    if (initialData && initialData.clubCategory) {
+      setClubCategory(initialData.clubCategory);
+      setFitnessTypes(initialData.services || []);
+      setAmenities(initialData.facilities || []);
+
+      if (initialData.openingTime) {
+        const [h, m] = initialData.openingTime.split(':');
+        setStartTime(new Date().setHours(parseInt(h), parseInt(m)));
       }
-    };
-    initData();
-  }, [initialData, userData, isInitialized, STORAGE_KEY]);
+
+      if (initialData.closingTime) {
+        const [h, m] = initialData.closingTime.split(':');
+        setEndTime(new Date().setHours(parseInt(h), parseInt(m)));
+      }
+
+      setWeekdayRange(initialData.weekday || 'Monday to Friday');
+      setWeekendRange(initialData.weekend || 'Saturday & Sunday');
+
+    } else {
+      const saved = await AsyncStorage.getItem(STORAGE_KEY);
+
+      if (saved) {
+        const parsed = JSON.parse(saved);
+
+        setClubCategory(parsed.clubCategory || 'Luxury');
+        setFitnessTypes(parsed.fitnessTypes || ['Gym']);
+        setAmenities(parsed.amenities || ['Parking', 'Wi-Fi']);
+        setStartTime(parsed.startTime || new Date().setHours(5, 0));
+        setEndTime(parsed.endTime || new Date().setHours(22, 0));
+        setWeekdayRange(parsed.weekdayRange || 'Monday to Friday');
+        setWeekendRange(parsed.weekendRange || 'Saturday & Sunday');
+      }
+    }
+  };
+
+  initData();
+
+}, [STORAGE_KEY]);
 
   // 2. Draft backup
-  useEffect(() => {
-    if (isInitialized) {
-      const draft = {
-        clubCategory,
-        fitnessTypes,
-        amenities,
-        startTime,
-        endTime,
-        weekdayRange,
-        weekendRange,
-      };
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
-    }
-  }, [
+ useEffect(() => {
+  if (!STORAGE_KEY) return;
+
+  const draft = {
     clubCategory,
     fitnessTypes,
     amenities,
@@ -99,9 +102,19 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
     endTime,
     weekdayRange,
     weekendRange,
-    isInitialized,
-    STORAGE_KEY,
-  ]);
+  };
+
+  AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+}, [
+  clubCategory,
+  fitnessTypes,
+  amenities,
+  startTime,
+  endTime,
+  weekdayRange,
+  weekendRange,
+  STORAGE_KEY
+]);
 
   const weekdayOptions = [
     'Monday to Friday',
@@ -160,7 +173,7 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
       // Mutate with onSuccess handler
       submitStep4.mutate(payload as any, {
         onSuccess: async () => {
-          await AsyncStorage.removeItem(STORAGE_KEY);
+          await AsyncStorage.setItem('@onboarding_step', '4');
           props.onNext && props.onNext();
         },
         onError: (err) => {
@@ -174,18 +187,52 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
     if (Platform.OS === 'android') {
       setShowPicker(null);
     }
+
     if (selectedDate) {
-      if (showPicker === 'start') setStartTime(selectedDate.getTime());
-      if (showPicker === 'end') setEndTime(selectedDate.getTime());
+      let newStart = startTime;
+      let newEnd = endTime;
+
+      if (showPicker === 'start') {
+        newStart = selectedDate.getTime();
+        setStartTime(newStart);
+      }
+
+      if (showPicker === 'end') {
+        newEnd = selectedDate.getTime();
+        setEndTime(newEnd);
+      }
+
+      saveDraft({
+        clubCategory,
+        fitnessTypes,
+        amenities,
+        startTime: newStart,
+        endTime: newEnd,
+        weekdayRange,
+        weekendRange,
+      });
     }
   };
-
   const toggleSelection = (item: string, state: any, setState: any) => {
+    let newState;
+
     if (state.includes(item)) {
-      setState(state.filter((i: string) => i !== item));
+      newState = state.filter((i: string) => i !== item);
     } else {
-      setState([...state, item]);
+      newState = [...state, item];
     }
+
+    setState(newState);
+
+    saveDraft({
+      clubCategory,
+      fitnessTypes: setState === setFitnessTypes ? newState : fitnessTypes,
+      amenities: setState === setAmenities ? newState : amenities,
+      startTime,
+      endTime,
+      weekdayRange,
+      weekendRange,
+    });
   };
 
   const CheckboxItem = ({ label, isSelected, onPress }: any) => (
@@ -361,9 +408,45 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
                 onPress={() => {
                   if (showCategoryModal) {
                     setClubCategory(option);
+
+                    saveDraft({
+                      clubCategory: option,
+                      fitnessTypes,
+                      amenities,
+                      startTime,
+                      endTime,
+                      weekdayRange,
+                      weekendRange,
+                    });
+
                     setShowCategoryModal(false);
                   } else {
-                    showDayModal === 'weekday' ? setWeekdayRange(option) : setWeekendRange(option);
+                    if (showDayModal === 'weekday') {
+                      setWeekdayRange(option);
+
+                      saveDraft({
+                        clubCategory,
+                        fitnessTypes,
+                        amenities,
+                        startTime,
+                        endTime,
+                        weekdayRange: option,
+                        weekendRange,
+                      });
+                    } else {
+                      setWeekendRange(option);
+
+                      saveDraft({
+                        clubCategory,
+                        fitnessTypes,
+                        amenities,
+                        startTime,
+                        endTime,
+                        weekdayRange,
+                        weekendRange: option,
+                      });
+                    }
+
                     setShowDayModal(null);
                   }
                 }}

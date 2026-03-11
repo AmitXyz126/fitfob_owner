@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { useLoginRequest } from '@/hooks/useAuth';
 import Toast from 'react-native-toast-message';
 import { useAuthStore } from '@/store/useAuthStore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // 1. Validation Schema
 const loginSchema = z.object({
@@ -44,29 +45,32 @@ export default function Login() {
     defaultValues: { identifier: '', password: '' },
   });
 
-
   const { setUser } = useAuthStore();
   const onSubmit = (data: LoginFormData) => {
     loginMutation.mutate(data, {
-      onSuccess: () => {
+      onSuccess: async (response) => {
+        if (rememberMe) {
+          await AsyncStorage.setItem('rememberUser', JSON.stringify(response));
+        }
+        setUser(response);
+
         Toast.show({
           type: 'success',
           text1: 'Login Successful',
           text2: 'Welcome back! 👋',
         });
 
-       
+        router.replace('/');
       },
 
       onError: (error: any) => {
-        const serverMsg =
-          error?.response?.data?.error?.message || "Something went wrong";
+        const serverMsg = error?.response?.data?.error?.message || 'Something went wrong';
         const status = error?.response?.status;
 
-        if (status === 401 || serverMsg.toLowerCase().includes("password")) {
+        if (status === 401 || serverMsg.toLowerCase().includes('password')) {
           setError('password', {
             type: 'manual',
-            message: 'Incorrect password! Please try again.'
+            message: 'Incorrect password! Please try again.',
           });
 
           Toast.show({
@@ -74,16 +78,14 @@ export default function Login() {
             text1: 'Authentication Failed',
             text2: 'The password you entered is incorrect. 🔑',
           });
-
         } else if (
           status === 404 ||
-          serverMsg.toLowerCase().includes("user") ||
-          serverMsg.toLowerCase().includes("identifier")
+          serverMsg.toLowerCase().includes('user') ||
+          serverMsg.toLowerCase().includes('identifier')
         ) {
-
           setError('identifier', {
             type: 'manual',
-            message: 'Email/Phone is not registered. Please sign up first.'
+            message: 'Email/Phone is not registered. Please sign up first.',
           });
 
           Toast.show({
@@ -91,7 +93,6 @@ export default function Login() {
             text1: 'User Not Found',
             text2: 'Please check your email or sign up. ✉️',
           });
-
         } else {
           Toast.show({
             type: 'error',
@@ -109,12 +110,11 @@ export default function Login() {
       {isLoading && (
         <View
           className="absolute inset-0 z-50 items-center justify-center"
-          style={{ backgroundColor: 'rgba(255, 255, 255, 0.8)' }}
-        >
-          <View className="items-center justify-center p-8 bg-white rounded-3xl  border border-[#CCCECE]">
+          style={{ backgroundColor: 'rgba(255, 255, 255, 0.8)' }}>
+          <View className="items-center justify-center rounded-3xl border border-[#CCCECE]  bg-white p-8">
             <ActivityIndicator size="large" color="#F6163C" />
             <Text className="mt-4 font-bold text-lg text-slate-900">Logging In</Text>
-            <Text className="text-slate-400 mt-1">Authenticating your account...</Text>
+            <Text className="mt-1 text-slate-400">Authenticating your account...</Text>
           </View>
         </View>
       )}
@@ -124,7 +124,6 @@ export default function Login() {
         keyboardShouldPersistTaps="handled"
         pointerEvents={isLoading ? 'none' : 'auto'}
         contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
-
         {/* Header Section */}
         <View className="mt-12 items-center">
           <Image
@@ -132,7 +131,7 @@ export default function Login() {
             className="h-[54px] w-[54px]"
             resizeMode="contain"
           />
-          <Text className="font-bold text-4xl text-darkText">Welcome Back</Text>
+          <Text className="font-bold text-4xl text-darkText">Get Started now</Text>
           <Text className="mt-2 text-center font-medium text-sm text-secondaryText">
             Please login to your account!
           </Text>
@@ -146,7 +145,8 @@ export default function Login() {
               control={control}
               name="identifier"
               render={({ field: { onChange, onBlur, value } }) => (
-                <View className={`h-14 justify-center rounded-2xl border ${errors.identifier ? 'border-red-500' : 'border-border'} bg-white px-4 `}>
+                <View
+                  className={`h-14 justify-center rounded-2xl border ${errors.identifier ? 'border-red-500' : 'border-border'} bg-white px-4 `}>
                   <TextInput
                     placeholder="Email or Phone number"
                     onBlur={onBlur}
@@ -160,7 +160,9 @@ export default function Login() {
                 </View>
               )}
             />
-            {errors.identifier && <Text className="ml-1 mt-1 text-xs text-red-500">{errors.identifier.message}</Text>}
+            {errors.identifier && (
+              <Text className="ml-1 mt-1 text-xs text-red-500">{errors.identifier.message}</Text>
+            )}
           </View>
 
           {/* Password Field */}
@@ -170,7 +172,8 @@ export default function Login() {
               control={control}
               name="password"
               render={({ field: { onChange, onBlur, value } }) => (
-                <View className={`h-14 flex-row items-center rounded-2xl border ${errors.password ? 'border-red-500' : 'border-border'} bg-white px-4 `}>
+                <View
+                  className={`h-14 flex-row items-center rounded-2xl border ${errors.password ? 'border-red-500' : 'border-border'} bg-white px-4 `}>
                   <TextInput
                     placeholder="*******"
                     secureTextEntry={!isPasswordVisible}
@@ -180,30 +183,40 @@ export default function Login() {
                     editable={!isLoading}
                     className="h-full flex-1 text-darkText"
                   />
-                  <TouchableOpacity disabled={isLoading} onPress={() => setIsPasswordVisible(!isPasswordVisible)}>
-                    <Ionicons name={isPasswordVisible ? 'eye-outline' : 'eye-off-outline'} size={20} color="#6B7280" />
+                  <TouchableOpacity
+                    disabled={isLoading}
+                    onPress={() => setIsPasswordVisible(!isPasswordVisible)}>
+                    <Ionicons
+                      name={isPasswordVisible ? 'eye-outline' : 'eye-off-outline'}
+                      size={20}
+                      color="#6B7280"
+                    />
                   </TouchableOpacity>
                 </View>
               )}
             />
-            {errors.password && <Text className="ml-1 mt-1 text-xs text-red-500">{errors.password.message}</Text>}
+            {errors.password && (
+              <Text className="ml-1 mt-1 text-xs text-red-500">{errors.password.message}</Text>
+            )}
           </View>
 
           {/* Remember Me & Forgot Password Row */}
-          <View className="flex-row items-center justify-between px-1 mt-3">
+          <View className="mt-3 flex-row items-center justify-between px-1">
             <TouchableOpacity
               disabled={isLoading}
               onPress={() => setRememberMe(!rememberMe)}
-              className="flex-row items-center"
-            >
-              <View className={`h-5 w-5 rounded border items-center justify-center ${rememberMe ? 'bg-[#F6163C] border-[#F6163C]' : 'border-slate-300'}`}>
+              className="flex-row items-center">
+              <View
+                className={`h-5 w-5 items-center justify-center rounded border ${rememberMe ? 'border-[#F6163C] bg-[#F6163C]' : 'border-slate-300'}`}>
                 {rememberMe && <Ionicons name="checkmark" size={14} color="white" />}
               </View>
-              <Text className="ml-2 text-sm text-secondaryText font-medium">Remember me</Text>
+              <Text className="ml-2 font-medium text-sm text-secondaryText">Remember me</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity disabled={isLoading} onPress={() => router.push('/auth/ForgotPasswordScreen')}>
-              <Text className="font-bold text-primary text-sm">Forgot Password?</Text>
+            <TouchableOpacity
+              disabled={isLoading}
+              onPress={() => router.push('/auth/ForgotPasswordScreen')}>
+              <Text className="font-bold text-sm text-primary">Forgot Password?</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -220,24 +233,38 @@ export default function Login() {
 
         {/* Divider */}
         <View className="mb-2 mt-8 flex-row items-center px-4">
-          <LinearGradient colors={['rgba(0,0,0,0)', '#000000']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 1.5, flex: 1 }} />
+          <LinearGradient
+            colors={['rgba(0,0,0,0)', '#000000']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{ height: 1.5, flex: 1 }}
+          />
           <Text className="mx-2 font-medium text-xs text-darkText">OR</Text>
-          <LinearGradient colors={['#000000', 'rgba(0,0,0,0)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ height: 1.5, flex: 1 }} />
+          <LinearGradient
+            colors={['#000000', 'rgba(0,0,0,0)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{ height: 1.5, flex: 1 }}
+          />
         </View>
 
         {/* Social Buttons */}
-        <View className="mb-6 flex-row justify-between mt-2">
-          <TouchableOpacity disabled={isLoading} className="h-14 flex-[0.47] items-center justify-center rounded-2xl bg-[#F2F2F2]">
+        <View className="mb-6 mt-2 flex-row justify-between">
+          <TouchableOpacity
+            disabled={isLoading}
+            className="h-14 flex-[0.47] items-center justify-center rounded-2xl bg-[#F2F2F2]">
             <Image source={require('../../assets/images/Google.png')} className="h-6 w-6" />
           </TouchableOpacity>
-          <TouchableOpacity disabled={isLoading} className="h-14 flex-[0.47] items-center justify-center rounded-2xl bg-[#F2F2F2]">
+          <TouchableOpacity
+            disabled={isLoading}
+            className="h-14 flex-[0.47] items-center justify-center rounded-2xl bg-[#F2F2F2]">
             <Image source={require('../../assets/images/Facebook.png')} className="h-6 w-6" />
           </TouchableOpacity>
         </View>
 
         {/* Footer */}
         <View className="flex-row justify-center pb-6">
-          <Text className="text-secondaryText">Don't have an account?{' '}</Text>
+          <Text className="text-secondaryText">Don't have an account? </Text>
           <TouchableOpacity disabled={isLoading} onPress={() => router.push('/auth/SignUp')}>
             <Text className="font-bold text-primary">Sign Up</Text>
           </TouchableOpacity>

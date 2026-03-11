@@ -44,8 +44,7 @@ export default function SignUpOtpScreen() {
       return;
     }
 
-    // Normal typing: Only keep the last character entered in this box
-    const newOtp = [...otp];
+     const newOtp = [...otp];
     newOtp[index] = cleanText.slice(-1);
     setOtp(newOtp);
 
@@ -64,8 +63,7 @@ export default function SignUpOtpScreen() {
   const isOtpComplete = otp.every((digit) => digit !== '');
 
   // --- Extraction logic ---
-  // Using direct access from params for maximum reliability
-  const rawEmail = Array.isArray(email) ? email[0] : email;
+   const rawEmail = Array.isArray(email) ? email[0] : email;
   const rawToken = Array.isArray(signupToken) ? signupToken[0] : signupToken;
 
   const decodedEmail = typeof rawEmail === 'string' ? rawEmail.toLowerCase().trim() : '';

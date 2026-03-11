@@ -14,7 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUserDetail } from '@/hooks/useUserDetail';
 import { useAuthStore } from '@/store/useAuthStore';
- 
+
 const OnBoarding1 = forwardRef(({ initialData, onNext }: any, ref) => {
   const { profileStatus, submitStep1 } = useUserDetail();
   const userId = profileStatus?.id || profileStatus?.pendingClubOwnerId;
@@ -45,12 +45,18 @@ const OnBoarding1 = forwardRef(({ initialData, onNext }: any, ref) => {
         setOwnerName(initialData.ownerName || '');
         setPhone(initialData.phoneNumber || '');
         setEmail(initialData.email || '');
-        setImage(initialData.image || initialData.logoUrl || null);
+        setImage(initialData.image || initialData.logoUrl || initialData.logo?.uri || null);
 
         const logoVal = initialData.logoId || initialData.logo;
 
-        if (logoVal && typeof logoVal === 'object') {
+        if (logoVal) {
           setLogoId(logoVal);
+
+          if (typeof logoVal === 'object' && logoVal.uri) {
+            setImage(logoVal.uri);
+          } else if (typeof logoVal === 'string') {
+            setImage(logoVal);
+          }
         }
       } else {
         const savedData = await AsyncStorage.getItem(STORAGE_KEY);
@@ -69,7 +75,7 @@ const OnBoarding1 = forwardRef(({ initialData, onNext }: any, ref) => {
     };
 
     initData();
-  }, [userId]);
+  }, [userId, initialData]);
 
   // 2. Continuous draft backup
   useEffect(() => {
@@ -130,42 +136,43 @@ const OnBoarding1 = forwardRef(({ initialData, onNext }: any, ref) => {
   // --- VALIDATION & API SUBMIT LOGIC ---
 
   useImperativeHandle(ref, () => ({
-   handleSave: () => {
-  if (!image) return Alert.alert('Required', 'Please upload a club logo');
-  if (!clubName.trim()) return Alert.alert('Required', 'Club Name is required');
-  if (!ownerName.trim()) return Alert.alert('Required', 'Owner Name is required');
+    handleSave: () => {
+      if (!image) return Alert.alert('Required', 'Please upload a club logo');
+      if (!clubName.trim()) return Alert.alert('Required', 'Club Name is required');
+      if (!ownerName.trim()) return Alert.alert('Required', 'Owner Name is required');
 
-   const finalEmail = email.trim() || user?.email || '';
-  const finalPhone = phone.trim() || user?.phoneNumber || '';
+      const finalEmail = email.trim() || user?.email || '';
+      const finalPhone = phone.trim() || user?.phoneNumber || '';
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
- 
-  const hasValidPhone = finalPhone.length >= 10;
-  const hasValidEmail = finalEmail.length > 0 && emailRegex.test(finalEmail);
- 
-  if (!hasValidPhone && !hasValidEmail) {
-    return Alert.alert(
-      'Required',
-      'Please provide either a valid 10-digit phone number or a valid email address.'
-    );
-  }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  if (!LogoId) return Alert.alert('Required', 'Please upload a club logo');
+      const hasValidPhone = finalPhone.length >= 10;
+      const hasValidEmail = finalEmail.length > 0 && emailRegex.test(finalEmail);
 
-  const payload = {
-    clubName: clubName.trim(),
-    ownerName: ownerName.trim(),
-    phone: finalPhone,
-    email: finalEmail,
-    logo: LogoId,
-  };
+      if (!hasValidPhone && !hasValidEmail) {
+        return Alert.alert(
+          'Required',
+          'Please provide either a valid 10-digit phone number or a valid email address.'
+        );
+      }
 
-  submitStep1.mutate(payload, {
-    onSuccess: () => {
-       if (onNext) onNext();
+      if (!LogoId) return Alert.alert('Required', 'Please upload a club logo');
+
+      const payload = {
+        clubName: clubName.trim(),
+        ownerName: ownerName.trim(),
+        phone: finalPhone,
+        email: finalEmail,
+        logo: LogoId,
+      };
+
+      submitStep1.mutate(payload, {
+        onSuccess: async () => {
+          await AsyncStorage.setItem('@onboarding_step', '2');
+          if (onNext) onNext();
+        },
+      });
     },
-  });
-},
     getFormData: () => ({
       clubName,
       ownerName,

@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   TextInput,
- } from 'react-native';
+} from 'react-native';
 import MapView, { UrlTile } from 'react-native-maps';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -19,7 +19,7 @@ interface OnBoarding2Props {
   onConfirm: () => void;
 }
 
-const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
+const OnBoarding2 = ({ onConfirm }: OnBoarding2Props) => {
   const { profileStatus, submitStep2 } = useUserDetail();
   const userId = profileStatus?.id || profileStatus?.pendingClubOwnerId;
   const STORAGE_KEY = `@onboarding_step2_map_data_${userId || 'guest'}`;
@@ -63,10 +63,17 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
           setIsInitialized(true);
         } else if (!isInitialized) {
           const savedData = await AsyncStorage.getItem(STORAGE_KEY);
+
           if (savedData) {
             const parsed = JSON.parse(savedData);
+
             setRegion(parsed.region);
-            setLocationInfo(parsed.locationInfo);
+
+            setLocationInfo({
+              name: parsed.locationInfo.name,
+              address: parsed.locationInfo.address,
+            });
+
             setSearchQuery(parsed.locationInfo.address);
           } else {
             await getCurrentLocation();
@@ -101,56 +108,46 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
 
       const data = await res.json();
 
-     if (data) {
-  const address = data.display_name;
+      if (data) {
+        const address = data.display_name;
 
-  const name =
-    data.address?.road ||
-    data.address?.suburb ||
-    data.address?.city ||
-    'Selected Location';
+        const name =
+          data.address?.road || data.address?.suburb || data.address?.city || 'Selected Location';
 
-  const locationData = {
-    name,
-    address,
+        const locationData = {
+          name,
+          address,
 
-    clubAddress:
-      data.address?.road ||
-      data.address?.neighbourhood ||
-      data.address?.suburb ||
-      '',
+          clubAddress:
+            data.address?.road || data.address?.neighbourhood || data.address?.suburb || '',
 
-    city:
-      data.address?.city ||
-      data.address?.town ||
-      data.address?.village ||
-      '',
+          city: data.address?.city || data.address?.town || data.address?.village || '',
 
-    state: data.address?.state || '',
+          state: data.address?.state || '',
 
-    pincode: data.address?.postcode || '',
-  };
+          pincode: data.address?.postcode || '',
+        };
 
-  setLocationInfo({
-    name: locationData.name,
-    address: locationData.address,
-  });
+        setLocationInfo({
+          name: locationData.name,
+          address: locationData.address,
+        });
 
-  setSearchQuery(address);
+        setSearchQuery(address);
 
-  await AsyncStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      region: {
-        latitude: lat,
-        longitude: lng,
-        latitudeDelta: 0.005,
-        longitudeDelta: 0.005,
-      },
-      locationInfo: locationData,
-    })
-  );
-}
+        await AsyncStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({
+            region: {
+              latitude: lat,
+              longitude: lng,
+              latitudeDelta: 0.005,
+              longitudeDelta: 0.005,
+            },
+            locationInfo: locationData,
+          })
+        );
+      }
     } catch (err) {
       console.log('Reverse geocode error', err);
     } finally {
@@ -161,7 +158,7 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
   // --- 3. OSM Search  ---
   const searchTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  const searchLocation = async (text:any) => {
+  const searchLocation = async (text: any) => {
     setSearchQuery(text);
 
     if (searchTimeout.current) {
@@ -199,53 +196,50 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
     }, 600);
   };
 
-const selectSearchResult = async (item: any) => {
+  const selectSearchResult = async (item: any) => {
+    const newRegion = {
+      latitude: parseFloat(item.lat),
+      longitude: parseFloat(item.lon),
+      latitudeDelta: 0.005,
+      longitudeDelta: 0.005,
+    };
 
-  const newRegion = {
-    latitude: parseFloat(item.lat),
-    longitude: parseFloat(item.lon),
-    latitudeDelta: 0.005,
-    longitudeDelta: 0.005,
+    setRegion(newRegion);
+
+    mapRef.current?.animateToRegion(newRegion, 1000);
+
+    await getAddressFromCoords(newRegion.latitude, newRegion.longitude);
+
+    setSearchQuery(item.display_name);
+
+    setSearchResults([]);
   };
-
-  setRegion(newRegion);
-
-  mapRef.current?.animateToRegion(newRegion, 1000);
-
-  
-  await getAddressFromCoords(newRegion.latitude, newRegion.longitude);
-
-  setSearchQuery(item.display_name);
-
-  setSearchResults([]);
-
-};
 
   const getCurrentLocation = async () => {
-  const { status } = await Location.requestForegroundPermissionsAsync();
+    const { status } = await Location.requestForegroundPermissionsAsync();
 
-  if (status !== "granted") {
-    Alert.alert("Permission denied");
-    return;
-  }
+    if (status !== 'granted') {
+      Alert.alert('Permission denied');
+      return;
+    }
 
-  const location = await Location.getCurrentPositionAsync({
-    accuracy: Location.Accuracy.High,
-  });
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.High,
+    });
 
-  const newRegion = {
-    latitude: location.coords.latitude,
-    longitude: location.coords.longitude,
-    latitudeDelta: 0.005,
-    longitudeDelta: 0.005,
+    const newRegion = {
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
+      latitudeDelta: 0.005,
+      longitudeDelta: 0.005,
+    };
+
+    setRegion(newRegion);
+
+    mapRef.current?.animateToRegion(newRegion, 1000);
+
+    getAddressFromCoords(newRegion.latitude, newRegion.longitude);
   };
-
-  setRegion(newRegion);
-
-  mapRef.current?.animateToRegion(newRegion, 1000);
-
-  getAddressFromCoords(newRegion.latitude, newRegion.longitude);
-};
 
   const handleConfirm = () => {
     if (isReverseGeocoding) return;
@@ -255,7 +249,7 @@ const selectSearchResult = async (item: any) => {
     };
     submitStep2.mutate(payload, {
       onSuccess: async () => {
-        await AsyncStorage.getItem(`@onboarding_step2_map_data_${userId}`)
+        await AsyncStorage.setItem('@onboarding_step', '3');
         onConfirm();
       },
       onError: () => {
@@ -368,4 +362,4 @@ const selectSearchResult = async (item: any) => {
   );
 };
 
-export default OnBoarding2_Part2;
+export default OnBoarding2;
