@@ -38,7 +38,7 @@ export default function ForgotPasswordScreen() {
       {
         onSuccess: () => {
           router.push({
-            pathname: '/auth/VerifyCode',  
+            pathname: '/auth/ForgotOtpScreen',  
             params: { email: data.email.toLowerCase().trim() }
           });
         },
@@ -94,7 +94,7 @@ export default function ForgotPasswordScreen() {
                   } bg-white px-4`}
                 >
                   <TextInput
-                    placeholder="xyztest@gmail.com"
+                    placeholder="Enter Gmail"
                     placeholderTextColor="#CBD5E1"
                     onBlur={onBlur}
                     onChangeText={onChange}
@@ -114,8 +114,7 @@ export default function ForgotPasswordScreen() {
             )}
           </View>
 
-          {/* Spacer - pushes button to bottom */}
-          <View className="flex-1" />
+           <View className="flex-1" />
 
           {/* Action Button */}
           <View className="mb-6">

@@ -195,6 +195,9 @@ export default function SignUp() {
             resizeMode="contain"
           />
           <Text className="font-bold text-4xl text-darkText">Sign up</Text>
+          <Text className="mt-2 text-center font-medium text-sm text-secondaryText">
+            Create an account to continue!{' '}
+          </Text>
         </View>
 
         <View className="mt-10 space-y-5">
@@ -225,7 +228,7 @@ export default function SignUp() {
 
           {/* Password Field */}
           <View>
-            <Text className="mb-2 ml-1 mt-2 text-sm text-secondaryText">Set Password</Text>
+            <Text className="mb-2 ml-1 mt-4 text-sm text-secondaryText">Set Password</Text>
             <Controller
               control={control}
               name="password"
@@ -258,7 +261,7 @@ export default function SignUp() {
 
           {/* Confirm Password Field */}
           <View>
-            <Text className="mb-2 ml-1 mt-2 text-sm text-secondaryText">Confirm Password</Text>
+            <Text className="mb-2 ml-1 mt-4 text-sm text-secondaryText">Confirm Password</Text>
             <Controller
               control={control}
               name="confirmPassword"

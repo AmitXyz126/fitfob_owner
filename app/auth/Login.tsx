@@ -76,7 +76,7 @@ export default function Login() {
           Toast.show({
             type: 'error',
             text1: 'Authentication Failed',
-            text2: 'The password you entered is incorrect. 🔑',
+            text2: 'The password you entered is incorrect. ',
           });
         } else if (
           status === 404 ||
@@ -167,7 +167,7 @@ export default function Login() {
 
           {/* Password Field */}
           <View>
-            <Text className="mb-2 ml-1 mt-3 text-sm text-secondaryText">Password</Text>
+            <Text className="mb-2 ml-1 mt-4 text-sm text-secondaryText">Password</Text>
             <Controller
               control={control}
               name="password"
