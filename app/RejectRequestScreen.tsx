@@ -1,16 +1,17 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import React from 'react';
-import {
+ import {
   View,
   Text,
   TouchableOpacity,
-  SafeAreaView,
   StatusBar,
   Image,
   Linking,
   Alert,
+  ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 
 const RejectRequestScreen = () => {
   // Function to handle Email
@@ -35,13 +36,19 @@ const RejectRequestScreen = () => {
 
       {/* Header */}
       <View className="px-4 py-2">
-        <TouchableOpacity activeOpacity={0.7}>
+        <TouchableOpacity 
+          activeOpacity={0.7}
+          onPress={() => router.replace('/auth/Login')}
+        >
           <Ionicons name="chevron-back" size={24} color="#CBD5E1" />
         </TouchableOpacity>
       </View>
 
-      {/* --- CONTENT SECTION SHIFTED UP --- */}
-      <View className="flex-1 px-6 pt-10">
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1 }}
+      >
+        <View className="flex-1 px-6 pt-10 pb-6 justify-center">
         <View className="mb-8 items-center justify-center">
           <Image
             source={require('../assets/images/cancel.png')}
@@ -85,11 +92,13 @@ const RejectRequestScreen = () => {
           </TouchableOpacity>
         </View>
       </View>
+    </ScrollView>
 
       {/* Close Button - Fixed at bottom */}
-      <View className="px-6 ">
+      <View className="px-6 py-4">
         <TouchableOpacity
           activeOpacity={0.8}
+          onPress={() => router.replace('/auth/Login')}
           className="h-16 w-full items-center justify-center rounded-2xl bg-[#F2F2F2]">
           <Text className="font-bold text-[16px] text-[#64748B]">Close</Text>
         </TouchableOpacity>
