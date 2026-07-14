@@ -146,11 +146,11 @@ export default function Welcome() {
                 By proceeding, you agree to
               </Text>
               <Text className="font-sans text-sm leading-sm text-primary underline">
-                Terms & Conditions
+                <Text onPress={() => router.push('/terms')}>Terms & Conditions</Text>
                 <Text className="font-sans text-sm leading-sm text-background no-underline">
                   {'   '}&{'   '}
                 </Text>
-                Privacy Policy.
+                <Text onPress={() => router.push('/privacy')}>Privacy Policy.</Text>
               </Text>
             </View>
           </View>

@@ -32,7 +32,7 @@ export default function OnBoardingStep() {
 
   const {
     submitStep1,
-    submitStep2,
+    // submitStep2,
     submitStep3,
     submitStep4,
     submitStep7,

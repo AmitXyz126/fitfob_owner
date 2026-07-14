@@ -7,8 +7,8 @@ import { z } from 'zod';
 import { Button } from '@/components/Button';
 import { Container } from '@/components/Container';
 import { KeyboardAwareScrollView } from '@pietile-native-kit/keyboard-aware-scrollview';
- import { useForgotSendOtp } from '@/hooks/useAuth';
-
+import { useForgotSendOtp } from '@/hooks/useAuth';
+ 
  const forgotPasswordSchema = z.object({
   email: z.string()
     .min(1, 'Email is required')

@@ -11,8 +11,8 @@ export default function OtpScreen() {
   const router = useRouter();
   const { email } = useLocalSearchParams();
 
-   const { mutate: resendOtp, isPending: isResending } = useForgotResendOtp();
-const { mutate: verifyOtp, isPending: isVerifying } = useForgotVerifyOtp();
+  const { mutate: resendOtp, isPending: isResending } = useForgotResendOtp();
+  const { mutate: verifyOtp, isPending: isVerifying } = useForgotVerifyOtp();
 
   const [timer, setTimer] = useState(60);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -57,6 +57,7 @@ const { mutate: verifyOtp, isPending: isVerifying } = useForgotVerifyOtp();
     }
   };
 
+
   const isOtpComplete = otp.every((digit) => digit !== '');
 
   const handleVerify = () => {
@@ -67,7 +68,7 @@ const { mutate: verifyOtp, isPending: isVerifying } = useForgotVerifyOtp();
       console.log('--- FORGOT PASSWORD VERIFY START ---');
       console.log('Identifier:', identifier);
       console.log('OTP:', otpString);
-      
+
       verifyOtp(
         {
           identifier: identifier,
@@ -76,11 +77,11 @@ const { mutate: verifyOtp, isPending: isVerifying } = useForgotVerifyOtp();
         {
           onSuccess: (data) => {
             // Robust token extraction
-            const token = 
-              data?.resetToken || 
-              data?.data?.resetToken || 
-              data?.token || 
-              data?.data?.token || 
+            const token =
+              data?.resetToken ||
+              data?.data?.resetToken ||
+              data?.token ||
+              data?.data?.token ||
               data?.code;
 
             console.log("✅ Forgot OTP Verified. Token:", token);
@@ -90,15 +91,15 @@ const { mutate: verifyOtp, isPending: isVerifying } = useForgotVerifyOtp();
                 pathname: '/auth/CreateNewPassword',
                 params: {
                   email: identifier,
-                  resetToken: token, 
+                  resetToken: token,
                 },
               });
             } else {
-               console.error("⚠️ Success but no resetToken found in response:", data);
+              console.error("⚠️ Success but no resetToken found in response:", data);
             }
           },
           onError: (error: any) => {
-             console.error('❌ Forgot Verify Error:', error.response?.data || error.message);
+            console.error('❌ Forgot Verify Error:', error.response?.data || error.message);
           },
         }
       );
@@ -149,9 +150,8 @@ const { mutate: verifyOtp, isPending: isVerifying } = useForgotVerifyOtp();
                 ref={(ref) => {
                   inputRefs.current[index] = ref;
                 }}
-                className={`h-14 w-[14%] rounded-[10px] border bg-white text-center font-bold text-xl text-slate-900 ${
-                  focusedIndex === index || digit ? 'border-[#F6163C]' : 'border-slate-200'
-                }`}
+                className={`h-14 w-[14%] rounded-[10px] border bg-white text-center font-bold text-xl text-slate-900 ${focusedIndex === index || digit ? 'border-[#F6163C]' : 'border-slate-200'
+                  }`}
                 onFocus={() => setFocusedIndex(index)}
                 keyboardType="number-pad"
                 maxLength={6}
