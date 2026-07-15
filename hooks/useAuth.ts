@@ -108,7 +108,7 @@ export const useLoginRequest = () => {
 
         setUser(userWithToken, true);
         console.log(userWithToken, 'usr Data');
-        
+
         if (!userWithToken.isVerified) {
           router.replace('/onBoardingScreen/OnBoardingStep');
         } else {

@@ -46,7 +46,7 @@ export default function OnBoardingStep() {
       setFormData(userData);
       setIsDataSynced(true);
 
-       if (userData.currentStep && userData.currentStep > 1) {
+      if (userData.currentStep && userData.currentStep > 1) {
         setStep(userData.currentStep);
       }
     }
@@ -70,14 +70,14 @@ export default function OnBoardingStep() {
       if (data) updateFormData(data);
       onboarding1Ref.current?.handleSave();
       return;
-    }
-    if (step === 2) {
+    }    if (step === 2) {
       if (subStep === 1) {
         setSubStep(2);
       } else {
         const data = onboarding2DetailsRef.current?.getFormData();
         if (data) updateFormData(data);
         onboarding2DetailsRef.current?.handleSave();
+
       }
       return;
     }
@@ -111,6 +111,7 @@ export default function OnBoardingStep() {
     if (step === 2 && subStep === 2) return 'Confirm & Proceed';
     if (step === 3) return 'Save & Continue';
     if (step === 4) return subStep === 1 ? 'Upload Document' : 'Next Step';
+ 
     return 'Next';
   };
 
@@ -135,7 +136,8 @@ export default function OnBoardingStep() {
               activeOpacity={0.7}
               disabled={item > (userData?.currentStep || 1) && item > step}
               className="mx-1 flex-1 justify-center">
-              <View className={`w-full rounded-full ${bgColor}`} />
+              <View className={`w-full rounded-full ${bgColor}`} /> 
+
             </TouchableOpacity>
           );
         })}
@@ -198,7 +200,7 @@ export default function OnBoardingStep() {
         </View>
 
         {!(step === 2 && subStep === 1) && (
-          <View className="bg-white pb-8 pt-4 ">
+          <View className="bg-white pb-8 pt-4">
             <Button
               title={getButtonTitle()}
               onPress={handleNext}

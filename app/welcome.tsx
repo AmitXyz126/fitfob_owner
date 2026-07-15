@@ -115,9 +115,8 @@ export default function Welcome() {
                       transitionProperty: 'all',
                       transitionTimingFunction: 'ease-in-out',
                     }}
-                    className={`mr-2 h-2 rounded-full ${
-                      i === realIndex ? 'w-8 bg-primary' : 'w-2 bg-white'
-                    }`}
+                    className={`mr-2 h-2 rounded-full ${i === realIndex ? 'w-8 bg-primary' : 'w-2 bg-white'
+                      }`}
                   />
                 );
               })}
