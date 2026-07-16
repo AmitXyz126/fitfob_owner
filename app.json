@@ -3,7 +3,7 @@
     "name": "fitfob_owner",
     "slug": "fitFob_owner",
     "version": "1.0.0",
-     "jsEngine": "hermes",
+    "jsEngine": "hermes",
     "scheme": [
       "fitfob_owner",
       "fb2349725998870415"
@@ -59,6 +59,13 @@
           "apiKey": ""
         }
       }
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e22deb02-0025-469d-9ea6-3ad7639ab080"
+      }
+    },
+    "owner": "amozart"
   }
 }

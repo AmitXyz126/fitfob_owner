@@ -77,7 +77,6 @@ export default function OnBoardingStep() {
         const data = onboarding2DetailsRef.current?.getFormData();
         if (data) updateFormData(data);
         onboarding2DetailsRef.current?.handleSave();
-
       }
       return;
     }
@@ -156,7 +155,7 @@ export default function OnBoardingStep() {
               onNext={() => setStep(2)}
             />
           )}
-
+                                       
           {step === 2 &&
             (subStep === 1 ? (
               <OnBoarding2_Part2

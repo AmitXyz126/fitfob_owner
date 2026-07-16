@@ -10,6 +10,8 @@ export const ENDPOINTS = {
   FORGOT_VERIFY_OTP: `${BASE_URL}/api/auth/verify-otp`,
   FORGOT_SET_PASSWORD: `${BASE_URL}/api/auth/reset-password`,
   UPLOADFILE: `${BASE_URL}/api/upload`,
+  GOOGLE_AUTH: `${BASE_URL}/api/clubOwner/google`,
+  FACEBOOK_AUTH: `${BASE_URL}/api/clubOwner/facebook`,
 
   // Onboarding Flow
   GET_ONBOARDING_STATUS: `${BASE_URL}/api/pending-club-owner/me`,
