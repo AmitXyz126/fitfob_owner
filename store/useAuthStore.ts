@@ -7,6 +7,7 @@ import { create } from 'zustand';
   email: string;
   token: string;
   role?: any;
+  verification_status?:string
   [key: string]: any;
 }
 

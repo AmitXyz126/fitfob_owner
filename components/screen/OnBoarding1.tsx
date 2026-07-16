@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
 import {
   View,
@@ -12,14 +13,15 @@ import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUserDetail } from '@/hooks/useUserDetail';
-
-// Removed global STORAGE_KEY_STEP1 to use user-specific key inside component
-
+import { useAuthStore } from '@/store/useAuthStore';
+ 
 const OnBoarding1 = forwardRef(({ initialData, onNext }: any, ref) => {
-  const { userData, submitStep1 } = useUserDetail();
-  const userId = userData?.id || userData?.pendingClubOwnerId;
+  const { profileStatus, submitStep1 } = useUserDetail();
+  const userId = profileStatus?.id || profileStatus?.pendingClubOwnerId;
   const STORAGE_KEY = `@onboarding_step1_data_${userId || 'guest'}`;
   const isSubmitting = submitStep1.isPending;
+
+  const { user } = useAuthStore();
 
   const [clubName, setClubName] = useState('');
   const [ownerName, setOwnerName] = useState('');
@@ -32,6 +34,7 @@ const OnBoarding1 = forwardRef(({ initialData, onNext }: any, ref) => {
   // Use a flag to ensure single initialization
   const [isInitialized, setIsInitialized] = useState(false);
 
+  console.log(user, 'get');
   // 1. Initialize logic
   useEffect(() => {
     if (!userId || !STORAGE_KEY) return;
@@ -125,44 +128,44 @@ const OnBoarding1 = forwardRef(({ initialData, onNext }: any, ref) => {
   };
 
   // --- VALIDATION & API SUBMIT LOGIC ---
+
   useImperativeHandle(ref, () => ({
-    handleSave: () => {
-      // 1. Required Validations
-      if (!image) return Alert.alert('Required', 'Please upload a club logo');
-      if (!clubName.trim()) return Alert.alert('Required', 'Club Name is required');
-      if (!ownerName.trim()) return Alert.alert('Required', 'Owner Name is required');
-      if (!phone.trim() || phone.length < 10)
-        return Alert.alert('Required', 'Enter a valid 10-digit phone number');
+   handleSave: () => {
+  if (!image) return Alert.alert('Required', 'Please upload a club logo');
+  if (!clubName.trim()) return Alert.alert('Required', 'Club Name is required');
+  if (!ownerName.trim()) return Alert.alert('Required', 'Owner Name is required');
 
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!email.trim() || !emailRegex.test(email))
-        return Alert.alert('Required', 'Enter a valid email address');
+   const finalEmail = email.trim() || user?.email || '';
+  const finalPhone = phone.trim() || user?.phoneNumber || '';
 
-      // 2. Validate LogoId
-      if (!LogoId) {
-        return Alert.alert('Required', 'Please upload a club logo');
-      }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+ 
+  const hasValidPhone = finalPhone.length >= 10;
+  const hasValidEmail = finalEmail.length > 0 && emailRegex.test(finalEmail);
+ 
+  if (!hasValidPhone && !hasValidEmail) {
+    return Alert.alert(
+      'Required',
+      'Please provide either a valid 10-digit phone number or a valid email address.'
+    );
+  }
 
-      const payload = {
-        clubName: clubName.trim(),
-        ownerName: ownerName.trim(),
-        phone: phone.trim(),
-        email: email.trim(),
-        logo: LogoId,
-      };
+  if (!LogoId) return Alert.alert('Required', 'Please upload a club logo');
 
-      console.log('--- Step 1 Submission ---');
-      console.log('LogoId:', LogoId);
-      console.log('Final Payload:', payload);
+  const payload = {
+    clubName: clubName.trim(),
+    ownerName: ownerName.trim(),
+    phone: finalPhone,
+    email: finalEmail,
+    logo: LogoId,
+  };
 
-      // 3. API Call with Loading handled by isSubmitting
-      submitStep1.mutate(payload, {
-        onSuccess: async () => {
-          await AsyncStorage.removeItem(STORAGE_KEY);
-          if (onNext) onNext();
-        },
-      });
+  submitStep1.mutate(payload, {
+    onSuccess: () => {
+       if (onNext) onNext();
     },
+  });
+},
     getFormData: () => ({
       clubName,
       ownerName,
@@ -242,7 +245,7 @@ const OnBoarding1 = forwardRef(({ initialData, onNext }: any, ref) => {
 
         <View>
           <Text className="mb-2 ml-1 mt-4 font-medium text-[13px] text-slate-500">
-            Phone Number
+            Phone Number{user?.email && '(optional)'}
           </Text>
           <View
             className={`h-14 w-full flex-row items-center rounded-xl border px-3 ${isSubmitting ? 'border-slate-100 bg-slate-50' : 'border-slate-200 bg-white'}`}>
@@ -255,7 +258,7 @@ const OnBoarding1 = forwardRef(({ initialData, onNext }: any, ref) => {
               <Ionicons name="chevron-down" size={14} color="#64748B" />
             </View>
             <TextInput
-              value={phone}
+              value={phone || user?.phoneNumber || ''}
               onChangeText={setPhone}
               editable={!isSubmitting}
               keyboardType="numeric"
@@ -268,11 +271,14 @@ const OnBoarding1 = forwardRef(({ initialData, onNext }: any, ref) => {
         </View>
 
         <View className="mb-6 mt-4">
-          <Text className="mb-2 ml-1 font-medium text-[13px] text-slate-500">Email Address</Text>
+          <Text className="mb-2 ml-1 font-medium text-[13px] text-slate-500">
+            Email Address{user?.phoneNumber && '(optional)'}
+          </Text>
           <TextInput
-            value={email}
+            value={email || user?.email || ''}
+            selectTextOnFocus={false}
             onChangeText={setEmail}
-            editable={!isSubmitting}
+            editable={false}
             keyboardType="email-address"
             placeholder="Enter email address"
             placeholderTextColor="#94A3B8"

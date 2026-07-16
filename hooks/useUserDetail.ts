@@ -9,7 +9,7 @@ export const useUserDetail = () => {
   const queryClient = useQueryClient();
 
    const {
-    data: userData,
+    data: profileStatus,
     isLoading: isFetchingStatus,
     refetch,
     isRefetching,
@@ -29,7 +29,7 @@ export const useUserDetail = () => {
 
   const submitStep1 = useMutation({
     mutationFn: (formData: any) => {
-      const id = userData?.id || userData?.pendingClubOwnerId;
+      const id = profileStatus?.id || profileStatus?.pendingClubOwnerId;
       if (!id) throw new Error('User ID not found!');
       return userDetailsApi.saveStep1(id, formData);
     },
@@ -48,7 +48,7 @@ export const useUserDetail = () => {
 
   const submitStep2 = useMutation({
     mutationFn: (locationData: { latitude: string; longitude: string }) => {
-      const id = userData?.id || userData?.pendingClubOwnerId;
+      const id = profileStatus?.id || profileStatus?.pendingClubOwnerId;
       if (!id) throw new Error('User ID not found!');
       return userDetailsApi.saveStep2(id, locationData);
     },
@@ -65,7 +65,7 @@ export const useUserDetail = () => {
       state: string;
       pincode: string;
     }) => {
-      const id = userData?.id || userData?.pendingClubOwnerId;
+      const id = profileStatus?.id || profileStatus?.pendingClubOwnerId;
       if (!id) throw new Error('User ID not found!');
       return userDetailsApi.saveStep3(id, addressData);
     },
@@ -84,7 +84,7 @@ export const useUserDetail = () => {
 
   const submitStep4 = useMutation({
     mutationFn: (configData: any) => {
-      const id = userData?.id || userData?.pendingClubOwnerId;
+      const id = profileStatus?.id || profileStatus?.pendingClubOwnerId;
       if (!id) throw new Error('User ID not found!');
       return userDetailsApi.configureClub(id, configData);
     },
@@ -148,7 +148,7 @@ export const useUserDetail = () => {
   });
 
   return {
-    userData,
+    profileStatus,
     isFetchingStatus,
     refetch,
     isRefetching,

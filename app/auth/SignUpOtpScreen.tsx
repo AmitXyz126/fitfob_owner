@@ -7,10 +7,11 @@ import { Container } from '@/components/Container';
 import { KeyboardAwareScrollView } from '@pietile-native-kit/keyboard-aware-scrollview';
 import { useVerifyOtp, useResendOtp } from '@/hooks/useAuth';
 import Toast from 'react-native-toast-message';
+import { useAuthStore } from '@/store/useAuthStore';
 
-export default function OtpScreen() {
+export default function SignUpOtpScreen() {
   const router = useRouter();
-
+  const { setUser } = useAuthStore();
 
   const { email, signupToken } = useLocalSearchParams();
   const { mutate: verifyMutation, isPending } = useVerifyOtp();
@@ -29,10 +30,8 @@ export default function OtpScreen() {
   }, [timer]);
 
   const handleChange = (text: string, index: number) => {
-
     const cleanText = text.replace(/[^0-9]/g, '');
 
-    // Support for Paste / Auto-fill (if more than 1 digit is entered)
     if (cleanText.length > 1) {
       const pastedOtp = cleanText.split('').slice(0, 6);
       const newOtp = [...otp];
@@ -69,11 +68,9 @@ export default function OtpScreen() {
   const rawEmail = Array.isArray(email) ? email[0] : email;
   const rawToken = Array.isArray(signupToken) ? signupToken[0] : signupToken;
 
-  const decodedEmail =
-    typeof rawEmail === 'string' ? rawEmail.toLowerCase().trim() : '';
+  const decodedEmail = typeof rawEmail === 'string' ? rawEmail.toLowerCase().trim() : '';
 
-  const decodedToken =
-    typeof rawToken === 'string' ? rawToken.trim() : '';
+  const decodedToken = typeof rawToken === 'string' ? rawToken.trim() : '';
 
   // --- Verify Logic ---
   const handleVerify = () => {
@@ -102,7 +99,45 @@ export default function OtpScreen() {
 
     console.log('📡 [OtpScreen] SENDING TO API:', JSON.stringify(finalPayload, null, 2));
 
-    verifyMutation(finalPayload);
+    verifyMutation(finalPayload, {
+      onSuccess: (data) => {
+        console.log(data, 'Vergiy otp');
+
+        if (data && data.jwt && data.user) {
+          console.log('✅ OTP Verified. Finalizing User Session...');
+
+          const userWithToken = {
+            ...data.user,
+            token: data.jwt,
+          };
+
+          setUser(userWithToken, true);
+
+          Toast.show({
+            type: 'success',
+            text1: 'Verification Success ✅',
+            text2: 'Welcome to the app!',
+          });
+          router.replace('/onBoardingScreen/OnBoardingStep');
+          console.log('🚀 User Data Saved. Redirecting to Dashboard...');
+        } else {
+          console.warn('⚠️ API Success but missing fields in response:', data);
+          router.replace('/auth/Login');
+        }
+      },
+      onError: (error: any) => {
+        const errorData = error.response?.data;
+        const msg = errorData?.error?.message || errorData?.message || 'Verification Failed';
+
+        console.error('❌ OTP Verify Error:', msg);
+
+        Toast.show({
+          type: 'error',
+          text1: 'Verification Failed',
+          text2: msg,
+        });
+      },
+    });
   };
 
   const handleResend = () => {
@@ -110,7 +145,7 @@ export default function OtpScreen() {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Session expired. Please start again.'
+        text2: 'Session expired. Please start again.',
       });
       return;
     }
@@ -167,7 +202,8 @@ export default function OtpScreen() {
           <View className="mt-12 items-center">
             <Text className="px-4 text-center text-base leading-6 text-slate-400">
               Please enter the code we just sent to{'\n'}
-              <Text className="font-bold text-slate-900">{decodedEmail || 'your email'}</Text> to proceed
+              <Text className="font-bold text-slate-900">{decodedEmail || 'your email'}</Text> to
+              proceed
             </Text>
           </View>
 
@@ -195,10 +231,7 @@ export default function OtpScreen() {
           {/* Resend Section */}
           <View className="mt-10 flex-row items-center justify-center">
             <Text className="text-sm text-slate-400">Didn&lsquo;t receive OTP? </Text>
-            <TouchableOpacity
-              disabled={timer > 0 || isResending}
-              onPress={handleResend}
-            >
+            <TouchableOpacity disabled={timer > 0 || isResending} onPress={handleResend}>
               <Text
                 className={`font-bold text-sm ${timer > 0 || isResending ? 'text-slate-300' : 'text-[#F6163C]'}`}>
                 {isResending

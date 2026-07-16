@@ -50,7 +50,7 @@ export const verifyOtpApi = async (payload: any) => {
       otp: payload.otp.toString(),
       signupToken: payload.signupToken,
     });
-
+    console.log(response.data)
     return response.data;
   } catch (error: any) {
     const errorData = error.response?.data;
