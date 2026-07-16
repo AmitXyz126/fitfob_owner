@@ -7,7 +7,7 @@ import { Container } from '@/components/Container';
 import { KeyboardAwareScrollView } from '@pietile-native-kit/keyboard-aware-scrollview';
 import { useForgotResendOtp, useForgotVerifyOtp } from '@/hooks/useAuth';
 
-export default function OtpScreen() {
+export default function VerifyCode() {
   const router = useRouter();
   const { email } = useLocalSearchParams();
 
