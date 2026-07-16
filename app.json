@@ -23,7 +23,8 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -43,9 +44,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.xyzstudio.fitfob",
       "googleServicesFile": "./GoogleService-Info.plist",
-      "config": {
-        // "googleMapsApiKey": "AIzaSyB7liTs6ffq-vFE9VZH5rjbQ_ttSSFSb4o"
-      }
+      "config": {}
     },
     "android": {
       "softwareKeyboardLayoutMode": "pan",

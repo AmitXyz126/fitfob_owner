@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -14,6 +14,7 @@ export default function OtpScreen() {
   const { email, signupToken } = useLocalSearchParams();
   const { mutate: verifyMutation, isPending } = useVerifyOtp();
   const { mutate: resendMutation, isPending: isResending } = useResendOtp();
+  const { setUser } = useAuthStore();
 
   const [timer, setTimer] = useState(60);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
