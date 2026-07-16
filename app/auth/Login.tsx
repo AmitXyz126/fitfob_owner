@@ -12,9 +12,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useLoginRequest } from '@/hooks/useAuth';
+import { useLoginRequest, useGoogleAuthRequest, useFacebookAuthRequest } from '@/hooks/useAuth';
 import Toast from 'react-native-toast-message';
 import { useAuthStore } from '@/store/useAuthStore';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+import * as Facebook from 'expo-auth-session/providers/facebook';
+import * as AuthSession from 'expo-auth-session';
+
+WebBrowser.maybeCompleteAuthSession();
 
 // 1. Validation Schema
 const loginSchema = z.object({
@@ -30,8 +36,42 @@ export default function Login() {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
+  // Social Auth Hooks
+  const [googleRequest, googleResponse, googlePromptAsync] = Google.useIdTokenAuthRequest({
+    clientId: '694317966222-fr234kqdgdcn5hm5q9vb5vudqnq8c3b1.apps.googleusercontent.com',
+    redirectUri: 'https://auth.expo.io/@anonymous/fitFob_owner',
+  });
+  const [fbRequest, fbResponse, fbPromptAsync] = Facebook.useAuthRequest({
+    clientId: '1017733454437395',
+    responseType: AuthSession.ResponseType.Token,
+    redirectUri: 'https://auth.expo.io/@anonymous/fitFob_owner',
+  });
+
+  const googleAuthMutation = useGoogleAuthRequest();
+  const facebookAuthMutation = useFacebookAuthRequest();
+
+  // Handle Google Auth Response
+  React.useEffect(() => {
+    if (googleResponse?.type === 'success') {
+      const { idToken } = googleResponse.authentication || {};
+      if (idToken) {
+        googleAuthMutation.mutate({ token: idToken });
+      }
+    }
+  }, [googleResponse]);
+
+  // Handle Facebook Auth Response
+  React.useEffect(() => {
+    if (fbResponse?.type === 'success') {
+      const { accessToken } = fbResponse.authentication || {};
+      if (accessToken) {
+        facebookAuthMutation.mutate({ token: accessToken });
+      }
+    }
+  }, [fbResponse]);
+
   // Loading state shortcut
-  const isLoading = loginMutation.isPending;
+  const isLoading = loginMutation.isPending || googleAuthMutation.isPending || facebookAuthMutation.isPending;
 
   // 2. Form Hook Setup
   const {
@@ -227,10 +267,16 @@ export default function Login() {
 
         {/* Social Buttons */}
         <View className="mb-6 flex-row justify-between mt-2">
-          <TouchableOpacity disabled={isLoading} className="h-14 flex-[0.47] items-center justify-center rounded-2xl bg-[#F2F2F2]">
+          <TouchableOpacity
+            disabled={isLoading}
+            onPress={() => googlePromptAsync()}
+            className="h-14 flex-[0.47] items-center justify-center rounded-2xl bg-[#F2F2F2]">
             <Image source={require('../../assets/images/Google.png')} className="h-6 w-6" />
           </TouchableOpacity>
-          <TouchableOpacity disabled={isLoading} className="h-14 flex-[0.47] items-center justify-center rounded-2xl bg-[#F2F2F2]">
+          <TouchableOpacity
+            disabled={isLoading}
+            onPress={() => fbPromptAsync()}
+            className="h-14 flex-[0.47] items-center justify-center rounded-2xl bg-[#F2F2F2]">
             <Image source={require('../../assets/images/Facebook.png')} className="h-6 w-6" />
           </TouchableOpacity>
         </View>

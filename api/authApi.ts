@@ -125,3 +125,25 @@ export const resetPasswordApi = async (payload: any) => {
     throw error;
   }
 };
+
+// 5. Google Authentication
+export const googleAuthApi = async (payload: { token: string }) => {
+  try {
+    const response = await api.post(ENDPOINTS.GOOGLE_AUTH, payload);
+    return response.data;
+  } catch (error: any) {
+    console.error('❌ Google Auth API Error:', error.response?.data || error.message);
+    throw error;
+  }
+};
+
+// 6. Facebook Authentication
+export const facebookAuthApi = async (payload: { token: string }) => {
+  try {
+    const response = await api.post(ENDPOINTS.FACEBOOK_AUTH, payload);
+    return response.data;
+  } catch (error: any) {
+    console.error('❌ Facebook Auth API Error:', error.response?.data || error.message);
+    throw error;
+  }
+};

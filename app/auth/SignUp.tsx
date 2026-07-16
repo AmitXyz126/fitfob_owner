@@ -10,8 +10,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import * as Facebook from 'expo-auth-session/providers/facebook';
-import { ResponseType } from 'expo-auth-session';
-import { useSignupRequest } from '@/hooks/useAuth';
+import * as AuthSession from 'expo-auth-session';
+import { useSignupRequest, useGoogleAuthRequest, useFacebookAuthRequest } from '@/hooks/useAuth';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -108,14 +108,39 @@ export default function SignUp() {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
 
-  // Social Auth Hooks (Existing)
+  // Social Auth Hooks
   const [googleRequest, googleResponse, googlePromptAsync] = Google.useIdTokenAuthRequest({
-    clientId: '1026944446347-4gpshovr4kn56afecqsevj7o0assovht.apps.googleusercontent.com',
+    clientId: '694317966222-fr234kqdgdcn5hm5q9vb5vudqnq8c3b1.apps.googleusercontent.com',
+    redirectUri: 'https://auth.expo.io/@anonymous/fitFob_owner',
   });
   const [fbRequest, fbResponse, fbPromptAsync] = Facebook.useAuthRequest({
-    clientId: '2349725998870415',
-    responseType: ResponseType.Token,
+    clientId: '1017733454437395',
+    responseType: AuthSession.ResponseType.Token,
+    redirectUri: 'https://auth.expo.io/@anonymous/fitFob_owner',
   });
+
+  const googleAuthMutation = useGoogleAuthRequest();
+  const facebookAuthMutation = useFacebookAuthRequest();
+
+  // Handle Google Auth Response
+  React.useEffect(() => {
+    if (googleResponse?.type === 'success') {
+      const { idToken } = googleResponse.authentication || {};
+      if (idToken) {
+        googleAuthMutation.mutate({ token: idToken });
+      }
+    }
+  }, [googleResponse]);
+
+  // Handle Facebook Auth Response
+  React.useEffect(() => {
+    if (fbResponse?.type === 'success') {
+      const { accessToken } = fbResponse.authentication || {};
+      if (accessToken) {
+        facebookAuthMutation.mutate({ token: accessToken });
+      }
+    }
+  }, [fbResponse]);
 
   const {
     control,
@@ -126,7 +151,7 @@ export default function SignUp() {
     defaultValues: { identifier: '', password: '', confirmPassword: '' },
   });
 
-  const isLoading = isPending;
+  const isLoading = isPending || googleAuthMutation.isPending || facebookAuthMutation.isPending;
 
   const onSubmit = (data: SignupFormData) => {
     const payload = {

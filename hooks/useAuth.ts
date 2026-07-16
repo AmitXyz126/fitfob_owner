@@ -8,6 +8,8 @@ import {
   resetPasswordApi,
   signupStep1Api,
   verifyOtpApi,
+  googleAuthApi,
+  facebookAuthApi,
 } from '@/api/authApi';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter } from 'expo-router';
@@ -149,6 +151,84 @@ export const useResetPassword = () => {
 
       const msg = error.response?.data?.error?.message || 'Unable to reset password.';
       Toast.show({ type: 'error', text1: 'Error', text2: msg });
+    },
+  });
+};
+
+export const useGoogleAuthRequest = () => {
+  const { setUser } = useAuthStore();
+  const router = useRouter();
+
+  return useMutation({
+    mutationFn: googleAuthApi,
+    onSuccess: (data) => {
+      if (data && data.jwt && data.user) {
+        console.log('✅ Google Auth Success:', data.user.username || data.user.email);
+
+        const userWithToken = {
+          ...data.user,
+          token: data.jwt,
+        };
+
+        setUser(userWithToken, true);
+
+        if (!userWithToken.isVerified) {
+          router.replace('/onBoardingScreen/OnBoardingStep');
+        } else {
+          router.replace('/(tabs)');
+        }
+      } else {
+        console.warn('⚠️ API Success but missing fields in response:', data);
+        router.replace('/auth/Login');
+      }
+    },
+    onError: (error: any) => {
+      console.error('❌ Google Auth Error:', error.response?.data || error.message);
+      const msg = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Verification Failed';
+      Toast.show({
+        type: 'error',
+        text1: 'Google Authentication Failed',
+        text2: msg,
+      });
+    },
+  });
+};
+
+export const useFacebookAuthRequest = () => {
+  const { setUser } = useAuthStore();
+  const router = useRouter();
+
+  return useMutation({
+    mutationFn: facebookAuthApi,
+    onSuccess: (data) => {
+      if (data && data.jwt && data.user) {
+        console.log('✅ Facebook Auth Success:', data.user.username || data.user.email);
+
+        const userWithToken = {
+          ...data.user,
+          token: data.jwt,
+        };
+
+        setUser(userWithToken, true);
+
+        if (!userWithToken.isVerified) {
+          router.replace('/onBoardingScreen/OnBoardingStep');
+        } else {
+          router.replace('/(tabs)');
+        }
+      } else {
+        console.warn('⚠️ API Success but missing fields in response:', data);
+        router.replace('/auth/Login');
+      }
+    },
+    onError: (error: any) => {
+      console.error('❌ Facebook Auth Error:', error.response?.data || error.message);
+      const msg = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Verification Failed';
+      Toast.show({
+        type: 'error',
+        text1: 'Facebook Authentication Failed',
+        text2: msg,
+      });
     },
   });
 };

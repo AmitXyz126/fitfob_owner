@@ -11,8 +11,6 @@ import { useAuthStore } from '@/store/useAuthStore';
 
 export default function SignUpOtpScreen() {
   const router = useRouter();
-  const { setUser } = useAuthStore();
-
   const { email, signupToken } = useLocalSearchParams();
   const { mutate: verifyMutation, isPending } = useVerifyOtp();
   const { mutate: resendMutation, isPending: isResending } = useResendOtp();
@@ -63,7 +61,6 @@ export default function SignUpOtpScreen() {
 
   const isOtpComplete = otp.every((digit) => digit !== '');
 
-  // --- Extraction logic ---
   // Using direct access from params for maximum reliability
   const rawEmail = Array.isArray(email) ? email[0] : email;
   const rawToken = Array.isArray(signupToken) ? signupToken[0] : signupToken;

@@ -8,7 +8,7 @@ import { KeyboardAwareScrollView } from '@pietile-native-kit/keyboard-aware-scro
 import { useForgotResendOtp, useForgotVerifyOtp } from '@/hooks/useAuth';
 import Toast from 'react-native-toast-message';
 
-export default function ForgotOtpScreen() {
+export default function VerifyCode() {
   const router = useRouter();
   const { email } = useLocalSearchParams();
 
