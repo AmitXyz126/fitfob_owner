@@ -23,7 +23,23 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.694317966222-fr234kqdgdcn5hm5q9vb5vudqnq8c3b1"
+        }
+      ],
+      [
+        "react-native-fbsdk-next",
+        {
+          "appID": "1017733454437395",
+          "clientToken": "51394908565334eb54ab6530f699c04d",
+          "displayName": "FitFob",
+          "scheme": "fb1017733454437395",
+          "iosUserTrackingPermission": "This identifier will be used to deliver personalized ads to you."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
@@ -44,7 +60,7 @@
       "bundleIdentifier": "com.xyzstudio.fitfob",
       "googleServicesFile": "./GoogleService-Info.plist",
       "config": {
-        // "googleMapsApiKey": "AIzaSyB7liTs6ffq-vFE9VZH5rjbQ_ttSSFSb4o"
+        "googleMapsApiKey": "AIzaSyB7liTs6ffq-vFE9VZH5rjbQ_ttSSFSb4o"
       }
     },
     "android": {

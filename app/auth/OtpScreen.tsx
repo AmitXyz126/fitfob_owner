@@ -14,6 +14,7 @@ export default function OtpScreen() {
   const { email, signupToken } = useLocalSearchParams();
   const { mutate: verifyMutation, isPending } = useVerifyOtp();
   const { mutate: resendMutation, isPending: isResending } = useResendOtp();
+  const { setUser } = useAuthStore();
 
   const [timer, setTimer] = useState(60);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);

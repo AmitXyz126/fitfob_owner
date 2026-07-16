@@ -15,7 +15,7 @@ interface OnBoarding3Props {
 
 const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
   const { initialData } = props;
-  const { submitStep4, userData } = useUserDetail();
+  const { submitStep4, profileStatus: userData } = useUserDetail();
   const userId = userData?.id || userData?.pendingClubOwnerId;
   const STORAGE_KEY = `@onboarding_step3_data_${userId || 'guest'}`;
 

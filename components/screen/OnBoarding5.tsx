@@ -22,7 +22,7 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
   const router = useRouter();
   const [images, setImages] = useState<(string | null)[]>(Array(6).fill(null));
 
-   const { userData, submitStep7 } = useUserDetail();
+   const { submitStep7 } = useUserDetail();
   const isLoading = submitStep7.isPending;
 
   // Effect to populate images from initialData (userData)

@@ -8,8 +8,8 @@ import {
   resetPasswordApi,
   signupStep1Api,
   verifyOtpApi,
-  googleAuthApi,
-  facebookAuthApi,
+  facebookLoginApi,
+  googleLoginApi,
 } from '@/api/authApi';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter } from 'expo-router';
@@ -49,35 +49,35 @@ export const useResendOtp = () => {
 export const useVerifyOtp = () => {
   return useMutation({
     mutationFn: verifyOtpApi,
-   
+
   });
 };
 export const useLoginRequest = () => {
   const { setUser } = useAuthStore();
   const router = useRouter();
-return useMutation({
-  mutationFn: loginUserApi,
-  onSuccess: (data) => {
-    if (data && data.jwt && data.user) {
-      console.log('✅ Login Success:', data.user.username);
+  return useMutation({
+    mutationFn: loginUserApi,
+    onSuccess: (data) => {
+      if (data && data.jwt && data.user) {
+        console.log('✅ Login Success:', data.user.username);
 
-      const userWithToken = {
-        ...data.user,
-        token: data.jwt,
-      };
+        const userWithToken = {
+          ...data.user,
+          token: data.jwt,
+        };
 
-      setUser(userWithToken, true);
-      console.log(userWithToken, 'usr Data');
+        setUser(userWithToken, true);
+        console.log(userWithToken, 'usr Data');
 
-      // 🚀 Always go to onboarding flow checker
-      router.replace('/onBoardingScreen/OnBoardingStep');
-    }
-  },
+        // 🚀 Always go to onboarding flow checker
+        router.replace('/onBoardingScreen/OnBoardingStep');
+      }
+    },
 
-  onError: (error: any) => {
-    console.error('❌ Login Error:', error.response?.data || error.message);
-  },
-});
+    onError: (error: any) => {
+      console.error('❌ Login Error:', error.response?.data || error.message);
+    },
+  });
 };
 
 export const useForgotSendOtp = () => {
@@ -155,12 +155,12 @@ export const useResetPassword = () => {
   });
 };
 
-export const useGoogleAuthRequest = () => {
+export const useGoogleLogin = () => {
   const { setUser } = useAuthStore();
   const router = useRouter();
 
   return useMutation({
-    mutationFn: googleAuthApi,
+    mutationFn: googleLoginApi,
     onSuccess: (data) => {
       if (data && data.jwt && data.user) {
         console.log('✅ Google Auth Success:', data.user.username || data.user.email);
@@ -194,12 +194,12 @@ export const useGoogleAuthRequest = () => {
   });
 };
 
-export const useFacebookAuthRequest = () => {
+export const useFacebookLogin = () => {
   const { setUser } = useAuthStore();
   const router = useRouter();
 
   return useMutation({
-    mutationFn: facebookAuthApi,
+    mutationFn: facebookLoginApi,
     onSuccess: (data) => {
       if (data && data.jwt && data.user) {
         console.log('✅ Facebook Auth Success:', data.user.username || data.user.email);
@@ -232,3 +232,5 @@ export const useFacebookAuthRequest = () => {
     },
   });
 };
+
+

@@ -97,9 +97,8 @@ const RejectRequestScreen = () => {
       {/* Close Button - Fixed at bottom */}
       <View className="px-6 py-4">
         <TouchableOpacity
-        onPress={()=> router.replace('/auth/Login')}
-          activeOpacity={0.8}
           onPress={() => router.replace('/auth/Login')}
+          activeOpacity={0.8}
           className="h-16 w-full items-center justify-center rounded-2xl bg-[#F2F2F2]">
           <Text className="font-bold text-[16px] text-[#64748B]">Close</Text>
         </TouchableOpacity>
