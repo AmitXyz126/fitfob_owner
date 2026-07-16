@@ -9,7 +9,7 @@ import { useVerifyOtp, useResendOtp } from '@/hooks/useAuth';
 import Toast from 'react-native-toast-message';
 import { useAuthStore } from '@/store/useAuthStore';
 
-export default function SignUpOtpScreen() {
+export default function OtpScreen() {
   const router = useRouter();
   const { email, signupToken } = useLocalSearchParams();
   const { mutate: verifyMutation, isPending } = useVerifyOtp();
