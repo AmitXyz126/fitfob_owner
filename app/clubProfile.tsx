@@ -18,7 +18,7 @@ import { Container } from '@/components/Container';
 import LineGradient from '@/components/lineGradient/LineGradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
- 
+
 const ClubProfileScreen = () => {
   const router = useRouter();
 
@@ -63,7 +63,7 @@ const ClubProfileScreen = () => {
       className="flex-row items-center justify-between py-4">
       <View className="flex-1 flex-row items-center">
         <View className="mr-4 rounded-xl bg-[#E237441F] p-2">
-          <Icon  size={20} color="#EF4444"  />
+          <Icon size={20} color="#EF4444" />
         </View>
         <Text className="flex-1 font-medium text-base text-[#697281]" numberOfLines={1}>
           {title}

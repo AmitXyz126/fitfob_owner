@@ -137,7 +137,7 @@ export default function Login() {
         );
       } catch (err: any) {
         console.error('Google Login: Service error caught:', err);
-        if (err.message && !err.message.includes('cancelled')) {
+        if (err.message && err.message !== "User cancelled the Google Sign-In flow.") {
           Toast.show({
             type: 'error',
             text1: 'Google Login Failed',
