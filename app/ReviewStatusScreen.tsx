@@ -27,7 +27,10 @@ export default function ReviewStatusScreen() {
       });
 
       if (data.user.isVerified) {
-        router.push('/(tabs)');
+        if (router.canGoBack()) {
+          router.dismissAll();
+        }
+        router.replace('/(tabs)');
       }
     } catch (error) {
       console.log('Refresh failed', error);
@@ -36,7 +39,10 @@ export default function ReviewStatusScreen() {
 
   useEffect(() => {
     if (isVerified) {
-      router.push('/(tabs)');
+      if (router.canGoBack()) {
+        router.dismissAll();
+      }
+      router.replace('/(tabs)');
     }
   }, [isVerified]);
 

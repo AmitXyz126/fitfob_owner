@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 type TabType = 'Daily' | 'Weekly' | 'Monthly';
 
 const DATA = [
+  // Daily Transactions
   {
     id: '1',
     name: 'Barbara Gordon',
@@ -20,6 +21,25 @@ const DATA = [
   },
   {
     id: '2',
+    name: 'Sarah Connor',
+    plan: 'Premium pass',
+    price: '₹699.00',
+    date: 'Today, 8:15 pm',
+    image: 'https://randomuser.me/api/portraits/women/10.jpg',
+    type: 'Daily',
+  },
+  {
+    id: '3',
+    name: 'John Doe',
+    plan: 'Standard pass',
+    price: '₹499.00',
+    date: 'Today, 3:00 pm',
+    image: 'https://randomuser.me/api/portraits/men/11.jpg',
+    type: 'Daily',
+  },
+  // Weekly Transactions
+  {
+    id: '4',
     name: 'James Gordon',
     plan: 'Premium pass',
     price: '₹1200.00',
@@ -28,41 +48,24 @@ const DATA = [
     type: 'Weekly',
   },
   {
-    id: '3',
-    name: 'Bruce Wayne',
-    plan: 'Premium pass',
-    price: '₹2500.00',
-    date: '22nd Jan',
-    image: 'https://randomuser.me/api/portraits/men/3.jpg',
-    type: 'Monthly',
-  },
-  {
-    id: '4',
-    name: 'Bruce Wayne',
-    plan: 'Premium pass',
-    price: '₹2500.00',
-    date: '22nd Jan',
-    image: 'https://randomuser.me/api/portraits/men/3.jpg',
-    type: 'Monthly',
-  },
-  {
     id: '5',
-    name: 'Bruce Wayne',
+    name: 'Peter Parker',
     plan: 'Premium pass',
-    price: '₹2500.00',
-    date: '22nd Jan',
-    image: 'https://randomuser.me/api/portraits/men/3.jpg',
-    type: 'Monthly',
+    price: '₹1500.00',
+    date: '3 days ago',
+    image: 'https://randomuser.me/api/portraits/men/20.jpg',
+    type: 'Weekly',
   },
   {
     id: '6',
-    name: 'Bruce Wayne',
+    name: 'Clark Kent',
     plan: 'Premium pass',
-    price: '₹2500.00',
-    date: '22nd Jan',
-    image: 'https://randomuser.me/api/portraits/men/3.jpg',
-    type: 'Monthly',
+    price: '₹1800.00',
+    date: '5 days ago',
+    image: 'https://randomuser.me/api/portraits/men/21.jpg',
+    type: 'Weekly',
   },
+  // Monthly Transactions
   {
     id: '7',
     name: 'Bruce Wayne',
@@ -70,6 +73,42 @@ const DATA = [
     price: '₹2500.00',
     date: '22nd Jan',
     image: 'https://randomuser.me/api/portraits/men/3.jpg',
+    type: 'Monthly',
+  },
+  {
+    id: '8',
+    name: 'Diana Prince',
+    plan: 'Premium pass',
+    price: '₹2500.00',
+    date: '20th Jan',
+    image: 'https://randomuser.me/api/portraits/women/4.jpg',
+    type: 'Monthly',
+  },
+  {
+    id: '9',
+    name: 'Barry Allen',
+    plan: 'Premium pass',
+    price: '₹2500.00',
+    date: '15th Jan',
+    image: 'https://randomuser.me/api/portraits/men/5.jpg',
+    type: 'Monthly',
+  },
+  {
+    id: '10',
+    name: 'Hal Jordan',
+    plan: 'Premium pass',
+    price: '₹2500.00',
+    date: '12th Jan',
+    image: 'https://randomuser.me/api/portraits/men/6.jpg',
+    type: 'Monthly',
+  },
+  {
+    id: '11',
+    name: 'Arthur Curry',
+    plan: 'Premium pass',
+    price: '₹2500.00',
+    date: '10th Jan',
+    image: 'https://randomuser.me/api/portraits/men/7.jpg',
     type: 'Monthly',
   },
 ];
@@ -85,7 +124,7 @@ const Wallet = () => {
   };
 
   const filteredData = useMemo(() => {
-    return DATA.filter((item) => item.type === activeTab || activeTab === 'Monthly');
+    return DATA.filter((item) => item.type === activeTab);
   }, [activeTab]);
 
   const renderItem = ({ item }: { item: (typeof DATA)[0] }) => (
@@ -93,7 +132,7 @@ const Wallet = () => {
       activeOpacity={0.7}
       onPress={() =>
         router.push({
-          pathname: '/earningDetail',
+          pathname: '/(tabs)/earningDetail',
           params: { ...item },
         })
       }
@@ -123,37 +162,68 @@ const Wallet = () => {
         </View>
 
         <View className="my-4 flex-row rounded-xl bg-slate-100 p-1">
-          {/* Tabs UI - Same as yours */}
+          {/* Tabs UI with inline styling to bypass NativeWind shadow race condition */}
           {(['Daily', 'Weekly', 'Monthly'] as TabType[]).map((tab) => (
             <TouchableOpacity
               key={tab}
               onPress={() => setActiveTab(tab)}
-              className={`flex-1 items-center rounded-lg py-2.5 ${activeTab === tab ? 'bg-white shadow-sm' : ''}`}>
+              style={
+                activeTab === tab
+                  ? {
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.1,
+                      shadowRadius: 2,
+                      elevation: 1,
+                      backgroundColor: 'white',
+                    }
+                  : {}
+              }
+              className={`flex-1 items-center rounded-lg py-2.5`}>
               <Text
-                className={`font-bold ${activeTab === tab ? 'text-slate-900' : 'text-slate-400'}`}>
+                className={`font-bold ${
+                  activeTab === tab ? 'text-slate-900' : 'text-slate-400'
+                }`}>
                 {tab}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
+        {/* LinearGradient with inline styles to prevent NativeWind opacity/shadow race condition */}
         <LinearGradient
           colors={['#F6163C', '#FF5F7A']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={{ borderRadius: 16, overflow: 'hidden' }}
-          className="relative mb-6 shadow-xl shadow-red-300">
+          style={{
+            borderRadius: 16,
+            overflow: 'hidden',
+            shadowColor: '#F6163C',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.2,
+            shadowRadius: 8,
+            elevation: 4,
+          }}
+          className="relative mb-6">
           <Image
             source={require('../../assets/images/bgLayer.png')}
             className="absolute right-0 top-0 h-full w-1/2"
             resizeMode="cover"
           />
           <View className="relative z-10 px-4 py-5">
-            <Text className="font-medium text-white/80">Monthly Earnings</Text>
+            <Text className="font-medium text-white" style={{ opacity: 0.8 }}>
+              {stats[activeTab].label}
+            </Text>
             <View className="mt-2 flex-row items-center justify-between">
-              <Text className="font-bold font-sans text-4xl leading-9 text-white">₹2,40,000</Text>
-              <View className="rounded-full bg-black/10 px-3 py-1.5 backdrop-blur-md">
-                <Text className="font-bold text-[10px] text-white">+20% this month</Text>
+              <Text className="font-bold font-sans text-4xl leading-9 text-white">
+                {stats[activeTab].amount}
+              </Text>
+              <View
+                className="rounded-full px-3 py-1.5 backdrop-blur-md"
+                style={{ backgroundColor: 'rgba(0, 0, 0, 0.1)' }}>
+                <Text className="font-bold text-[10px] text-white">
+                  {stats[activeTab].change}
+                </Text>
               </View>
             </View>
           </View>
@@ -168,13 +238,13 @@ const Wallet = () => {
         </View>
       </View>
 
-      {/* Scrollable List - Added flex: 1 to fill the remaining gap */}
+      {/* Scrollable List */}
       <FlatList
         data={filteredData}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
-        style={{ flex: 1 }}  
+        style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 20 }}
       />
     </Container>

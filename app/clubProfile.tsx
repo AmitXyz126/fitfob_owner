@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Image, TouchableOpacity, ScrollView, ImageBackground } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, Image, TouchableOpacity, ScrollView, ImageBackground, Dimensions, Animated, Easing, StyleSheet } from 'react-native';
 import {
   ChevronLeft,
   ChevronRight,
@@ -17,17 +17,191 @@ import { useRouter } from 'expo-router';
 import { Container } from '@/components/Container';
 import LineGradient from '@/components/lineGradient/LineGradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useAuthStore } from '@/store/useAuthStore';
+import { useUserDetail } from '@/hooks/useUserDetail';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+const FLOATING_ICONS = [
+  'dumbbell',
+  'kettlebell',
+  'weight',
+  'heart-flash',
+  'run',
+  'arm-flex',
+  'trophy-outline',
+  'clock-outline',
+];
+
+const PREMIUM_COLORS = [
+  '#F6163C', // Brand Crimson
+  '#FF7A00', // Premium Orange/Amber
+  '#FFD700', // Gold
+  '#10B981', // Energetic Green
+  '#3B82F6', // Focus Blue
+  '#8B5CF6', // Power Purple
+];
+
+const GymBackgroundAnimation = () => {
+  const items = useRef(
+    Array.from({ length: 15 }).map((_, i) => {
+      const boxSize = Math.random() * 20 + 64; // Larger random size from 64 to 84
+      return {
+        id: i,
+        icon: FLOATING_ICONS[i % FLOATING_ICONS.length],
+        color: PREMIUM_COLORS[i % PREMIUM_COLORS.length],
+        boxSize: boxSize,
+        iconSize: boxSize * 0.46,
+        borderRadius: boxSize * 0.28,
+        left: Math.random() * (SCREEN_WIDTH - 90),
+        yAnim: new Animated.Value(SCREEN_HEIGHT + 100),
+        rotAnim: new Animated.Value(0),
+        swayAnim: new Animated.Value(0),
+        opacityAnim: new Animated.Value(0),
+        duration: Math.random() * 5000 + 13000, // 13s to 18s (staggered speed)
+        delay: Math.random() * 5000,
+      };
+    })
+  ).current;
+
+  useEffect(() => {
+    items.forEach((item) => {
+      // Loop sequence
+      const runCycle = (isFirstRun = false) => {
+        item.yAnim.setValue(SCREEN_HEIGHT + 100);
+        item.rotAnim.setValue(0);
+        item.swayAnim.setValue(0);
+        item.opacityAnim.setValue(0);
+
+        Animated.sequence([
+          isFirstRun ? Animated.delay(item.delay) : Animated.delay(0),
+          Animated.parallel([
+            // 1. Move Y (upwards)
+            Animated.timing(item.yAnim, {
+              toValue: -150,
+              duration: item.duration,
+              easing: Easing.linear,
+              useNativeDriver: true,
+            }),
+            // 2. Rotate continuously
+            Animated.timing(item.rotAnim, {
+              toValue: 360,
+              duration: item.duration,
+              easing: Easing.linear,
+              useNativeDriver: true,
+            }),
+            // 3. Opacity (fade in at bottom, stay constant, fade out at top)
+            Animated.sequence([
+              Animated.timing(item.opacityAnim, {
+                toValue: 0.22, // Watermark peak opacity
+                duration: item.duration * 0.15,
+                useNativeDriver: true,
+              }),
+              Animated.delay(item.duration * 0.7),
+              Animated.timing(item.opacityAnim, {
+                toValue: 0,
+                duration: item.duration * 0.15,
+                useNativeDriver: true,
+              }),
+            ]),
+            // 4. Sway left and right dynamically ("idr udr")
+            Animated.sequence([
+              Animated.timing(item.swayAnim, {
+                toValue: Math.random() * 40 + 20, // Sway right
+                duration: item.duration * 0.25,
+                easing: Easing.inOut(Easing.ease),
+                useNativeDriver: true,
+              }),
+              Animated.timing(item.swayAnim, {
+                toValue: -(Math.random() * 40 + 20), // Sway left
+                duration: item.duration * 0.5,
+                easing: Easing.inOut(Easing.ease),
+                useNativeDriver: true,
+              }),
+              Animated.timing(item.swayAnim, {
+                toValue: 0,
+                duration: item.duration * 0.25,
+                easing: Easing.inOut(Easing.ease),
+                useNativeDriver: true,
+              }),
+            ]),
+          ]),
+        ]).start(() => {
+          // Restart loop immediately without delay on subsequent loops
+          runCycle(false);
+        });
+      };
+
+      runCycle(true);
+    });
+  }, [items]);
+
+  return (
+    <View style={[StyleSheet.absoluteFillObject, { zIndex: -1 }]} pointerEvents="none">
+      {items.map((item) => {
+        const spin = item.rotAnim.interpolate({
+          inputRange: [0, 360],
+          outputRange: ['0deg', '360deg'],
+        });
+
+        return (
+          <Animated.View
+            key={item.id}
+            style={{
+              position: 'absolute',
+              left: item.left,
+              width: item.boxSize,
+              height: item.boxSize,
+              alignItems: 'center',
+              justifyContent: 'center',
+              transform: [
+                { translateY: item.yAnim },
+                { translateX: item.swayAnim },
+                { rotate: spin },
+              ],
+              opacity: item.opacityAnim,
+            }}
+          >
+            <MaterialCommunityIcons name={item.icon as any} size={item.iconSize} color={item.color} />
+          </Animated.View>
+        );
+      })}
+    </View>
+  );
+};
 
 const ClubProfileScreen = () => {
   const router = useRouter();
 
   // --- States for Dynamic Data ---
+  const { user } = useAuthStore();
+  const { profileStatus } = useUserDetail();
+
   const [clubInfo, setClubInfo] = useState({
     name: 'Loading...',
     image: null,
     address: 'Fetching address...',
   });
+
+  const getDisplayName = () => {
+    const rawName = profileStatus?.ownerName || user?.username || 'User';
+    const namePart = rawName.includes('@') ? rawName.split('@')[0] : rawName;
+    if (/^\+?[0-9]+$/.test(namePart)) {
+      return 'User';
+    }
+    const cleanedName = namePart
+      .replace(/[0-9]/g, '')
+      .replace(/[._-]/g, ' ')
+      .split(' ')
+      .filter(Boolean)
+      .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+    return cleanedName || 'User';
+  };
+
+  const ownerName = getDisplayName();
+  const ownerEmail = user?.email || profileStatus?.email || 'owner@fitfob.com';
 
   // --- Fetch Data from Onboarding ---
   useEffect(() => {
@@ -88,6 +262,7 @@ const ClubProfileScreen = () => {
 
   return (
     <Container>
+      <GymBackgroundAnimation />
       {/* Header */}
       <View className="relative mb-4 flex-row items-center py-4">
         <TouchableOpacity onPress={() => router.back()} className="absolute left-0 z-10 p-2">
@@ -117,11 +292,12 @@ const ClubProfileScreen = () => {
                     <Image
                       // --- DYNAMIC IMAGE ---
                       source={
-                        clubInfo.image
-                          ? { uri: clubInfo.image }
-                          : { uri: 'https://i.pravatar.cc/100?u=fitness' }
+                        profileStatus?.logoUrl
+                          ? { uri: profileStatus.logoUrl }
+                          : require('../assets/images/fitfob_profile.png')
                       }
                       className="h-14 w-14 rounded-full"
+                      resizeMode={profileStatus?.logoUrl ? 'cover' : 'contain'}
                     />
 
                     <View className="absolute bottom-0 right-0 rounded-full border border-white bg-[#F6163C] p-1">
@@ -137,10 +313,10 @@ const ClubProfileScreen = () => {
               <View className="ml-4 flex-1">
                 <View className="flex-row items-center">
                   {/* --- DYNAMIC NAME --- */}
-                  <Text className="mr-2 font-bold text-xl text-white">{clubInfo.name}</Text>
+                  <Text className="mr-2 font-bold text-xl text-white">{ownerName}</Text>
                   <Image className="h-5 w-5" source={require('../assets/images/white-tick.png')} />
                 </View>
-                <Text className="text-sm text-white/90">anytimefitnessgym@gmail.com</Text>
+                <Text className="text-sm text-white/90">{ownerEmail}</Text>
               </View>
             </View>
             <View className="my-4">
@@ -171,19 +347,29 @@ const ClubProfileScreen = () => {
             icon={ShieldCheck}
             title="Verification Status"
             showBadge={true}
-            showArrow={false}
+            showArrow={true}
+            onPress={() => router.push('/verificationStatus')}
           />
           <LineGradient />
 
           <MenuOption
             icon={FileText}
             title="Documents"
+            onPress={() => router.push('/documents')}
           />
           <LineGradient />
-          <MenuOption icon={Clock} title="Timings" />
+          <MenuOption
+            icon={Clock}
+            title="Timings"
+            onPress={() => router.push('/clubTimings')}
+          />
           <LineGradient />
 
-          <MenuOption icon={Wifi} title="Amenities" />
+          <MenuOption
+            icon={Wifi}
+            title="Amenities"
+            onPress={() => router.push('/clubAmenities')}
+          />
           <LineGradient />
 
           <MenuOption
@@ -192,17 +378,24 @@ const ClubProfileScreen = () => {
             onPress={() => router.push('/ManageBankScreen')}
           />
         </View>
+      </ScrollView>
 
+      {/* Logout Button (Fixed at bottom) */}
+      <View className="bg-white py-4 border-t border-slate-50">
         <TouchableOpacity
           onPress={async () => {
+            await useAuthStore.getState().logOut();
             await AsyncStorage.clear();
-            router.replace('../../');
+            if (router.canGoBack()) {
+              router.dismissAll();
+            }
+            router.replace('/welcome');
           }}
-          className=" mt-10 flex-row items-center justify-center rounded-[8px] bg-[#F8F8F8] py-4">
+          className="flex-row items-center justify-center rounded-[8px] bg-[#F8F8F8] py-4">
           <LogOut size={20} color="#94A3B8" />
           <Text className="ml-2 font-bold text-base text-gray-400">Logout</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </View>
     </Container>
   );
 };

@@ -6,7 +6,7 @@ interface ContainerProps {
   style?: ViewStyle;
 }
 
-export const Container = ({ children, style }: ContainerProps) => {
+export const  Container = ({ children, style }: ContainerProps) => {
  
   const edges: Edge[] = ['top', 'left', 'right']; 
 

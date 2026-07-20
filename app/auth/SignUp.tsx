@@ -242,7 +242,7 @@ export default function SignUp() {
       }
     }
   };
- 
+
 
   return (
     <Container>
@@ -388,7 +388,7 @@ export default function SignUp() {
           />
         </View>
 
-         <View className="mb-6 mt-2 flex-col gap-3">
+        <View className="mb-6 mt-2 flex-col gap-3">
           <GoogleButton
             onPress={handleGoogleLogin}
             isLoading={googleIsPending}

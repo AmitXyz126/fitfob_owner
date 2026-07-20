@@ -33,11 +33,12 @@ export interface OnBoarding4Handle {
 interface Props {
   onUploadSuccess?: (data: any) => void;
   onUploadDone?: (data: any) => void;
+  onBack?: () => void;
 }
 
 const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
   const isFocused = useIsFocused();
-  const { onUploadSuccess, onUploadDone } = props;
+  const { onUploadSuccess, onUploadDone, onBack } = props;
   const { uploadDoc, refetch } = useUserDetail(); 
 
   const [showModal, setShowModal] = useState(false);
@@ -190,7 +191,14 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
 
   return (
     <View className="flex-1 bg-white">
-      <Text className="mb-6 font-bold text-2xl text-[#1C1C1C]">Add Govt Document</Text>
+      <View className="mb-6 flex-row items-center">
+        {onBack && (
+          <TouchableOpacity onPress={onBack} className="mr-3 p-1 rounded-full bg-gray-50 border border-gray-100">
+            <Ionicons name="arrow-back" size={22} color="#1C1C1C" />
+          </TouchableOpacity>
+        )}
+        <Text className="font-bold text-2xl text-[#1C1C1C]">Add Govt Document</Text>
+      </View>
 
       <View
         className={`relative h-80 w-full overflow-hidden rounded-[30px] border-2 shadow-md ${scanStatus === 'failed' ? 'border-red-200' : 'border-gray-100'}`}>

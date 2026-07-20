@@ -12,14 +12,21 @@ import OnBoarding5 from '@/components/screen/OnBoarding5';
 import { KeyboardAwareScrollView } from '@pietile-native-kit/keyboard-aware-scrollview';
 import { useRouter } from 'expo-router';
 import { useState, useRef, useEffect } from 'react';
-import { TouchableOpacity, View } from 'react-native';
+import { TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { useUserDetail } from '@/hooks/useUserDetail';
 import { useAuthStore } from '@/store/useAuthStore';
+import GymLoader from '@/components/GymLoader';
+import { useMutationState } from '@tanstack/react-query';
 
 export default function OnBoardingStep() {
   const router = useRouter();
+  const pendingMutations = useMutationState({
+    filters: { status: 'pending' },
+  });
+  const isLoading = pendingMutations.length > 0;
   const [step, setStep] = useState(1);
   const [subStep, setSubStep] = useState(1);
+  const [hasCheckedDocuments, setHasCheckedDocuments] = useState(false);
   const totalSteps = 5;
   const { user } = useAuthStore();
 
@@ -41,6 +48,8 @@ export default function OnBoardingStep() {
     submitStep7,
     confirmDocs,
     profileStatus,
+    isFetchingStatus,
+    documents,
   } = useUserDetail();
 
   // --- 2. Sync Global State with API Once ---
@@ -67,16 +76,25 @@ export default function OnBoardingStep() {
 
     if (status === 'completed') {
       if (user.verification_status === 'rejected') {
+        if (router.canGoBack()) {
+          router.dismissAll();
+        }
         router.replace('/RejectRequestScreen');
         return;
       }
 
       if (user.verification_status === 'pending') {
+        if (router.canGoBack()) {
+          router.dismissAll();
+        }
         router.replace('/ReviewStatusScreen');
         return;
       }
 
       if (user.verification_status === 'approved') {
+        if (router.canGoBack()) {
+          router.dismissAll();
+        }
         router.replace('/(tabs)');
         return;
       }
@@ -89,16 +107,33 @@ export default function OnBoardingStep() {
     }
   }, [user, profileStatus]);
 
+  useEffect(() => {
+    if (step === 4 && documents && !hasCheckedDocuments) {
+      const docList = documents?.documents || documents?.data || documents || [];
+      if (docList.length > 0) {
+        setSubStep(2);
+      }
+      setHasCheckedDocuments(true);
+    } else if (step !== 4 && hasCheckedDocuments) {
+      setHasCheckedDocuments(false);
+    }
+  }, [step, documents, hasCheckedDocuments]);
+
+  if (isFetchingStatus && !profileStatus) {
+    return (
+      <Container>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
+          <ActivityIndicator size="large" color="#F6163C" />
+        </View>
+      </Container>
+    );
+  }
+
   const updateFormData = (newData: any) => {
     setFormData((prev: any) => ({ ...prev, ...newData }));
   };
 
-  const isLoading =
-    submitStep1.isPending ||
-    submitStep3.isPending ||
-    submitStep4.isPending ||
-    submitStep7.isPending ||
-    confirmDocs.isPending;
+
 
   const handleNext = async () => {
     if (step === 1) {
@@ -106,7 +141,7 @@ export default function OnBoardingStep() {
       if (data) updateFormData(data);
       onboarding1Ref.current?.handleSave();
       return;
-    }    if (step === 2) {
+    } if (step === 2) {
       if (subStep === 1) {
         setSubStep(2);
       } else {
@@ -146,12 +181,13 @@ export default function OnBoardingStep() {
     if (step === 2 && subStep === 2) return 'Confirm & Proceed';
     if (step === 3) return 'Save & Continue';
     if (step === 4) return subStep === 1 ? 'Upload Document' : 'Next Step';
- 
+
     return 'Next';
   };
 
   return (
     <Container>
+      <GymLoader visible={isLoading} />
       {/* Progress Bar */}
       <View className="ios:mt-1 mt-4 flex-row justify-between bg-white pb-4 ">
         {[1, 2, 3, 4, 5].map((item) => {
@@ -173,7 +209,7 @@ export default function OnBoardingStep() {
               activeOpacity={0.7}
               disabled={item > (profileStatus?.currentStep || 1) && item > step}
               className="mx-1 flex-1 justify-center">
-              <View className={`w-full rounded-full ${bgColor}`} /> 
+              <View className={`w-full rounded-full ${bgColor}`} />
 
             </TouchableOpacity>
           );
@@ -189,7 +225,7 @@ export default function OnBoardingStep() {
           {step === 1 && (
             <OnBoarding1 ref={onboarding1Ref} initialData={formData} onNext={() => setStep(2)} />
           )}
-                                       
+
           {step === 2 &&
             (subStep === 1 ? (
               <OnBoarding2_Part2 onConfirm={() => setSubStep(2)} />
@@ -226,6 +262,11 @@ export default function OnBoardingStep() {
                     setSubStep(2);
                   }
                 }}
+                onBack={
+                  documents && (documents?.documents || documents?.data || documents || []).length > 0
+                    ? () => setSubStep(2)
+                    : undefined
+                }
               />
             ) : (
               <OnBoarding4_List onAddMore={() => setSubStep(1)} />

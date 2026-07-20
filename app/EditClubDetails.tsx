@@ -20,17 +20,36 @@ import * as ImagePicker from 'expo-image-picker';
 import { Button } from '@/components/Button';
 import { Container } from '@/components/Container';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useAuthStore } from '@/store/useAuthStore';
+import { useUserDetail } from '@/hooks/useUserDetail';
 
 const EditClubDetails = () => {
   const router = useRouter();
 
+  const { user } = useAuthStore();
+  const { profileStatus } = useUserDetail();
+
   // --- FORM STATES ---
-  const [clubImage, setClubImage] = useState('https://i.pravatar.cc/150?u=fitness');
-  const [clubName, setClubName] = useState('Lois');
-  const [ownerName, setOwnerName] = useState('Rohan Mehta');
-  const [phone, setPhone] = useState('9400000000');
-  const [email, setEmail] = useState('Loisbecket@gmail.com');
-  const [isVerified, setIsVerified] = useState(true);
+  const [clubImage, setClubImage] = useState('');
+  const [clubName, setClubName] = useState('');
+  const [ownerName, setOwnerName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [isVerified, setIsVerified] = useState(false);
+
+  React.useEffect(() => {
+    if (profileStatus) {
+      if (profileStatus.logoUrl) setClubImage(profileStatus.logoUrl);
+      if (profileStatus.clubName) setClubName(profileStatus.clubName);
+      if (profileStatus.ownerName) setOwnerName(profileStatus.ownerName);
+      if (profileStatus.phoneNumber) setPhone(profileStatus.phoneNumber);
+      if (profileStatus.email) setEmail(profileStatus.email);
+      if (profileStatus.status === 'completed') setIsVerified(true);
+    } else if (user) {
+      if (user.username) setOwnerName(user.username);
+      if (user.email) setEmail(user.email);
+    }
+  }, [profileStatus, user]);
 
   // --- TIME & DAY STATES ---
   const [weekdayRange, setWeekdayRange] = useState('Monday to Friday');
@@ -83,8 +102,16 @@ const EditClubDetails = () => {
           {/* PROFILE IMAGE */}
           <View className="my-6 items-center">
             <TouchableOpacity onPress={pickImage} className="relative">
-              <View className="h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-slate-50 bg-purple-600">
-                <Image source={{ uri: clubImage }} className="h-full w-full" />
+              <View className="h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-slate-50 bg-[#F1F5F9]">
+                <Image
+                  source={
+                    clubImage
+                      ? { uri: clubImage }
+                      : require('../assets/images/fitfob_profile.png')
+                  }
+                  className="h-full w-full"
+                  resizeMode={clubImage ? 'cover' : 'contain'}
+                />
               </View>
               <View className="absolute bottom-1 right-1 rounded-full border-2 border-white bg-[#F6163C] p-2">
                 <Ionicons name="camera" size={16} color="white" />

@@ -35,6 +35,12 @@ export default function Layout() {
         <Stack.Screen name="bankSummary" />
         <Stack.Screen name="payoutHistory" />
         <Stack.Screen name="ViewAllScreen" />
+        <Stack.Screen name="notification" />
+        <Stack.Screen name="chat" />
+        <Stack.Screen name="documents" />
+        <Stack.Screen name="clubAmenities" />
+        <Stack.Screen name="verificationStatus" />
+        <Stack.Screen name="clubTimings" />
       </Stack>
       <Toast />
     </QueryClientProvider>

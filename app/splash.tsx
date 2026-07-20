@@ -8,9 +8,11 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { useAuthStore } from '@/store/useAuthStore';
 
 export default function Splash() {
   const router = useRouter();
+  const { initializeAuth } = useAuthStore();
 
   // Logo animation values
   const translateY = useSharedValue(40);
@@ -45,11 +47,24 @@ export default function Splash() {
       easing: Easing.inOut(Easing.ease),
     });
 
-    const t = setTimeout(() => {
-      router.replace('/welcome');
-    }, 1500);
+    const checkAuthAndNavigate = async () => {
+      try {
+        await initializeAuth();
+      } catch (error) {
+        console.error('Failed to initialize auth in splash:', error);
+      }
 
-    return () => clearTimeout(t);
+      setTimeout(() => {
+        const currentUser = useAuthStore.getState().user;
+        if (currentUser && currentUser.token) {
+          router.replace('/onBoardingScreen/OnBoardingStep');
+        } else {
+          router.replace('/welcome');
+        }
+      }, 1500);
+    };
+
+    checkAuthAndNavigate();
   }, []);
 
   return (

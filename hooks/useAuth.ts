@@ -70,6 +70,9 @@ export const useLoginRequest = () => {
         console.log(userWithToken, 'usr Data');
 
         // 🚀 Always go to onboarding flow checker
+        if (router.canGoBack()) {
+          router.dismissAll();
+        }
         router.replace('/onBoardingScreen/OnBoardingStep');
       }
     },
@@ -173,8 +176,14 @@ export const useGoogleLogin = () => {
         setUser(userWithToken, true);
 
         if (!userWithToken.isVerified) {
+          if (router.canGoBack()) {
+            router.dismissAll();
+          }
           router.replace('/onBoardingScreen/OnBoardingStep');
         } else {
+          if (router.canGoBack()) {
+            router.dismissAll();
+          }
           router.replace('/(tabs)');
         }
       } else {
@@ -212,8 +221,14 @@ export const useFacebookLogin = () => {
         setUser(userWithToken, true);
 
         if (!userWithToken.isVerified) {
+          if (router.canGoBack()) {
+            router.dismissAll();
+          }
           router.replace('/onBoardingScreen/OnBoardingStep');
         } else {
+          if (router.canGoBack()) {
+            router.dismissAll();
+          }
           router.replace('/(tabs)');
         }
       } else {
