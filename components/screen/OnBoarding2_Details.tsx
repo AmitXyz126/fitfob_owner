@@ -30,7 +30,7 @@ const OnBoarding2_Details = forwardRef((props: OnBoarding2DetailsProps, ref) => 
 
   const [isInitialized, setIsInitialized] = useState(false);
 
-   useEffect(() => {
+  useEffect(() => {
     if (profileStatus?.address) {
       const fullAddress = profileStatus.address;
       const parts = fullAddress.split(',').map((p: string) => p.trim());

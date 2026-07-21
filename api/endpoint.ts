@@ -23,5 +23,4 @@ export const ENDPOINTS = {
   Step_6: `${BASE_URL}/api/pending-club-owner/confirm-government-docs`,
   Get: `${BASE_URL}/api/pending-club-owner/documents`,
   STEP_7: `${BASE_URL}/api/pending-club-owner/upload-club-photos`,
-  
 };

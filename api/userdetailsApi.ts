@@ -102,7 +102,7 @@ saveStep1: async (id: number, data: any) => {
     const fileToUpload = {
       uri: fileData.uri,
       name: fileData.name || 'document.jpg',
-      type: fileData.type || 'image/jpeg',
+      type: fileData.type || fileData.mimeType || 'image/jpeg',
     };
 
     formData.append('file', fileToUpload as any);

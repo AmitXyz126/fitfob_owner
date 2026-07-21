@@ -8,8 +8,8 @@ import { Button } from '@/components/Button';
 import { Container } from '@/components/Container';
 import { KeyboardAwareScrollView } from '@pietile-native-kit/keyboard-aware-scrollview';
 import { useForgotSendOtp } from '@/hooks/useAuth';
- 
- const forgotPasswordSchema = z.object({
+
+const forgotPasswordSchema = z.object({
   email: z.string()
     .min(1, 'Email is required')
     .email('Please enter a valid email address'),
@@ -19,7 +19,7 @@ type ForgotFormData = z.infer<typeof forgotPasswordSchema>;
 
 export default function ForgotPasswordScreen() {
   const router = useRouter();
-  
+
   // --- ADDED: Mutation Hook ---
   const { mutate: sendOtp, isPending } = useForgotSendOtp();
 
@@ -33,12 +33,12 @@ export default function ForgotPasswordScreen() {
   });
 
   const onSubmit = (data: ForgotFormData) => {
-     sendOtp(
-      { identifier: data.email.toLowerCase().trim() }, 
+    sendOtp(
+      { identifier: data.email.toLowerCase().trim() },
       {
         onSuccess: () => {
           router.push({
-            pathname: '/auth/VerifyCode',  
+            pathname: '/auth/VerifyCode',
             params: { email: data.email.toLowerCase().trim() }
           });
         },
@@ -65,13 +65,13 @@ export default function ForgotPasswordScreen() {
         <View className="flex-1 ">
           {/* Title Section */}
           <View className="mt-8">
-            <Text 
+            <Text
               className="text-4xl font-bold text-slate-900"
               style={{ fontFamily: 'PlusJakartaSans-Bold' }}
             >
               Forgot Password
             </Text>
-            <Text 
+            <Text
               className="mt-3 text-base text-slate-400"
               style={{ fontFamily: 'PlusJakartaSans-Medium' }}
             >
@@ -88,10 +88,9 @@ export default function ForgotPasswordScreen() {
               control={control}
               name="email"
               render={({ field: { onChange, onBlur, value } }) => (
-                <View 
-                  className={`h-14 justify-center rounded-2xl border ${
-                    errors.email ? 'border-red-500' : 'border-slate-200'
-                  } bg-white px-4`}
+                <View
+                  className={`h-14 justify-center rounded-2xl border ${errors.email ? 'border-red-500' : 'border-slate-200'
+                    } bg-white px-4`}
                 >
                   <TextInput
                     placeholder="xyztest@gmail.com"
@@ -102,7 +101,7 @@ export default function ForgotPasswordScreen() {
                     className="h-full text-slate-900 text-base"
                     autoCapitalize="none"
                     keyboardType="email-address"
-                    editable={!isPending} 
+                    editable={!isPending}
                   />
                 </View>
               )}

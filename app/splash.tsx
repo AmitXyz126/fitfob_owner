@@ -54,10 +54,16 @@ export default function Splash() {
         console.error('Failed to initialize auth in splash:', error);
       }
 
-      setTimeout(() => {
+      setTimeout(async () => {
         const currentUser = useAuthStore.getState().user;
         if (currentUser && currentUser.token) {
-          router.replace('/onBoardingScreen/OnBoardingStep');
+          if (currentUser.isVerified) {
+            router.replace('/onBoardingScreen/OnBoardingStep');
+          } else {
+            // Requiring login on fresh launch if onboarding is incomplete
+            await useAuthStore.getState().logOut();
+            router.replace('/welcome');
+          }
         } else {
           router.replace('/welcome');
         }

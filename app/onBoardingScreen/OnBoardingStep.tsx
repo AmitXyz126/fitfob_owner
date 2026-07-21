@@ -17,6 +17,7 @@ import { useUserDetail } from '@/hooks/useUserDetail';
 import { useAuthStore } from '@/store/useAuthStore';
 import GymLoader from '@/components/GymLoader';
 import { useMutationState } from '@tanstack/react-query';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function OnBoardingStep() {
   const router = useRouter();
@@ -29,6 +30,37 @@ export default function OnBoardingStep() {
   const [hasCheckedDocuments, setHasCheckedDocuments] = useState(false);
   const totalSteps = 5;
   const { user } = useAuthStore();
+
+  // --- Step Mapping Helpers (Backend vs Frontend) ---
+  const mapApiStepToFrontend = (apiStep: number) => {
+    switch (apiStep) {
+      case 1:
+        return { step: 1, subStep: 1 };
+      case 2:
+        return { step: 2, subStep: 1 };
+      case 3:
+        return { step: 2, subStep: 2 };
+      case 4:
+        return { step: 3, subStep: 1 };
+      case 5:
+        return { step: 4, subStep: 1 };
+      case 6:
+        return { step: 4, subStep: 2 };
+      case 7:
+        return { step: 5, subStep: 1 };
+      default:
+        return { step: 1, subStep: 1 };
+    }
+  };
+
+  const mapFrontendToApiStep = (stepVal: number, subStepVal: number) => {
+    if (stepVal === 1) return 1;
+    if (stepVal === 2) return subStepVal === 1 ? 2 : 3;
+    if (stepVal === 3) return 4;
+    if (stepVal === 4) return subStepVal === 1 ? 5 : 6;
+    if (stepVal === 5) return 7;
+    return 1;
+  };
 
   // --- 1. Centralized Parent State ---
   const [formData, setFormData] = useState<any>({});
@@ -60,11 +92,50 @@ export default function OnBoardingStep() {
       setFormData(profileStatus);
       setIsDataSynced(true);
 
-      if (profileStatus.currentStep && profileStatus.currentStep > 1) {
-        setStep(profileStatus.currentStep);
-      }
+      const loadSavedProgress = async () => {
+        try {
+          const savedStep = await AsyncStorage.getItem(`@onboarding_current_step_${user?.id}`);
+          const savedSubStep = await AsyncStorage.getItem(`@onboarding_current_substep_${user?.id}`);
+          
+          const apiStep = profileStatus.currentStep || 1;
+          const backendMapped = mapApiStepToFrontend(apiStep);
+          
+          if (savedStep) {
+            const parsedStep = parseInt(savedStep);
+            const parsedSubStep = savedSubStep ? parseInt(savedSubStep) : 1;
+            const savedApiVal = mapFrontendToApiStep(parsedStep, parsedSubStep);
+
+            if (savedApiVal >= apiStep && parsedStep <= 5) {
+              setStep(parsedStep);
+              setSubStep(parsedSubStep);
+              return;
+            }
+          }
+          
+          setStep(backendMapped.step);
+          setSubStep(backendMapped.subStep);
+        } catch (e) {
+          console.log('Error loading onboarding progress', e);
+        }
+      };
+
+      loadSavedProgress();
     }
-  }, [profileStatus]);
+  }, [profileStatus, user]);
+
+  // --- Save Onboarding Progress ---
+  useEffect(() => {
+    if (!user?.id) return;
+    const saveProgress = async () => {
+      try {
+        await AsyncStorage.setItem(`@onboarding_current_step_${user.id}`, String(step));
+        await AsyncStorage.setItem(`@onboarding_current_substep_${user.id}`, String(subStep));
+      } catch (e) {
+        console.log('Error saving onboarding progress', e);
+      }
+    };
+    saveProgress();
+  }, [step, subStep, user]);
 
   //  useEffect
   useEffect(() => {
@@ -98,9 +169,18 @@ export default function OnBoardingStep() {
         router.replace('/(tabs)');
         return;
       }
+
+      // Fallback redirect for completed status if verification_status is not set/updated
+      if (router.canGoBack()) {
+        router.dismissAll();
+      }
+      router.replace('/ReviewStatusScreen');
+      return;
     } else if (status === 'draft') {
       if (!isDataSynced) {
-        setStep(profileStatus?.currentStep || 1);
+        const backendMapped = mapApiStepToFrontend(profileStatus?.currentStep || 1);
+        setStep(backendMapped.step);
+        setSubStep(backendMapped.subStep);
       }
     } else {
       router.replace('/onBoardingScreen/OnBoardingStep');
@@ -197,17 +277,20 @@ export default function OnBoardingStep() {
               : item < step
                 ? 'bg-[#FFC1C1] h-3'
                 : 'border h-3 border-gray-200';
+          
+          const maxAllowedFrontendStep = mapApiStepToFrontend(profileStatus?.currentStep || 1).step;
+
           return (
             <TouchableOpacity
               key={item}
               onPress={() => {
-                if (item <= (profileStatus?.currentStep || step)) {
+                if (item <= maxAllowedFrontendStep) {
                   setStep(item);
                   setSubStep(1);
                 }
               }}
               activeOpacity={0.7}
-              disabled={item > (profileStatus?.currentStep || 1) && item > step}
+              disabled={item > maxAllowedFrontendStep && item > step}
               className="mx-1 flex-1 justify-center">
               <View className={`w-full rounded-full ${bgColor}`} />
 
@@ -262,11 +345,15 @@ export default function OnBoardingStep() {
                     setSubStep(2);
                   }
                 }}
-                onBack={
-                  documents && (documents?.documents || documents?.data || documents || []).length > 0
-                    ? () => setSubStep(2)
-                    : undefined
-                }
+                onBack={() => {
+                  const docList = documents?.documents || documents?.data || documents || [];
+                  if (docList.length > 0) {
+                    setSubStep(2);
+                  } else {
+                    setStep(3);
+                    setSubStep(1);
+                  }
+                }}
               />
             ) : (
               <OnBoarding4_List onAddMore={() => setSubStep(1)} />
@@ -275,7 +362,7 @@ export default function OnBoardingStep() {
           {step === 5 && <OnBoarding5 ref={onboarding5Ref} initialData={formData} />}
         </View>
 
-        {!(step === 2 && subStep === 1) && (
+        {!(step === 2 && subStep === 1) && !(step === 4 && subStep === 1) && (
           <View className="bg-white pb-8 pt-4">
             <Button
               title={getButtonTitle()}

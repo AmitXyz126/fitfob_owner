@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Modal, Animated, StyleSheet, Easing, Dimensions } from 'react-native';
+import { View, Text, Modal, Animated, StyleSheet, Easing, Dimensions, Image } from 'react-native';
 
 interface GymLoaderProps {
   visible: boolean;
@@ -28,18 +28,16 @@ export default function GymLoader({ visible }: GymLoaderProps) {
         Animated.sequence([
           Animated.timing(liftAnim, {
             toValue: -22,
-            duration: 900,
-            easing: Easing.bezier(0.25, 1, 0.5, 1),
+            duration: 1200,
+            easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
-          Animated.delay(100),
           Animated.timing(liftAnim, {
             toValue: 0,
-            duration: 800,
-            easing: Easing.bezier(0.5, 0, 0.75, 0),
+            duration: 1200,
+            easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
-          Animated.delay(150),
         ])
       ).start();
 
@@ -105,18 +103,11 @@ export default function GymLoader({ visible }: GymLoaderProps) {
             
             {/* Centered Barbell Lifting */}
             <Animated.View style={[styles.barbell, { transform: [{ translateY: liftAnim }] }]}>
-              {/* Left Plate Outer */}
-              <View style={[styles.plate, styles.plateOuter]} />
-              {/* Left Plate Inner */}
-              <View style={[styles.plate, styles.plateInner]} />
-              
-              {/* Silver Bar */}
-              <View style={styles.bar} />
-              
-              {/* Right Plate Inner */}
-              <View style={[styles.plate, styles.plateInner]} />
-              {/* Right Plate Outer */}
-              <View style={[styles.plate, styles.plateOuter]} />
+              <Image
+                source={require('../assets/images/Vector.png')}
+                style={{ width: 40, height: 40 }}
+                resizeMode="contain"
+              />
             </Animated.View>
             
             {/* Dynamic Ground Shadow */}
@@ -221,11 +212,10 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   barbell: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    width: 80,
-    height: 30,
+    width: 64,
+    height: 64,
     zIndex: 2,
   },
   bar: {

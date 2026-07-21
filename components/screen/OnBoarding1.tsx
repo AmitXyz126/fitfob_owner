@@ -45,14 +45,20 @@ const OnBoarding1 = forwardRef(({ initialData, onNext }: any, ref) => {
         setOwnerName(initialData.ownerName || '');
         setPhone(initialData.phoneNumber || '');
         setEmail(initialData.email || '');
-        setImage(initialData.image || initialData.logoUrl || null);
 
         const logoVal = initialData.logoId || initialData.logo;
-
         if (logoVal && typeof logoVal === 'object') {
           setLogoId(logoVal);
+          if (logoVal.uri) {
+            setImage(logoVal.uri);
+          } else {
+            setImage(initialData.image || initialData.logoUrl || null);
+          }
+        } else {
+          setImage(initialData.image || initialData.logoUrl || null);
         }
-      } else {
+        setIsInitialized(true);
+      } else if (!isInitialized) {
         const savedData = await AsyncStorage.getItem(STORAGE_KEY);
         if (savedData) {
           const parsed = JSON.parse(savedData);
@@ -63,13 +69,12 @@ const OnBoarding1 = forwardRef(({ initialData, onNext }: any, ref) => {
           setImage(parsed.image || null);
           setLogoId(parsed.logoId);
         }
+        setIsInitialized(true);
       }
-
-      setIsInitialized(true);
     };
 
     initData();
-  }, [userId]);
+  }, [userId, initialData, isInitialized, STORAGE_KEY]);
 
   // 2. Continuous draft backup
   useEffect(() => {

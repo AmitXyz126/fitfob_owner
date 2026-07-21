@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   forgotResendOtpApi,
   forgotSendOtpApi,
@@ -55,6 +55,7 @@ export const useVerifyOtp = () => {
 export const useLoginRequest = () => {
   const { setUser } = useAuthStore();
   const router = useRouter();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: loginUserApi,
     onSuccess: (data) => {
@@ -68,6 +69,9 @@ export const useLoginRequest = () => {
 
         setUser(userWithToken, true);
         console.log(userWithToken, 'usr Data');
+
+        // Clear query cache to pull correct details with new token
+        queryClient.clear();
 
         // 🚀 Always go to onboarding flow checker
         if (router.canGoBack()) {
@@ -161,6 +165,7 @@ export const useResetPassword = () => {
 export const useGoogleLogin = () => {
   const { setUser } = useAuthStore();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: googleLoginApi,
@@ -174,6 +179,9 @@ export const useGoogleLogin = () => {
         };
 
         setUser(userWithToken, true);
+        
+        // Clear query cache to pull correct details with new token
+        queryClient.clear();
 
         if (!userWithToken.isVerified) {
           if (router.canGoBack()) {
@@ -206,6 +214,7 @@ export const useGoogleLogin = () => {
 export const useFacebookLogin = () => {
   const { setUser } = useAuthStore();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: facebookLoginApi,
@@ -219,6 +228,9 @@ export const useFacebookLogin = () => {
         };
 
         setUser(userWithToken, true);
+
+        // Clear query cache to pull correct details with new token
+        queryClient.clear();
 
         if (!userWithToken.isVerified) {
           if (router.canGoBack()) {

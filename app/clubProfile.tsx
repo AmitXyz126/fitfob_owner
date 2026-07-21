@@ -12,6 +12,7 @@ import {
   LogOut,
   SquarePen,
   FileText,
+  Lock,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Container } from '@/components/Container';
@@ -376,6 +377,13 @@ const ClubProfileScreen = () => {
             icon={Wallet}
             title="Your Account"
             onPress={() => router.push('/ManageBankScreen')}
+          />
+          <LineGradient />
+
+          <MenuOption
+            icon={Lock}
+            title="Change Password"
+            onPress={() => router.push('/ChangePasswordScreen')}
           />
         </View>
       </ScrollView>

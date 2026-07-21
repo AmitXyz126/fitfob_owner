@@ -37,13 +37,24 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
 
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // 1. Initial Load from initialData (Parent/API) or Local Storage
+  // 1. Initial Load from Local Storage (Priority 1) or initialData (Fallback)
   useEffect(() => {
     const initData = async () => {
-      // Priority 1: initialData (from Parent/API)
+      if (isInitialized) return;
+
+      const saved = await AsyncStorage.getItem(STORAGE_KEY);
       const data = initialData || userData;
 
-      if (data && data.clubCategory) {
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setClubCategory(parsed.clubCategory || 'Luxury');
+        setFitnessTypes(parsed.fitnessTypes || ['Gym']);
+        setAmenities(parsed.amenities || ['Parking', 'Wi-Fi']);
+        setStartTime(parsed.startTime || new Date().setHours(5, 0));
+        setEndTime(parsed.endTime || new Date().setHours(22, 0));
+        setWeekdayRange(parsed.weekdayRange || 'Monday to Friday');
+        setWeekendRange(parsed.weekendRange || 'Saturday & Sunday');
+      } else if (data && data.clubCategory) {
         setClubCategory(data.clubCategory);
         setFitnessTypes(data.services || []);
         setAmenities(data.facilities || []);
@@ -57,22 +68,8 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
         }
         setWeekdayRange(data.weekday || 'Monday to Friday');
         setWeekendRange(data.weekend || 'Saturday & Sunday');
-        setIsInitialized(true);
-      } else if (!isInitialized) {
-        // Priority 2: Local Storage Draft (only if no server data yet)
-        const saved = await AsyncStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          setClubCategory(parsed.clubCategory || 'Luxury');
-          setFitnessTypes(parsed.fitnessTypes || ['Gym']);
-          setAmenities(parsed.amenities || ['Parking', 'Wi-Fi']);
-          setStartTime(parsed.startTime || new Date().setHours(5, 0));
-          setEndTime(parsed.endTime || new Date().setHours(22, 0));
-          setWeekdayRange(parsed.weekdayRange || 'Monday to Friday');
-          setWeekendRange(parsed.weekendRange || 'Saturday & Sunday');
-        }
-        setIsInitialized(true);
       }
+      setIsInitialized(true);
     };
     initData();
   }, [initialData, userData, isInitialized, STORAGE_KEY]);
@@ -369,15 +366,14 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
                 }}
                 className="flex-row items-center justify-between border-b border-slate-50 py-5">
                 <Text
-                  className={`text-[16px] ${
-                    (showCategoryModal
+                  className={`text-[16px] ${(showCategoryModal
                       ? clubCategory
                       : showDayModal === 'weekday'
                         ? weekdayRange
                         : weekendRange) === option
                       ? 'font-bold text-[#F6163C]'
                       : 'text-slate-700'
-                  }`}>
+                    }`}>
                   {option}
                 </Text>
                 {(showCategoryModal
@@ -385,8 +381,8 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
                   : showDayModal === 'weekday'
                     ? weekdayRange
                     : weekendRange) === option && (
-                  <Ionicons name="checkmark-circle" size={24} color="#F6163C" />
-                )}
+                    <Ionicons name="checkmark-circle" size={24} color="#F6163C" />
+                  )}
               </TouchableOpacity>
             ))}
           </View>
