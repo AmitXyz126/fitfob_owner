@@ -179,7 +179,7 @@ export const useGoogleLogin = () => {
         };
 
         setUser(userWithToken, true);
-        
+
         // Clear query cache to pull correct details with new token
         queryClient.clear();
 

@@ -15,7 +15,7 @@ import {
 import { Container } from '@/components/Container';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 
 type TabType = 'Daily' | 'Weekly' | 'Monthly';
 
@@ -125,7 +125,6 @@ const DATA = [
 ];
 
 const Wallet = () => {
-  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>('Monthly');
 
   // Filter & Search states

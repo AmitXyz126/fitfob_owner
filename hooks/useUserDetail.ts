@@ -1,11 +1,9 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
- import { userDetailsApi } from '@/api/userdetailsApi';
+import { userDetailsApi } from '@/api/userdetailsApi';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 import Toast from 'react-native-toast-message';
 
 export const useUserDetail = () => {
-  const router = useRouter();
   const queryClient = useQueryClient();
 
    const {
