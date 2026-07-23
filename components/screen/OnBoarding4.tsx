@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
+import  { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import {
   View,
   Text,
@@ -172,13 +172,7 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
       showsVerticalScrollIndicator={false}>
       {/* Title Header */}
       <View className="mb-6 flex-row items-center">
-        {onBack && (
-          <TouchableOpacity
-            onPress={onBack}
-            className="mr-3 h-10 w-10 items-center justify-center rounded-full border border-slate-100 bg-slate-50">
-            <Ionicons name="chevron-back" size={20} color="#1C1C1C" />
-          </TouchableOpacity>
-        )}
+      
         <Text className="font-bold text-[24px] text-[#1C1C1C]">Upload Govt Document</Text>
       </View>
 

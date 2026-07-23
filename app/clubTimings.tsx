@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Container } from '@/components/Container';
 import { useUserDetail } from '@/hooks/useUserDetail';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function ClubTimingsScreen() {
   const router = useRouter();
@@ -59,23 +60,100 @@ export default function ClubTimingsScreen() {
     outputRange: ['300deg', '660deg'], // start at 10 o'clock
   });
 
-  // Helper to format 24h string to 12h AM/PM
-  const formatTime = (timeStr?: string) => {
+  const [timingsData, setTimingsData] = useState({
+    openingTime: '05:00 AM',
+    closingTime: '10:00 PM',
+    weekday: 'Monday to Friday',
+    weekend: 'Saturday & Sunday',
+  });
+
+  // Helper to format 24h string or timestamp to 12h AM/PM
+  const formatTime = (timeStr?: any) => {
     if (!timeStr) return null;
-    const parts = timeStr.split(':');
-    if (parts.length < 2) return timeStr;
-    let hours = parseInt(parts[0], 10);
-    const minutes = parts[1];
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12;
-    hours = hours ? hours : 12; // the hour '0' should be '12'
-    return `${hours}:${minutes} ${ampm}`;
+    if (typeof timeStr === 'number') {
+      const d = new Date(timeStr);
+      let hours = d.getHours();
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12 || 12;
+      return `${hours}:${minutes} ${ampm}`;
+    }
+    const str = String(timeStr).trim();
+    if (str.includes('AM') || str.includes('PM')) return str;
+    const parts = str.split(':');
+    if (parts.length >= 2) {
+      let hours = parseInt(parts[0], 10);
+      const minutes = parts[1].substring(0, 2);
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12 || 12;
+      return `${hours}:${minutes} ${ampm}`;
+    }
+    return str;
   };
 
-  const openTime = formatTime(profileStatus?.openingTime) || '05:00 AM';
-  const closeTime = formatTime(profileStatus?.closingTime) || '10:00 PM';
-  const weekdayRange = profileStatus?.workingDays || 'Monday to Friday';
-  const weekendRange = 'Saturday & Sunday';
+  useEffect(() => {
+    const loadTimings = async () => {
+      let savedProfile: any = null;
+      let savedStep4: any = null;
+      try {
+        const json1 = await AsyncStorage.getItem('club_profile');
+        if (json1) savedProfile = JSON.parse(json1);
+
+        const keys = await AsyncStorage.getAllKeys();
+        const step4Key = keys.find((k) => k.includes('onboarding_step4_data') || k.includes('onboarding_step3'));
+        if (step4Key) {
+          const json4 = await AsyncStorage.getItem(step4Key);
+          if (json4) savedStep4 = JSON.parse(json4);
+        }
+      } catch (e) {
+        console.log('Error reading storage in clubTimings:', e);
+      }
+
+      const pData = profileStatus?.data || profileStatus || {};
+
+      const rawOpen =
+        pData?.openingTime ||
+        pData?.opening_time ||
+        savedProfile?.openingTime ||
+        savedStep4?.startTime ||
+        savedStep4?.openingTime;
+
+      const rawClose =
+        pData?.closingTime ||
+        pData?.closing_time ||
+        savedProfile?.closingTime ||
+        savedStep4?.endTime ||
+        savedStep4?.closingTime;
+
+      const wDay =
+        pData?.weekday ||
+        pData?.workingDays ||
+        pData?.working_days ||
+        savedProfile?.weekday ||
+        savedStep4?.weekdayRange ||
+        savedStep4?.weekday ||
+        'Monday to Friday';
+
+      const wEnd =
+        pData?.weekend ||
+        savedProfile?.weekend ||
+        savedStep4?.weekendRange ||
+        savedStep4?.weekend ||
+        'Saturday & Sunday';
+
+      const formattedOpen = formatTime(rawOpen) || '05:00 AM';
+      const formattedClose = formatTime(rawClose) || '10:00 PM';
+
+      setTimingsData({
+        openingTime: formattedOpen,
+        closingTime: formattedClose,
+        weekday: wDay,
+        weekend: wEnd,
+      });
+    };
+
+    loadTimings();
+  }, [profileStatus]);
 
   return (
     <Container style={{ flex: 1, backgroundColor: '#FFF' }}>
@@ -189,9 +267,9 @@ export default function ClubTimingsScreen() {
               <Ionicons name="calendar-outline" size={18} color="#475569" />
             </View>
             <View className="flex-1">
-              <Text className="font-sans font-bold text-[14px] text-[#1C1C1C]">{weekdayRange}</Text>
+              <Text className="font-sans font-bold text-[14px] text-[#1C1C1C]">{timingsData.weekday}</Text>
               <Text className="font-sans font-semibold text-[12px] text-[#F6163C] mt-1">
-                {openTime} - {closeTime}
+                {timingsData.openingTime} - {timingsData.closingTime}
               </Text>
             </View>
           </View>
@@ -202,9 +280,9 @@ export default function ClubTimingsScreen() {
               <Ionicons name="calendar-clear-outline" size={18} color="#475569" />
             </View>
             <View className="flex-1">
-              <Text className="font-sans font-bold text-[14px] text-[#1C1C1C]">{weekendRange}</Text>
-              <Text className="font-sans font-semibold text-[12px] text-slate-400 mt-1">
-                06:00 AM - 08:00 PM
+              <Text className="font-sans font-bold text-[14px] text-[#1C1C1C]">{timingsData.weekend}</Text>
+              <Text className="font-sans font-semibold text-[12px] text-slate-500 mt-1">
+                {timingsData.weekend === 'Closed' ? 'Closed' : `${timingsData.openingTime} - ${timingsData.closingTime}`}
               </Text>
             </View>
           </View>

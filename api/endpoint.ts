@@ -10,6 +10,8 @@ export const ENDPOINTS = {
   FORGOT_VERIFY_OTP: `${BASE_URL}/api/auth/verify-otp`,
   FORGOT_SET_PASSWORD: `${BASE_URL}/api/auth/reset-password`,
   UPLOADFILE: `${BASE_URL}/api/upload`,
+  UPLOAD: `${BASE_URL}/api/upload`,
+  UPLOAD_FILE: `${BASE_URL}/api/upload`,
   GOOGLE_AUTH: `${BASE_URL}/api/clubOwner/google`,
   FACEBOOK_AUTH: `${BASE_URL}/api/clubOwner/facebook`,
 
@@ -23,4 +25,6 @@ export const ENDPOINTS = {
   Step_6: `${BASE_URL}/api/pending-club-owner/confirm-government-docs`,
   Get: `${BASE_URL}/api/pending-club-owner/documents`,
   STEP_7: `${BASE_URL}/api/pending-club-owner/upload-club-photos`,
+  CHANGE_PASSWORD: `${BASE_URL}/api/change-password`,
+  CLUB_OWNERS: `${BASE_URL}/api/club-owners`,
 };

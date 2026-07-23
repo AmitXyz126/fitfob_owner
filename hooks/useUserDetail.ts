@@ -14,6 +14,7 @@ export const useUserDetail = () => {
   } = useQuery({
     queryKey: ['club-owner-me'],
     queryFn: userDetailsApi.getMe,
+    retry: 1,
   });
 
   const {
@@ -27,8 +28,7 @@ export const useUserDetail = () => {
 
   const submitStep1 = useMutation({
     mutationFn: (formData: any) => {
-      const id = profileStatus?.id || profileStatus?.pendingClubOwnerId;
-      if (!id) throw new Error('User ID not found!');
+      const id = profileStatus?.id || profileStatus?.pendingClubOwnerId || 0;
       return userDetailsApi.saveStep1(id, formData);
     },
     onSuccess: () => {
@@ -46,13 +46,19 @@ export const useUserDetail = () => {
 
   const submitStep2 = useMutation({
     mutationFn: (locationData: { latitude: string; longitude: string }) => {
-      const id = profileStatus?.id || profileStatus?.pendingClubOwnerId;
-      if (!id) throw new Error('User ID not found!');
+      const id = profileStatus?.id || profileStatus?.pendingClubOwnerId || 0;
       return userDetailsApi.saveStep2(id, locationData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
       // Toast.show({ type: 'success', text1: 'Location Saved! 📍' });
+    },
+    onError: (error: any) => {
+      Toast.show({
+        type: 'error',
+        text1: 'Step 2 Error',
+        text2: error.response?.data?.message || 'Failed to save location',
+      });
     },
   });
 
@@ -63,8 +69,7 @@ export const useUserDetail = () => {
       state: string;
       pincode: string;
     }) => {
-      const id = profileStatus?.id || profileStatus?.pendingClubOwnerId;
-      if (!id) throw new Error('User ID not found!');
+      const id = profileStatus?.id || profileStatus?.pendingClubOwnerId || 0;
       return userDetailsApi.saveStep3(id, addressData);
     },
     onSuccess: () => {
@@ -82,8 +87,7 @@ export const useUserDetail = () => {
 
   const submitStep4 = useMutation({
     mutationFn: (configData: any) => {
-      const id = profileStatus?.id || profileStatus?.pendingClubOwnerId;
-      if (!id) throw new Error('User ID not found!');
+      const id = profileStatus?.id || profileStatus?.pendingClubOwnerId || 0;
       return userDetailsApi.configureClub(id, configData);
     },
     onSuccess: () => {
@@ -145,6 +149,34 @@ export const useUserDetail = () => {
     },
   });
 
+  const updateClubOwner = useMutation({
+    mutationFn: (data: any) => {
+      const id =
+        profileStatus?.id ||
+        profileStatus?.clubOwnerId ||
+        profileStatus?.pendingClubOwnerId ||
+        profileStatus?.data?.id ||
+        profileStatus?.data?.attributes?.id;
+      if (!id) throw new Error('Owner ID not found!');
+      return userDetailsApi.updateClubOwner(id, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
+      Toast.show({ type: 'success', text1: 'Club Details Updated! ✅' });
+    },
+    onError: (error: any) => {
+      console.error('Update Club Owner Error:', error?.response?.data || error?.message);
+      Toast.show({
+        type: 'error',
+        text1: 'Update Failed',
+        text2:
+          error?.response?.data?.error?.message ||
+          error?.response?.data?.message ||
+          'Failed to update club details',
+      });
+    },
+  });
+
   return {
     profileStatus,
     isFetchingStatus,
@@ -157,6 +189,7 @@ export const useUserDetail = () => {
     uploadDoc,
     confirmDocs,
     submitStep7,
+    updateClubOwner,
     documents,
     isDocsLoading,
     refetchDocs,

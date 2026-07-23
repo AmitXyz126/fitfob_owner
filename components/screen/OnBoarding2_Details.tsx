@@ -1,7 +1,8 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
+import { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Alert, Keyboard } from 'react-native';
 import { useUserDetail } from '@/hooks/useUserDetail';
+import { useAuthStore } from '@/store/useAuthStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface OnBoarding2DetailsProps {
@@ -10,11 +11,27 @@ interface OnBoarding2DetailsProps {
   onNext?: () => void;
 }
 
+const parseAddressString = (fullAddress: string) => {
+  if (!fullAddress) return { clubAddress: '', city: '', state: '', pincode: '' };
+  const parts = fullAddress.split(',').map((p) => p.trim());
+  const pincodeMatch = fullAddress.match(/\b\d{6}\b/);
+  const pincode = pincodeMatch ? pincodeMatch[0] : '';
+  const countryRemoved = parts.filter((p) => p.toLowerCase() !== 'india');
+  const statePart = countryRemoved[countryRemoved.length - 1] || '';
+  const state = statePart.replace(/[0-9]/g, '').trim();
+  const city = countryRemoved[countryRemoved.length - 2] || '';
+  const clubAddress = countryRemoved.slice(0, Math.max(1, countryRemoved.length - 2)).join(', ') || parts[0] || '';
+  return { clubAddress, city, state, pincode };
+};
+
 const OnBoarding2_Details = forwardRef((props: OnBoarding2DetailsProps, ref) => {
   const { onBack, onNext, initialData } = props;
   const { submitStep3, profileStatus } = useUserDetail();
+  const { user } = useAuthStore();
   const userId = profileStatus?.id || profileStatus?.pendingClubOwnerId;
-  const STORAGE_KEY = `@onboarding_step2_details_${userId || 'guest'}`;
+  const userKey = userId || user?.id || user?.email || 'guest';
+  const MAP_STORAGE_KEY = `@onboarding_step2_map_data_${userKey}`;
+  const STORAGE_KEY = `@onboarding_step2_details_${userKey}`;
 
   const [formData, setFormData] = useState({
     clubAddress: '',
@@ -53,30 +70,38 @@ const OnBoarding2_Details = forwardRef((props: OnBoarding2DetailsProps, ref) => 
     }
   }, [profileStatus?.address]);
 
-  // --- 2. Initialize logic (Flow Unchanged) ---
+  // --- 2. Initialize logic ---
   useEffect(() => {
     const initData = async () => {
       const data = initialData || profileStatus;
 
-      //  MAP SCREEN SE SAVED LOCATION LOAD
-      const savedMap = await AsyncStorage.getItem(
-        `@onboarding_step2_map_data_${userId || 'guest'}`
-      );
+      // MAP SCREEN SE SAVED LOCATION LOAD
+      let savedMap = await AsyncStorage.getItem(MAP_STORAGE_KEY);
+      if (!savedMap) {
+        const keys = await AsyncStorage.getAllKeys();
+        const mapKey = keys.find((k) => k.includes('onboarding_step2_map_data'));
+        if (mapKey) {
+          savedMap = await AsyncStorage.getItem(mapKey);
+        }
+      }
 
       if (savedMap) {
         const parsed = JSON.parse(savedMap);
 
         if (parsed?.locationInfo) {
+          const loc = parsed.locationInfo;
+          const parsedAddress = parseAddressString(loc.address || loc.name || '');
+
           setFormData({
-            clubAddress: parsed.locationInfo.clubAddress || '',
-            city: parsed.locationInfo.city || '',
-            state: parsed.locationInfo.state || '',
-            pincode: parsed.locationInfo.pincode || '',
+            clubAddress: loc.clubAddress || loc.name || parsedAddress.clubAddress || '',
+            city: loc.city || parsedAddress.city || '',
+            state: loc.state || parsedAddress.state || '',
+            pincode: loc.pincode || parsedAddress.pincode || '',
           });
 
           setLocationInfo({
-            name: parsed.locationInfo.name || 'Selected Location',
-            address: parsed.locationInfo.address || '',
+            name: loc.name || 'Selected Location',
+            address: loc.address || '',
           });
 
           setIsInitialized(true);
@@ -84,7 +109,7 @@ const OnBoarding2_Details = forwardRef((props: OnBoarding2DetailsProps, ref) => 
         }
       }
 
-      //  existing logic
+      // existing logic
       if (data && (data.clubAddress || data.pincode)) {
         setFormData({
           clubAddress: data.clubAddress || '',

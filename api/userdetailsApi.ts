@@ -21,9 +21,66 @@ export const userDetailsApi = {
     return response.data;
   },
 
-   getMe: async () => {
-    const response = await api.get(ENDPOINTS.GET_ONBOARDING_STATUS);
+  uploadFile: async (fileData: { uri: string; name?: string; type?: string }) => {
+    const formData = new FormData();
+    const fileToUpload = {
+      uri: fileData.uri,
+      name: fileData.name || `file_${Date.now()}.jpg`,
+      type: fileData.type || 'image/jpeg',
+    };
+    formData.append('files', fileToUpload as any);
+
+    const response = await api.post(ENDPOINTS.UPLOADFILE, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        Accept: 'application/json',
+      },
+    });
+
     return response.data;
+  },
+
+  getMe: async () => {
+    try {
+      const response = await api.get(ENDPOINTS.GET_ONBOARDING_STATUS);
+      const data = response.data;
+      if (data) {
+        const isApproved =
+          data.isApprovedOwner === true ||
+          data.verification_status === 'approved' ||
+          data.verificationStatus === 'approved' ||
+          data.status === 'approved';
+        return {
+          ...data,
+          isApprovedOwner: isApproved,
+          verification_status: isApproved
+            ? 'approved'
+            : data.verification_status || data.verificationStatus || 'pending',
+        };
+      }
+      return data;
+    } catch (error: any) {
+      console.log('GET_ONBOARDING_STATUS error in getMe, checking club-owners fallback:', error?.response?.status, error?.message);
+      // When user is approved by admin, pending-club-owner/me returns 404/400 because they are now in club-owners!
+      try {
+        const ownerRes = await api.get(ENDPOINTS.CLUB_OWNERS);
+        const ownerList = ownerRes.data?.data || ownerRes.data || [];
+        const ownerData = Array.isArray(ownerList) ? (ownerList[0] || null) : ownerRes.data;
+
+        if (ownerData && (ownerData.id || ownerData.clubName || ownerData.ownerName || ownerData.attributes)) {
+          console.log('✅ Approved Club Owner record found in club-owners:', ownerData);
+          return {
+            ...ownerData,
+            status: 'approved',
+            verification_status: 'approved',
+            isApprovedOwner: true,
+          };
+        }
+      } catch (e) {
+        console.log('Error fetching club-owners in getMe fallback:', e);
+      }
+      throw error;
+    }
   },
 
 saveStep1: async (id: number, data: any) => {
@@ -42,6 +99,8 @@ saveStep1: async (id: number, data: any) => {
     };
 
     formData.append('logo', file as any);
+  } else if (typeof data.logo === 'string' && data.logo) {
+    formData.append('logo', data.logo);
   }
 
   const response = await api.post(
@@ -148,6 +207,13 @@ saveStep1: async (id: number, data: any) => {
        transformRequest: (data) => data,
     });
 
+    return response.data;
+  },
+
+  updateClubOwner: async (id: number | string, payloadData: any) => {
+    const response = await api.put(`${ENDPOINTS.CLUB_OWNERS}/${id}`, {
+      data: payloadData,
+    });
     return response.data;
   },
 };

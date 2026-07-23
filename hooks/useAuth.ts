@@ -10,6 +10,7 @@ import {
   verifyOtpApi,
   facebookLoginApi,
   googleLoginApi,
+  changePasswordApi,
 } from '@/api/authApi';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter } from 'expo-router';
@@ -257,6 +258,12 @@ export const useFacebookLogin = () => {
         text2: msg,
       });
     },
+  });
+};
+
+export const useChangePassword = () => {
+  return useMutation({
+    mutationFn: changePasswordApi,
   });
 };
 

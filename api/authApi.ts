@@ -1,5 +1,6 @@
 import axios, { isAxiosError } from 'axios';
 import { ENDPOINTS } from './endpoint';
+import apiInstance from './apiInstance';
  
 
 const api = axios.create({
@@ -168,3 +169,8 @@ export async function facebookLoginApi(payload: FacebookLoginPayload) {
     throw new Error('An unexpected error occurred during Facebook login');
   }
 }
+
+export const changePasswordApi = async (payload: { oldPassword: string; newPassword: string }) => {
+  const response = await apiInstance.post(ENDPOINTS.CHANGE_PASSWORD, payload);
+  return response.data;
+};

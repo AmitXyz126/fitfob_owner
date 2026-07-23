@@ -12,7 +12,7 @@ import OnBoarding5 from '@/components/screen/OnBoarding5';
 import { KeyboardAwareScrollView } from '@pietile-native-kit/keyboard-aware-scrollview';
 import { useRouter } from 'expo-router';
 import { useState, useRef, useEffect } from 'react';
-import { TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import { TouchableOpacity, View, ActivityIndicator, BackHandler } from 'react-native';
 import { useUserDetail } from '@/hooks/useUserDetail';
 import { useAuthStore } from '@/store/useAuthStore';
 import GymLoader from '@/components/GymLoader';
@@ -137,16 +137,49 @@ export default function OnBoardingStep() {
     saveProgress();
   }, [step, subStep, user]);
 
+  // Hardware Back Handler for incomplete onboarding
+  useEffect(() => {
+    const onBackPress = () => {
+      const isCompleted =
+        profileStatus?.status === 'completed' ||
+        profileStatus?.status === 'approved' ||
+        profileStatus?.isApprovedOwner ||
+        profileStatus?.verification_status === 'approved' ||
+        profileStatus?.verification_status === 'pending';
+
+      if (!isCompleted && step === 1 && subStep === 1) {
+        useAuthStore.getState().logOut().then(() => {
+          router.replace('/welcome');
+        });
+        return true;
+      }
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [step, subStep, profileStatus]);
+
   //  useEffect
   useEffect(() => {
     if (!user) return;
     if (!profileStatus) return;
     console.log(user, 'user data');
     console.log(profileStatus, 'profile status');
-    const { status } = profileStatus;
+    const { status, isApprovedOwner } = profileStatus;
+
+    const verificationStatus = profileStatus.verification_status || user.verification_status;
+
+    if (isApprovedOwner || verificationStatus === 'approved') {
+      if (router.canGoBack()) {
+        router.dismissAll();
+      }
+      router.replace('/(tabs)');
+      return;
+    }
 
     if (status === 'completed') {
-      if (user.verification_status === 'rejected') {
+      if (verificationStatus === 'rejected') {
         if (router.canGoBack()) {
           router.dismissAll();
         }
@@ -154,7 +187,7 @@ export default function OnBoardingStep() {
         return;
       }
 
-      if (user.verification_status === 'pending') {
+      if (verificationStatus === 'pending') {
         if (router.canGoBack()) {
           router.dismissAll();
         }
@@ -162,7 +195,7 @@ export default function OnBoardingStep() {
         return;
       }
 
-      if (user.verification_status === 'approved') {
+      if (verificationStatus === 'approved') {
         if (router.canGoBack()) {
           router.dismissAll();
         }
@@ -170,7 +203,7 @@ export default function OnBoardingStep() {
         return;
       }
 
-      // Fallback redirect for completed status if verification_status is not set/updated
+      // Fallback redirect for completed status
       if (router.canGoBack()) {
         router.dismissAll();
       }
@@ -182,8 +215,6 @@ export default function OnBoardingStep() {
         setStep(backendMapped.step);
         setSubStep(backendMapped.subStep);
       }
-    } else {
-      router.replace('/onBoardingScreen/OnBoardingStep');
     }
   }, [user, profileStatus]);
 
@@ -216,8 +247,11 @@ export default function OnBoardingStep() {
 
 
   const handleNext = async () => {
+  
     if (step === 1) {
+      
       const data = onboarding1Ref.current?.getFormData();
+       console.log(data, 'data');
       if (data) updateFormData(data);
       onboarding1Ref.current?.handleSave();
       return;

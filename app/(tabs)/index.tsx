@@ -1,5 +1,5 @@
 /* eslint-disable react/no-unescaped-entities */
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, Image, TouchableOpacity, Platform, Modal, StyleSheet, Pressable } from 'react-native';
 import { Container } from '@/components/Container';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useUserDetail } from '@/hooks/useUserDetail';
 import { useAuthStore } from '@/store/useAuthStore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import Animated, {
   useSharedValue,
@@ -151,10 +152,107 @@ const CheckinItem = ({ item, index, scrollY, onSelect }: any) => {
   );
 };
 
+const getImageUriString = (val: any): string => {
+  if (!val) return '';
+  let str = '';
+  if (typeof val === 'string') {
+    str = val;
+  } else if (typeof val === 'object') {
+    str = val.uri || val.url || val.path || val.src || '';
+  }
+  if (!str) return '';
+  if (str.startsWith('/')) {
+    const baseUrl = process.env.EXPO_PUBLIC_API_URL || '';
+    if (baseUrl) {
+      const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+      return `${cleanBase}${str}`;
+    }
+  }
+  return str;
+};
+
 const HomeScreen = () => {
   const { profileStatus } = useUserDetail();
   const { user } = useAuthStore();
   const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
+  const [storedClubName, setStoredClubName] = useState<string>('');
+  const [storedOwnerName, setStoredOwnerName] = useState<string>('');
+
+  useEffect(() => {
+    const loadClubData = async () => {
+      try {
+        let logoFromStorage: any = null;
+        let cNameFromStorage: string | null = null;
+        let oNameFromStorage: string | null = null;
+
+        const savedData = await AsyncStorage.getItem('club_profile');
+        if (savedData) {
+          const parsedData = JSON.parse(savedData);
+          if (parsedData.image) logoFromStorage = parsedData.image;
+          if (parsedData.logo) logoFromStorage = parsedData.logo;
+          if (parsedData.clubName) cNameFromStorage = parsedData.clubName;
+          if (parsedData.ownerName) oNameFromStorage = parsedData.ownerName;
+        }
+
+        const userKey = profileStatus?.id || profileStatus?.pendingClubOwnerId || user?.id || user?.email || '';
+        const keys = await AsyncStorage.getAllKeys();
+        const step1Keys = keys.filter((k) => k.includes('onboarding_step1_data'));
+        let step1Key = userKey ? step1Keys.find((k) => k.includes(String(userKey))) : null;
+
+        if (step1Key) {
+          const step1Json = await AsyncStorage.getItem(step1Key);
+          if (step1Json) {
+            const parsedStep1 = JSON.parse(step1Json);
+            if (!logoFromStorage) {
+              logoFromStorage = parsedStep1.image || parsedStep1.logo || parsedStep1.logoUrl || parsedStep1.logoId;
+            }
+            if (!cNameFromStorage) {
+              cNameFromStorage = parsedStep1.clubName || parsedStep1.name;
+            }
+            if (!oNameFromStorage) {
+              oNameFromStorage = parsedStep1.ownerName;
+            }
+          }
+        }
+
+        const pData = profileStatus?.data || profileStatus || {};
+        const rawLogo =
+          pData?.logoUrl ||
+          pData?.logo ||
+          pData?.logo_url ||
+          pData?.pendingClubOwner?.logoUrl ||
+          pData?.pendingClubOwner?.logo ||
+          logoFromStorage ||
+          null;
+
+        const finalLogoUri = getImageUriString(rawLogo);
+
+        setProfileImageUri(finalLogoUri || null);
+        setImageError(false);
+        if (cNameFromStorage) setStoredClubName(cNameFromStorage);
+        if (oNameFromStorage) setStoredOwnerName(oNameFromStorage);
+
+        // Persist fresh profileStatus into club_profile for app restarts/re-logins
+        const cNameApi = pData?.clubName || pData?.club_name || pData?.pendingClubOwner?.clubName;
+        const oNameApi = pData?.ownerName || pData?.owner_name || pData?.pendingClubOwner?.ownerName;
+        if (cNameApi || oNameApi || finalLogoUri) {
+          const updatedStorage = {
+            ...(savedData ? JSON.parse(savedData) : {}),
+            ...(cNameApi ? { clubName: cNameApi } : {}),
+            ...(oNameApi ? { ownerName: oNameApi } : {}),
+            ...(finalLogoUri ? { image: finalLogoUri, logo: finalLogoUri } : {}),
+          };
+          await AsyncStorage.setItem('club_profile', JSON.stringify(updatedStorage));
+        }
+      } catch (e) {
+        console.log('Error loading club profile image in index:', e);
+      }
+    };
+
+    loadClubData();
+  }, [profileStatus, user]);
 
   // Scroll Shared Value for Stacking Card Scroll Animation
   const scrollY = useSharedValue(0);
@@ -166,19 +264,33 @@ const HomeScreen = () => {
   });
 
   const getDisplayName = () => {
-    const rawName = profileStatus?.ownerName || user?.username || 'User';
-    const namePart = rawName.includes('@') ? rawName.split('@')[0] : rawName;
-    if (/^\+?[0-9]+$/.test(namePart)) {
-      return 'User';
+    const pData = profileStatus?.data || profileStatus || {};
+    const rawName =
+      pData?.ownerName ||
+      pData?.owner_name ||
+      pData?.pendingClubOwner?.ownerName ||
+      pData?.pendingClubOwner?.owner_name ||
+      profileStatus?.ownerName ||
+      profileStatus?.owner_name ||
+      storedOwnerName ||
+      user?.username ||
+      '';
+
+    if (!rawName) return 'User';
+
+    if (rawName.includes('@')) {
+      const namePart = rawName.split('@')[0];
+      const cleanedName = namePart
+        .replace(/[0-9]/g, '')
+        .replace(/[._-]/g, ' ')
+        .split(' ')
+        .filter(Boolean)
+        .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+      return cleanedName || 'User';
     }
-    const cleanedName = namePart
-      .replace(/[0-9]/g, '')
-      .replace(/[._-]/g, ' ')
-      .split(' ')
-      .filter(Boolean)
-      .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-    return cleanedName || 'User';
+
+    return rawName;
   };
 
   const getGreeting = () => {
@@ -190,9 +302,8 @@ const HomeScreen = () => {
   };
 
   const ownerName = getDisplayName();
-  const truncatedOwnerName = ownerName.length > 6 ? `${ownerName.slice(0, 6)}...` : ownerName;
-  const clubName = profileStatus?.clubName || 'Fitfob fitness Club';
-  const logoUrl = profileStatus?.logoUrl || null;
+  const pData = profileStatus?.data || profileStatus || {};
+  const clubName = pData?.clubName || pData?.club_name || storedClubName || 'Fitfob fitness Club';
   const greeting = getGreeting();
 
   return (
@@ -200,35 +311,35 @@ const HomeScreen = () => {
       <View style={{ paddingTop: Platform.OS === 'ios' ? 10 : 20 }}>
         {/* Header */}
         <View className="mb-6 flex-row items-center justify-between">
-          <View className="flex-row items-center">
-            <TouchableOpacity onPress={() => router.push('/clubProfile')}>
+          <View className="flex-row items-center flex-1 mr-2">
+            <TouchableOpacity
+              onPress={() => router.push('/clubProfile')}
+              style={{
+                shadowColor: '#F6163C',
+                shadowOffset: { width: 0, height: 3 },
+                shadowOpacity: 0.3,
+                shadowRadius: 5,
+                elevation: 4,
+              }}
+              className="items-center justify-center rounded-full border-2 border-[#F6163C]/30 bg-red-50 p-0.5">
               <Image
-                className="h-12 w-12 rounded-full"
+                className="h-14 w-14 rounded-full"
                 source={
-                  logoUrl
-                    ? { uri: logoUrl }
+                  profileImageUri && !imageError
+                    ? { uri: profileImageUri }
                     : require('../../assets/images/fitfob_profile.png')
                 }
-                resizeMode={logoUrl ? 'cover' : 'contain'}
+                onError={() => setImageError(true)}
+                resizeMode={profileImageUri && !imageError ? 'cover' : 'contain'}
               />
             </TouchableOpacity>
-            <TouchableOpacity
-              activeOpacity={ownerName.length > 6 ? 0.7 : 1}
-              onPress={() => {
-                if (ownerName.length > 6) {
-                  Toast.show({
-                    type: 'info',
-                    text1: 'Club Owner',
-                    text2: ownerName,
-                    position: 'top',
-                  });
-                }
-              }}
-              className="ml-3">
-              <Text className="text-[12px] font-normal  text-[#1C1C1C]">
+            <TouchableOpacity onPress={() => router.push('/clubProfile')} className="ml-3 flex-1 justify-center">
+              <Text className="text-[12px] font-medium text-slate-500" numberOfLines={1}>
                 Welcome to {clubName}
               </Text>
-              <Text className="font-bold text-xl text-slate-900">{greeting}, {truncatedOwnerName}</Text>
+              <Text className="text-[18px] font-bold text-slate-900 leading-[24px]" numberOfLines={2}>
+                {greeting}, {ownerName}
+              </Text>
             </TouchableOpacity>
           </View>
           <View className="flex-row gap-2">

@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useState, useRef, useEffect } from 'react';
+import  { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import MapView, { UrlTile } from 'react-native-maps';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useUserDetail } from '@/hooks/useUserDetail';
+import { useAuthStore } from '@/store/useAuthStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface OnBoarding2Props {
@@ -21,8 +22,9 @@ interface OnBoarding2Props {
 
 const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
   const { profileStatus, submitStep2 } = useUserDetail();
+  const { user } = useAuthStore();
   const userId = profileStatus?.id || profileStatus?.pendingClubOwnerId;
-  const STORAGE_KEY = `@onboarding_step2_map_data_${userId || 'guest'}`;
+  const STORAGE_KEY = `@onboarding_step2_map_data_${userId || user?.id || user?.email || 'guest'}`;
 
   const [isLocalLoaded, setIsLocalLoaded] = useState(false);
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
@@ -254,12 +256,11 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
       longitude: region.longitude.toString(),
     };
     submitStep2.mutate(payload, {
-      onSuccess: async () => {
-        await AsyncStorage.getItem(`@onboarding_step2_map_data_${userId}`)
+      onSuccess: () => {
         onConfirm();
       },
-      onError: () => {
-        Alert.alert('Error', 'Failed to save location. Please try again.');
+      onError: (error: any) => {
+        Alert.alert('Error', error?.response?.data?.message || error?.message || 'Failed to save location. Please try again.');
       },
     });
   };

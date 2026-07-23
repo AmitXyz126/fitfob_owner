@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { View, Text, TextInput, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
@@ -9,6 +9,8 @@ import { Container } from '@/components/Container';
 import { KeyboardAwareScrollView } from '@pietile-native-kit/keyboard-aware-scrollview';
 import Toast from 'react-native-toast-message';
 import { Ionicons } from '@expo/vector-icons';
+
+import { useChangePassword } from '@/hooks/useAuth';
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required'),
@@ -23,7 +25,7 @@ type ChangePasswordFormData = z.infer<typeof changePasswordSchema>;
 
 export default function ChangePasswordScreen() {
   const router = useRouter();
-  const [isPending, setIsPending] = useState(false);
+  const { mutate: changePassword, isPending } = useChangePassword();
 
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
@@ -43,16 +45,34 @@ export default function ChangePasswordScreen() {
   });
 
   const onSubmit = (data: ChangePasswordFormData) => {
-    setIsPending(true);
-    setTimeout(() => {
-      setIsPending(false);
-      Toast.show({
-        type: 'success',
-        text1: 'Password Updated (Design Mode) ✅',
-        text2: 'Your password was mock-updated successfully.',
-      });
-      router.back();
-    }, 1200);
+    changePassword(
+      {
+        oldPassword: data.currentPassword,
+        newPassword: data.password,
+      },
+      {
+        onSuccess: (res: any) => {
+          Toast.show({
+            type: 'success',
+            text1: 'Success ✅',
+            text2: res?.message || 'Password changed successfully',
+          });
+          router.back();
+        },
+        onError: (error: any) => {
+          const msg =
+            error?.response?.data?.error?.message ||
+            error?.response?.data?.message ||
+            error?.message ||
+            'Failed to change password';
+          Toast.show({
+            type: 'error',
+            text1: 'Error ❌',
+            text2: msg,
+          });
+        },
+      }
+    );
   };
 
   return (
@@ -112,9 +132,8 @@ export default function ChangePasswordScreen() {
                 name="currentPassword"
                 render={({ field: { onChange, onBlur, value } }) => (
                   <View
-                    className={`h-14 flex-row items-center rounded-2xl border ${
-                      errors.currentPassword ? 'border-red-500' : 'border-slate-200'
-                    } bg-white px-4`}>
+                    className={`h-14 flex-row items-center rounded-2xl border ${errors.currentPassword ? 'border-red-500' : 'border-slate-200'
+                      } bg-white px-4`}>
                     <TextInput
                       placeholder="Enter current password"
                       placeholderTextColor="#CBD5E1"
@@ -153,9 +172,8 @@ export default function ChangePasswordScreen() {
                 name="password"
                 render={({ field: { onChange, onBlur, value } }) => (
                   <View
-                    className={`h-14 flex-row items-center rounded-2xl border ${
-                      errors.password ? 'border-red-500' : 'border-slate-200'
-                    } bg-white px-4`}>
+                    className={`h-14 flex-row items-center rounded-2xl border ${errors.password ? 'border-red-500' : 'border-slate-200'
+                      } bg-white px-4`}>
                     <TextInput
                       placeholder="Minimum 6 characters"
                       placeholderTextColor="#CBD5E1"
@@ -194,9 +212,8 @@ export default function ChangePasswordScreen() {
                 name="confirmPassword"
                 render={({ field: { onChange, onBlur, value } }) => (
                   <View
-                    className={`h-14 flex-row items-center rounded-2xl border ${
-                      errors.confirmPassword ? 'border-red-500' : 'border-slate-200'
-                    } bg-white px-4`}>
+                    className={`h-14 flex-row items-center rounded-2xl border ${errors.confirmPassword ? 'border-red-500' : 'border-slate-200'
+                      } bg-white px-4`}>
                     <TextInput
                       placeholder="Repeat new password"
                       placeholderTextColor="#CBD5E1"
