@@ -96,10 +96,10 @@ export default function OnBoardingStep() {
         try {
           const savedStep = await AsyncStorage.getItem(`@onboarding_current_step_${user?.id}`);
           const savedSubStep = await AsyncStorage.getItem(`@onboarding_current_substep_${user?.id}`);
-          
+
           const apiStep = profileStatus.currentStep || 1;
           const backendMapped = mapApiStepToFrontend(apiStep);
-          
+
           if (savedStep) {
             const parsedStep = parseInt(savedStep);
             const parsedSubStep = savedSubStep ? parseInt(savedSubStep) : 1;
@@ -111,7 +111,7 @@ export default function OnBoardingStep() {
               return;
             }
           }
-          
+
           setStep(backendMapped.step);
           setSubStep(backendMapped.subStep);
         } catch (e) {
@@ -164,13 +164,15 @@ export default function OnBoardingStep() {
   useEffect(() => {
     if (!user) return;
     if (!profileStatus) return;
-    console.log(user, 'user data');
-    console.log(profileStatus, 'profile status');
     const { status, isApprovedOwner } = profileStatus;
 
-    const verificationStatus = profileStatus.verification_status || user.verification_status;
+    const verificationStatus =
+      profileStatus.verification_status ||
+      profileStatus.verificationStatus ||
+      user.verification_status;
 
-    if (isApprovedOwner || verificationStatus === 'approved') {
+    // 1. Approved status -> Home Page (tabs)
+    if (isApprovedOwner || verificationStatus === 'approved' || status === 'approved') {
       if (router.canGoBack()) {
         router.dismissAll();
       }
@@ -178,38 +180,32 @@ export default function OnBoardingStep() {
       return;
     }
 
-    if (status === 'completed') {
-      if (verificationStatus === 'rejected') {
-        if (router.canGoBack()) {
-          router.dismissAll();
-        }
-        router.replace('/RejectRequestScreen');
-        return;
+    // 2. Rejected status -> Reject Request Screen
+    if (verificationStatus === 'rejected' || status === 'rejected') {
+      if (router.canGoBack()) {
+        router.dismissAll();
       }
+      router.replace('/RejectRequestScreen');
+      return;
+    }
 
-      if (verificationStatus === 'pending') {
-        if (router.canGoBack()) {
-          router.dismissAll();
-        }
-        router.replace('/ReviewStatusScreen');
-        return;
-      }
-
-      if (verificationStatus === 'approved') {
-        if (router.canGoBack()) {
-          router.dismissAll();
-        }
-        router.replace('/(tabs)');
-        return;
-      }
-
-      // Fallback redirect for completed status
+    // 3. In Review / Pending / Completed -> Review Status Screen
+    if (
+      status === 'in_review' ||
+      status === 'pending' ||
+      status === 'completed' ||
+      verificationStatus === 'in_review' ||
+      verificationStatus === 'pending'
+    ) {
       if (router.canGoBack()) {
         router.dismissAll();
       }
       router.replace('/ReviewStatusScreen');
       return;
-    } else if (status === 'draft') {
+    }
+
+    // 4. Draft status -> Onboarding
+    if (status === 'draft') {
       if (!isDataSynced) {
         const backendMapped = mapApiStepToFrontend(profileStatus?.currentStep || 1);
         setStep(backendMapped.step);
@@ -247,11 +243,11 @@ export default function OnBoardingStep() {
 
 
   const handleNext = async () => {
-  
+
     if (step === 1) {
-      
+
       const data = onboarding1Ref.current?.getFormData();
-       console.log(data, 'data');
+      console.log(data, 'data');
       if (data) updateFormData(data);
       onboarding1Ref.current?.handleSave();
       return;
@@ -311,7 +307,7 @@ export default function OnBoardingStep() {
               : item < step
                 ? 'bg-[#FFC1C1] h-3'
                 : 'border h-3 border-gray-200';
-          
+
           const maxAllowedFrontendStep = mapApiStepToFrontend(profileStatus?.currentStep || 1).step;
 
           return (

@@ -4,7 +4,7 @@ import Toast from 'react-native-toast-message';
 import '../global.css';
 import { useFonts } from 'expo-font';
 import { useEffect } from 'react';
-
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 const queryClient = new QueryClient();
 export default function Layout() {
@@ -22,28 +22,29 @@ export default function Layout() {
 
   if (!loaded) return null;
 
-
   return (
-    <QueryClientProvider client={queryClient}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="clubProfile" />
-        <Stack.Screen name="ClubPhotosScreen" />
-        <Stack.Screen name="ManageBankScreen" />
-        <Stack.Screen name="addBankAccount" />
-        <Stack.Screen name="bankSummary" />
-        <Stack.Screen name="payoutHistory" />
-        <Stack.Screen name="ViewAllScreen" />
-        <Stack.Screen name="notification" />
-        <Stack.Screen name="chat" />
-        <Stack.Screen name="documents" />
-        <Stack.Screen name="clubAmenities" />
-        <Stack.Screen name="verificationStatus" />
-        <Stack.Screen name="clubTimings" />
-      </Stack>
-      <Toast />
-    </QueryClientProvider>
+    <SafeAreaProvider>
+      <QueryClientProvider client={queryClient}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="clubProfile" />
+          <Stack.Screen name="ClubPhotosScreen" />
+          <Stack.Screen name="ManageBankScreen" />
+          <Stack.Screen name="addBankAccount" />
+          <Stack.Screen name="bankSummary" />
+          <Stack.Screen name="payoutHistory" />
+          <Stack.Screen name="ViewAllScreen" />
+          <Stack.Screen name="notification" />
+          <Stack.Screen name="chat" />
+          <Stack.Screen name="documents" />
+          <Stack.Screen name="clubAmenities" />
+          <Stack.Screen name="verificationStatus" />
+          <Stack.Screen name="clubTimings" />
+        </Stack>
+        <Toast />
+      </QueryClientProvider>
+    </SafeAreaProvider>
   );
 }
  

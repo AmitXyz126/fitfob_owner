@@ -10,6 +10,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useAuthStore } from '@/store/useAuthStore';
 
+import { userDetailsApi } from '@/api/userdetailsApi';
+
 export default function Splash() {
   const router = useRouter();
   const { initializeAuth } = useAuthStore();
@@ -56,13 +58,44 @@ export default function Splash() {
 
       setTimeout(async () => {
         const currentUser = useAuthStore.getState().user;
-        if (currentUser && currentUser.token) {
-          if (currentUser.isVerified) {
+        if (currentUser && (currentUser.token || currentUser.jwt)) {
+          try {
+            const statusData = await userDetailsApi.getMe();
+            const verificationStatus =
+              statusData?.verification_status ||
+              statusData?.verificationStatus ||
+              currentUser?.verification_status;
+            const status = statusData?.status;
+            const isApproved =
+              statusData?.isApprovedOwner ||
+              verificationStatus === 'approved' ||
+              status === 'approved';
+
+            if (isApproved) {
+              router.replace('/(tabs)');
+              return;
+            }
+
+            if (verificationStatus === 'rejected' || status === 'rejected') {
+              router.replace('/RejectRequestScreen');
+              return;
+            }
+
+            if (
+              status === 'in_review' ||
+              status === 'pending' ||
+              status === 'completed' ||
+              verificationStatus === 'in_review' ||
+              verificationStatus === 'pending'
+            ) {
+              router.replace('/ReviewStatusScreen');
+              return;
+            }
+
             router.replace('/onBoardingScreen/OnBoardingStep');
-          } else {
-            // Requiring login on fresh launch if onboarding is incomplete
-            await useAuthStore.getState().logOut();
-            router.replace('/welcome');
+          } catch (e) {
+            console.log('Error checking status in splash, defaulting to tabs:', e);
+            router.replace('/(tabs)');
           }
         } else {
           router.replace('/welcome');

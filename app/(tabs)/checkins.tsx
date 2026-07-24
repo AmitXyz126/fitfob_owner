@@ -14,6 +14,7 @@ import {
   TouchableWithoutFeedback,
   Animated as RNAnimated,
   Platform,
+  Switch,
 } from 'react-native';
 import { Container } from '@/components/Container';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,10 +33,19 @@ import Animated, {
   withDelay,
   Easing,
 } from 'react-native-reanimated';
+import apiInstance from '@/api/apiInstance';
+import { ENDPOINTS } from '@/api/endpoint';
 
 export default function CheckinsScreen() {
   const bottomSheetRef = useRef<BottomSheet>(null);
   const [status, setStatus] = useState<'success' | 'failed'>('success');
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [checkinDetails, setCheckinDetails] = useState<{
+    userName?: string;
+    userImage?: string;
+    time?: string;
+    message?: string;
+  } | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [torch, setTorch] = useState(false);
@@ -315,31 +325,165 @@ export default function CheckinsScreen() {
     []
   );
 
-  const handleBarCodeScanned = ({ data }: { data: string }) => {
+  const formatErrorMessage = (error: any): string => {
+    if (!error) return 'Invalid QR code. This scanner code is not recognized or booking has expired.';
+    if (typeof error === 'string') return error;
+
+    const errorData = error?.response?.data || error;
+
+    if (typeof errorData === 'string') return errorData;
+
+    if (errorData && typeof errorData === 'object') {
+      if (typeof errorData.message === 'string' && errorData.message.trim()) {
+        return errorData.message;
+      }
+      if (typeof errorData.error === 'string' && errorData.error.trim()) {
+        return errorData.error;
+      }
+      if (errorData.error && typeof errorData.error === 'object') {
+        if (typeof errorData.error.message === 'string' && errorData.error.message.trim()) {
+          return errorData.error.message;
+        }
+        if (typeof errorData.error.name === 'string' && errorData.error.name.trim()) {
+          return `${errorData.error.name}: Invalid scanner code.`;
+        }
+      }
+      if (typeof errorData.reason === 'string' && errorData.reason.trim()) {
+        return errorData.reason;
+      }
+      if (typeof errorData.details === 'string' && errorData.details.trim()) {
+        return errorData.details;
+      }
+    }
+
+    if (typeof error.message === 'string' && error.message.trim()) {
+      return error.message;
+    }
+
+    return 'Invalid QR code. This scanner code is not recognized or booking has expired.';
+  };
+
+  const processCheckin = async (scannedValue: string) => {
     if (scanned || loading) return;
     setLoading(true);
     Vibration.vibrate(100);
+    setErrorMessage('');
 
-    setTimeout(() => {
-      setLoading(false);
+    console.log('------------------ 📲 QR SCAN INITIATED ------------------');
+    console.log('RAW SCANNED DATA:', scannedValue);
+
+    try {
+      const rawVal = scannedValue.trim();
+      if (!rawVal) {
+        throw new Error('Invalid or empty QR code.');
+      }
+
+      let payload: any = {};
+      let extractedClientId = rawVal;
+
+      try {
+        const parsed = JSON.parse(rawVal);
+        console.log('PARSED QR OBJECT:', parsed);
+        if (parsed && typeof parsed === 'object') {
+          payload = parsed;
+          extractedClientId =
+            parsed.clientId ||
+            parsed.client_id ||
+            parsed.id ||
+            parsed.checkInId ||
+            parsed.checkinId ||
+            parsed.userId ||
+            parsed.user_id ||
+            parsed.qrData ||
+            parsed.code ||
+            parsed.token ||
+            rawVal;
+        }
+      } catch {
+        console.log('RAW QR STRING (NON-JSON):', rawVal);
+        extractedClientId = rawVal;
+      }
+
+      const finalPayload = {
+        clientId: extractedClientId,
+        id: extractedClientId,
+        checkInId: extractedClientId,
+        qrData: rawVal,
+        code: extractedClientId,
+        ...payload,
+      };
+
+      console.log('🚀 API ENDPOINT:', ENDPOINTS.CLIENT_CHECKIN_SCAN);
+      console.log('📦 SENDING PAYLOAD:', JSON.stringify(finalPayload, null, 2));
+
+      const response = await apiInstance.post(ENDPOINTS.CLIENT_CHECKIN_SCAN, finalPayload);
+
+      console.log('✅ API RESPONSE STATUS:', response.status);
+      console.log('📄 API RESPONSE DATA:', JSON.stringify(response.data, null, 2));
+
+      const resData = response.data;
+
+      // Strict validation: check if backend returned success: false or failure status even with 200 HTTP code
+      const isSuccess =
+        resData &&
+        resData.success !== false &&
+        resData.success !== 'false' &&
+        resData.status !== 'failed' &&
+        resData.status !== 'error' &&
+        resData.valid !== false &&
+        !resData.error &&
+        (resData.data || resData.user || resData.client || resData.customer || resData.success === true || resData.status === 'success');
+
+      if (!isSuccess) {
+        const failMessage = formatErrorMessage(resData);
+        console.log('⚠️ VALIDATION FAILED - SERVER RETURNED FAILURE MSG:', failMessage);
+        throw new Error(failMessage);
+      }
+
+      const dataObj = resData?.data || resData;
+      const userObj = dataObj?.user || dataObj?.client || dataObj?.customer || dataObj;
+
+      const userName = userObj?.name || userObj?.fullName || userObj?.userName || userObj?.ownerName || 'Customer';
+      const userImage = userObj?.profileImage || userObj?.avatar || userObj?.image || userObj?.logo;
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const msgStr = typeof resData?.message === 'string' ? resData.message : (typeof dataObj?.message === 'string' ? dataObj.message : `${userName} checked in successfully.`);
+
+      setCheckinDetails({
+        userName,
+        userImage,
+        time: timeStr,
+        message: msgStr,
+      });
+
+      console.log('🎉 CHECKIN SUCCESS FOR:', userName);
+      setStatus('success');
       setScanned(true);
-      setStatus(data && !data.toLowerCase().includes('error') ? 'success' : 'failed');
       bottomSheetRef.current?.expand();
-    }, 1500);
+    } catch (error: any) {
+      console.log('❌ CHECKIN API ERROR:', error?.response?.status, error?.response?.data || error?.message);
+      const msg = formatErrorMessage(error);
+      setErrorMessage(msg);
+      setStatus('failed');
+      setScanned(true);
+      bottomSheetRef.current?.expand();
+    } finally {
+      setLoading(false);
+      console.log('----------------------------------------------------------');
+    }
+  };
+
+  const handleBarCodeScanned = (scanningResult: any) => {
+    console.log('📷 BARCODE DETECTED RAW EVENT:', scanningResult);
+    const data = typeof scanningResult === 'string' ? scanningResult : scanningResult?.data;
+    if (!scanned && !loading && data) {
+      processCheckin(data);
+    }
   };
 
   const handleManualCheckin = () => {
     if (!manualId.trim() || loading) return;
-    setLoading(true);
     Keyboard.dismiss();
-    Vibration.vibrate(100);
-
-    setTimeout(() => {
-      setLoading(false);
-      setScanned(true);
-      setStatus(!manualId.toLowerCase().includes('error') && manualId.trim() !== '0000' ? 'success' : 'failed');
-      bottomSheetRef.current?.expand();
-    }, 1200);
+    processCheckin(manualId.trim());
   };
 
   return (
@@ -426,6 +570,7 @@ export default function CheckinsScreen() {
                 <View className="relative h-[310px] w-[310px] items-center justify-center overflow-hidden rounded-[32px] bg-slate-950 shadow-2xl">
                   {permission?.granted ? (
                     <CameraView
+                      facing="back"
                       onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
                       barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
                       enableTorch={torch}
@@ -477,26 +622,50 @@ export default function CheckinsScreen() {
                     </View>
                   )}
 
-                  {/* Torch Toggle Overlay */}
+                  {/* Flashlight / Torch Floating Button in Top-Right Corner */}
                   {permission?.granted && (
                     <TouchableOpacity
-                      onPress={() => setTorch(!torch)}
+                      onPress={() => setTorch((prev) => !prev)}
                       activeOpacity={0.8}
-                      style={torch ? styles.torchActive : styles.torchInactive}
-                      className="absolute bottom-4 flex-row items-center rounded-full py-1 pl-1 pr-4">
-                      <View className="h-7 w-7 items-center justify-center rounded-full bg-white">
-                        <Ionicons name="flash" size={14} color={torch ? '#EAB308' : '#F6163C'} />
-                      </View>
-                      <Text className="ml-2.5 font-bold text-[11px] text-white">
-                        {torch ? 'TORCH ON' : 'TORCH OFF'}
-                      </Text>
+                      className={`absolute top-3.5 right-3.5 z-30 h-10 w-10 items-center justify-center rounded-full border shadow-lg ${
+                        torch
+                          ? 'bg-[#F6163C] border-[#F6163C]'
+                          : 'bg-black/60 border-white/30'
+                      }`}>
+                      <Ionicons
+                        name={torch ? 'flash' : 'flash-off'}
+                        size={20}
+                        color="#FFFFFF"
+                      />
                     </TouchableOpacity>
                   )}
                 </View>
+
+                {/* Torch Toggle Pill Button below scanner viewport */}
+                {permission?.granted && (
+                  <TouchableOpacity
+                    onPress={() => setTorch((prev) => !prev)}
+                    activeOpacity={0.8}
+                    className={`mt-3 flex-row items-center rounded-full px-4 py-2 border shadow-sm ${
+                      torch
+                        ? 'bg-[#F6163C] border-[#F6163C]'
+                        : 'bg-white border-slate-200'
+                    }`}>
+                    <Ionicons
+                      name={torch ? 'flash' : 'flash-outline'}
+                      size={16}
+                      color={torch ? '#FFFFFF' : '#64748B'}
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text className={`font-bold text-xs ${torch ? 'text-white' : 'text-slate-700'}`}>
+                      {torch ? 'Torch ON' : 'Torch OFF'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               {/* MANUAL ID SECTION */}
-              <View className="mb-16 mt-8 w-full">
+              <View className="mb-6 mt-6 w-full">
                 <Text className="mb-2 ml-1 text-sm font-semibold text-slate-500">
                   Or Check In Manually
                 </Text>
@@ -531,21 +700,24 @@ export default function CheckinsScreen() {
           enablePanDownToClose
           backdropComponent={renderBackdrop}
           backgroundStyle={{ borderRadius: 28 }}
-          onClose={() => setScanned(false)}>
+          onClose={() => {
+            setScanned(false);
+            setManualId('');
+          }}>
           <BottomSheetView style={{ padding: 24, alignItems: 'center' }}>
             {status === 'success' ? (
               <View className="w-full items-center">
                 {/* Pulsing Avatar Frame */}
                 <View style={styles.successAvatarBorder} className="mb-4 rounded-full p-1 bg-emerald-50 border-2 border-emerald-400">
                   <Image
-                    source={{ uri: 'https://i.pravatar.cc/150?u=tina' }}
+                    source={{ uri: checkinDetails?.userImage || 'https://i.pravatar.cc/150?u=tina' }}
                     className="h-20 w-20 rounded-full"
                     resizeMode="cover"
                   />
                 </View>
                 {/* User info */}
                 <View className="flex-row justify-center items-center gap-1.5">
-                  <Text className="font-bold text-xl text-slate-900">Amit Singh</Text>
+                  <Text className="font-bold text-xl text-slate-900">{checkinDetails?.userName || 'Customer'}</Text>
                   <Image
                     source={require('../../assets/images/tick.png')}
                     style={{ width: 18, height: 18 }}
@@ -559,7 +731,7 @@ export default function CheckinsScreen() {
                 </Text>
 
                 <Text className="mt-1 text-center text-xs font-semibold text-slate-400">
-                  Amit Singh has checked in at 9:41 AM
+                  {checkinDetails?.message || `${checkinDetails?.userName || 'Customer'} has checked in at ${checkinDetails?.time || '9:41 AM'}`}
                 </Text>
 
                 {/* Done Button */}
@@ -573,10 +745,10 @@ export default function CheckinsScreen() {
             ) : (
               <View className="w-full items-center py-2">
                 {/* Failed Indicator */}
-                <View className="mb-4 h-24 w-24 items-center justify-center rounded-full bg-red-50 border-2 border-red-200">
+                <View className="mb-4 items-center justify-center">
                   <Image
                     source={require('../../assets/images/wrong.png')}
-                    style={{ width: 72, height: 72 }}
+                    style={{ width: 96, height: 96 }}
                     resizeMode="contain"
                   />
                 </View>
@@ -585,8 +757,10 @@ export default function CheckinsScreen() {
                 <Text className="font-bold text-2xl text-red-500">
                   Check-in Failed!
                 </Text>
-                <Text className="mt-1 text-center text-xs font-semibold text-slate-400 max-w-[240px]">
-                  Invalid OR code or booking expired. Please check and try again.
+                <Text className="mt-1 text-center text-xs font-semibold text-slate-400 max-w-[260px]">
+                  {typeof errorMessage === 'string' && errorMessage.trim()
+                    ? errorMessage
+                    : 'Invalid QR code. This code is not recognized or booking has expired.'}
                 </Text>
 
                 {/* Done Button */}

@@ -251,30 +251,63 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
           <Text className="mb-2 ml-1 font-sans text-sm font-normal text-[#697281]">
             Type of Fitness club
           </Text>
-          {['Gym', 'Yoga', 'Pilates', 'Dance', 'Kickboxing', 'Zumba', 'Climbing', 'Spin'].map(
-            (item) => (
-              <CheckboxItem
-                key={item}
-                label={item}
-                isSelected={fitnessTypes.includes(item)}
-                onPress={() => toggleSelection(item, fitnessTypes, setFitnessTypes)}
-              />
-            )
-          )}
+          {[
+            'Gym',
+            'Yoga',
+            'Dance',
+            'Pilates',
+            'Kickboxing',
+            'Zumba',
+            'Spin',
+            'Barre',
+            'Aqua Aerobics',
+            'Martial Arts',
+            'Salsa',
+            'Strength Training',
+            'CrossFit',
+            'Tai Chi',
+            'Boxing',
+            'HIIT',
+            'Ballet',
+            'Climbing',
+          ].map((item) => (
+            <CheckboxItem
+              key={item}
+              label={item}
+              isSelected={fitnessTypes.includes(item)}
+              onPress={() => toggleSelection(item, fitnessTypes, setFitnessTypes)}
+            />
+          ))}
         </View>
 
         <View className="mb-6">
           <Text className="mb-2 ml-1 font-sans text-sm font-normal text-[#697281]">Amenities</Text>
-          {['Parking', 'Wi-Fi', 'Showers', 'AC', 'Trainers', 'Pool', 'Restrooms', 'Breakfast'].map(
-            (item) => (
-              <CheckboxItem
-                key={item}
-                label={item}
-                isSelected={amenities.includes(item)}
-                onPress={() => toggleSelection(item, amenities, setAmenities)}
-              />
-            )
-          )}
+          {[
+            'Bar',
+            'Pet-Friendly',
+            '24-Hour Reception',
+            'Parking',
+            'Wi-Fi',
+            'AC',
+            'Breakfast',
+            'Airport Shuttle',
+            'Laundry',
+            'Restrooms',
+            'Pool',
+            'Gym',
+            'Room',
+            'Conference',
+            'Spa',
+            'Showers',
+            'Trainers',
+          ].map((item) => (
+            <CheckboxItem
+              key={item}
+              label={item}
+              isSelected={amenities.includes(item)}
+              onPress={() => toggleSelection(item, amenities, setAmenities)}
+            />
+          ))}
         </View>
 
         <View className="mb-10">

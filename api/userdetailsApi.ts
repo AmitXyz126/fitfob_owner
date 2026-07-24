@@ -1,5 +1,6 @@
 import api from './apiInstance';
 import { ENDPOINTS } from './endpoint';
+import { useAuthStore } from '@/store/useAuthStore';
 
 export interface PhotoFile {
   uri: string;
@@ -53,68 +54,88 @@ export const userDetailsApi = {
         return {
           ...data,
           isApprovedOwner: isApproved,
+          status: data.status || 'draft',
           verification_status: isApproved
             ? 'approved'
-            : data.verification_status || data.verificationStatus || 'pending',
+            : data.verification_status || data.verificationStatus || (data.status === 'draft' ? 'draft' : 'pending'),
         };
       }
       return data;
     } catch (error: any) {
       console.log('GET_ONBOARDING_STATUS error in getMe, checking club-owners fallback:', error?.response?.status, error?.message);
-      // When user is approved by admin, pending-club-owner/me returns 404/400 because they are now in club-owners!
+
+      const currentUserId = useAuthStore.getState().user?.id;
+      const currentUserEmail = useAuthStore.getState().user?.email;
+
       try {
         const ownerRes = await api.get(ENDPOINTS.CLUB_OWNERS);
         const ownerList = ownerRes.data?.data || ownerRes.data || [];
-        const ownerData = Array.isArray(ownerList) ? (ownerList[0] || null) : ownerRes.data;
 
-        if (ownerData && (ownerData.id || ownerData.clubName || ownerData.ownerName || ownerData.attributes)) {
-          console.log('✅ Approved Club Owner record found in club-owners:', ownerData);
-          return {
-            ...ownerData,
-            status: 'approved',
-            verification_status: 'approved',
-            isApprovedOwner: true,
-          };
+        if (Array.isArray(ownerList) && ownerList.length > 0) {
+          const matchingOwner = ownerList.find((o: any) => {
+            const ownerUserId = o?.user?.id || o?.userId || o?.attributes?.user?.data?.id || o?.user_id;
+            const ownerEmail = o?.email || o?.user?.email || o?.attributes?.email;
+            if (currentUserId && ownerUserId && String(ownerUserId) === String(currentUserId)) return true;
+            if (currentUserEmail && ownerEmail && String(ownerEmail).toLowerCase() === String(currentUserEmail).toLowerCase()) return true;
+            return false;
+          });
+
+          if (matchingOwner) {
+            // console.log('✅ Approved Club Owner record found for current user:', matchingOwner);
+            return {
+              ...matchingOwner,
+              status: 'approved',
+              verification_status: 'approved',
+              isApprovedOwner: true,
+            };
+          }
         }
       } catch (e) {
         console.log('Error fetching club-owners in getMe fallback:', e);
       }
-      throw error;
+
+      console.log('ℹ️ New user with no onboarding/owner record yet. Directing to onboarding step 1...');
+      return {
+        status: 'draft',
+        currentStep: 1,
+        isApprovedOwner: false,
+        verification_status: 'draft',
+      };
     }
   },
 
-saveStep1: async (id: number, data: any) => {
-  const formData = new FormData();
+  saveStep1: async (id: number, data: any) => {
+    const formData = new FormData();
 
-  formData.append('clubName', data.clubName);
-  formData.append('ownerName', data.ownerName);
-  formData.append('phoneNumber', data.phone);
-  formData.append('email', data.email);
+    formData.append('clubName', data.clubName);
+    formData.append('ownerName', data.ownerName);
+    formData.append('phoneNumber', data.phone);
+    formData.append('email', data.email);
 
-  if (data.logo?.uri) {
-    const file = {
-      uri: data.logo.uri,
-      name: data.logo.name || `logo_${Date.now()}.jpg`,
-      type: data.logo.type || 'image/jpeg',
-    };
+    if (data.logo?.uri) {
+      const file = {
+        uri: data.logo.uri,
+        name: data.logo.name || `logo_${Date.now()}.jpg`,
+        type: data.logo.type || 'image/jpeg',
+      };
 
-    formData.append('logo', file as any);
-  } else if (typeof data.logo === 'string' && data.logo) {
-    formData.append('logo', data.logo);
-  }
-
-  const response = await api.post(
-    ENDPOINTS.STEP_1,
-    formData,
-    {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+      formData.append('logo', file as any);
+    } else if (typeof data.logo === 'string' && data.logo) {
+      formData.append('logo', data.logo);
     }
-  );
 
-  return response.data;
-},
+    const response = await api.post(
+      ENDPOINTS.STEP_1,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+
+    return response.data;
+  },
 
   saveStep2: async (id: number, data: { latitude: string; longitude: string }) => {
     const payload = {
@@ -184,6 +205,12 @@ saveStep1: async (id: number, data: any) => {
   },
 
   getDocuments: async () => {
+    try {
+      const response = await api.get(ENDPOINTS.MY_DOCUMENTS);
+      if (response.data) return response.data;
+    } catch (e) {
+      console.log('MY_DOCUMENTS endpoint error, using pending-club-owner fallback:', e);
+    }
     const response = await api.get(ENDPOINTS.Get);
     return response.data;
   },
@@ -192,19 +219,19 @@ saveStep1: async (id: number, data: any) => {
     const formData = new FormData();
 
     photos.forEach((photo, index) => {
-       formData.append('clubPhotos', {
+      formData.append('clubPhotos', {
         uri: photo.uri,
         name: photo.name || `photo_${index}_${Date.now()}.jpg`,
         type: photo.type || 'image/jpeg',
       } as any);
     });
 
-     const response = await api.post(ENDPOINTS.STEP_7, formData, {
+    const response = await api.post(ENDPOINTS.STEP_7, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
         Accept: 'application/json',
       },
-       transformRequest: (data) => data,
+      transformRequest: (data) => data,
     });
 
     return response.data;

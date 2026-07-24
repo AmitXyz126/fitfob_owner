@@ -67,14 +67,11 @@ export const useLoginRequest = () => {
           ...data.user,
           token: data.jwt,
         };
-
         setUser(userWithToken, true);
-        console.log(userWithToken, 'usr Data');
 
         // Clear query cache to pull correct details with new token
         queryClient.clear();
 
-        // 🚀 Always go to onboarding flow checker
         if (router.canGoBack()) {
           router.dismissAll();
         }
@@ -184,17 +181,10 @@ export const useGoogleLogin = () => {
         // Clear query cache to pull correct details with new token
         queryClient.clear();
 
-        if (!userWithToken.isVerified) {
-          if (router.canGoBack()) {
-            router.dismissAll();
-          }
-          router.replace('/onBoardingScreen/OnBoardingStep');
-        } else {
-          if (router.canGoBack()) {
-            router.dismissAll();
-          }
-          router.replace('/(tabs)');
+        if (router.canGoBack()) {
+          router.dismissAll();
         }
+        router.replace('/onBoardingScreen/OnBoardingStep');
       } else {
         console.warn('⚠️ API Success but missing fields in response:', data);
         router.replace('/auth/Login');
@@ -233,17 +223,10 @@ export const useFacebookLogin = () => {
         // Clear query cache to pull correct details with new token
         queryClient.clear();
 
-        if (!userWithToken.isVerified) {
-          if (router.canGoBack()) {
-            router.dismissAll();
-          }
-          router.replace('/onBoardingScreen/OnBoardingStep');
-        } else {
-          if (router.canGoBack()) {
-            router.dismissAll();
-          }
-          router.replace('/(tabs)');
+        if (router.canGoBack()) {
+          router.dismissAll();
         }
+        router.replace('/onBoardingScreen/OnBoardingStep');
       } else {
         console.warn('⚠️ API Success but missing fields in response:', data);
         router.replace('/auth/Login');

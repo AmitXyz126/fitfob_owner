@@ -43,16 +43,18 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   setUser: async (user, rememberMe = false) => {
     const currentUser = get().user;
-    if (!user || !currentUser || currentUser.id !== user.id || currentUser.email !== user.email) {
-      await clearUserDrafts();
-    }
-    set({ user });
-
     if (!user) {
+      set({ user: null });
       await storageAPI.removeItem(STORAGE_KEY);
       await clearUserDrafts();
       return;
     }
+
+    if (currentUser && (currentUser.id !== user.id || currentUser.email !== user.email)) {
+      await clearUserDrafts();
+    }
+
+    set({ user });
 
     try {
       const ttlMinutes = rememberMe ? undefined : 1440;
@@ -64,11 +66,12 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   logOut: async () => {
     try {
+      set({ user: null });
       await storageAPI.removeItem(STORAGE_KEY);
       await clearUserDrafts();
-      set({ user: null });
     } catch (error) {
       console.error('Logout failed', error);
+      set({ user: null });
     }
   },
 
@@ -78,8 +81,13 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
       if (storedUser) {
         const parsedUser = typeof storedUser === 'string' ? JSON.parse(storedUser) : storedUser;
-
-        set({ user: parsedUser });
+        if (parsedUser && (parsedUser.token || parsedUser.jwt)) {
+          set({ user: parsedUser });
+        } else {
+          set({ user: null });
+        }
+      } else {
+        set({ user: null });
       }
     } catch (error) {
       console.error('Auth initialization failed:', error);

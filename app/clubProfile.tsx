@@ -1,4 +1,4 @@
-import  { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, memo } from 'react';
 import { View, Text, Image, TouchableOpacity, ScrollView, ImageBackground, Dimensions, Animated, Easing, StyleSheet } from 'react-native';
 import {
   ChevronLeft,
@@ -24,18 +24,36 @@ import { useUserDetail } from '@/hooks/useUserDetail';
 
 const getServiceIcon = (name: string) => {
   const lower = String(name).toLowerCase();
-  if (lower.includes('gym')) return 'barbell';
-  if (lower.includes('yoga')) return 'body';
-  if (lower.includes('dance')) return 'musical-notes';
+  if (lower.includes('gym') || lower.includes('strength')) return 'barbell';
+  if (lower.includes('yoga') || lower.includes('tai chi')) return 'body';
+  if (lower.includes('dance') || lower.includes('salsa') || lower.includes('ballet') || lower.includes('barre')) return 'musical-notes';
   if (lower.includes('pilates')) return 'accessibility';
-  if (lower.includes('zumba') || lower.includes('cardio')) return 'flame';
+  if (lower.includes('zumba') || lower.includes('hiit') || lower.includes('cardio')) return 'flame';
   if (lower.includes('spin') || lower.includes('cycle')) return 'bicycle';
-  if (lower.includes('box') || lower.includes('kick')) return 'fitness';
+  if (lower.includes('box') || lower.includes('kick') || lower.includes('martial')) return 'fitness';
+  if (lower.includes('aqua') || lower.includes('pool') || lower.includes('swim')) return 'water';
+  if (lower.includes('cross') || lower.includes('climb')) return 'trophy';
   return 'sparkles';
 };
 
-const FitnessServicePills = ({ services }: { services?: any }) => {
-  let items = services && services.length > 0 ? services : ['Gym', 'Yoga', 'Dance', 'Pilates'];
+const FitnessServicePills = memo(({ services }: { services?: any }) => {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.05, duration: 1200, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1200, useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [pulseAnim]);
+
+  let items = services;
+
+  if (!items) return null;
+
   if (typeof items === 'string') {
     try {
       items = JSON.parse(items);
@@ -44,18 +62,8 @@ const FitnessServicePills = ({ services }: { services?: any }) => {
     }
   }
   if (!Array.isArray(items) || items.length === 0) {
-    items = ['Gym', 'Yoga', 'Dance', 'Pilates'];
+    return null;
   }
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.05, duration: 1200, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 1200, useNativeDriver: true }),
-      ])
-    ).start();
-  }, []);
 
   return (
     <ScrollView
@@ -66,7 +74,7 @@ const FitnessServicePills = ({ services }: { services?: any }) => {
         const iconName = getServiceIcon(item);
         return (
           <Animated.View
-            key={item + idx}
+            key={`${item}-${idx}`}
             style={{
               transform: [{ scale: pulseAnim }],
             }}>
@@ -79,7 +87,7 @@ const FitnessServicePills = ({ services }: { services?: any }) => {
       })}
     </ScrollView>
   );
-};
+});
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -103,7 +111,7 @@ const PREMIUM_COLORS = [
   '#8B5CF6', // Power Purple
 ];
 
-const GymBackgroundAnimation = () => {
+const GymBackgroundAnimation = memo(() => {
   const items = useRef(
     Array.from({ length: 15 }).map((_, i) => {
       const boxSize = Math.random() * 20 + 64; // Larger random size from 64 to 84
@@ -229,7 +237,43 @@ const GymBackgroundAnimation = () => {
       })}
     </View>
   );
-};
+});
+const MenuOption = memo(({
+  icon: Icon,
+  title,
+  value,
+  showBadge = false,
+  showArrow = true,
+  onPress,
+}: any) => (
+  <TouchableOpacity
+    onPress={onPress}
+    activeOpacity={onPress ? 0.7 : 1}
+    className="flex-row items-center justify-between py-4">
+    <View className="flex-1 flex-row items-center">
+      <View className="mr-4 rounded-xl bg-[#E237441F] p-2">
+        <Icon size={20} color="#EF4444" />
+      </View>
+      <Text className="flex-1 font-medium text-base text-[#697281]" numberOfLines={1}>
+        {title}
+      </Text>
+    </View>
+
+    <View className="flex-row items-center">
+      {value && <Text className="mr-2 text-sm text-gray-400">{value}</Text>}
+      {showBadge && (
+        <View className="mr-1">
+          <Image
+            source={require('../assets/images/tick.png')}
+            className="h-6 w-6"
+            resizeMode="contain"
+          />
+        </View>
+      )}
+      {showArrow && <ChevronRight size={20} color="#6B7280" />}
+    </View>
+  </TouchableOpacity>
+));
 
 const ClubProfileScreen = () => {
   const router = useRouter();
@@ -361,10 +405,15 @@ const ClubProfileScreen = () => {
 
         const resolvedServices =
           pData?.services ||
+          pData?.fitnessTypes ||
           pData?.pendingClubOwner?.services ||
+          pData?.pendingClubOwner?.fitnessTypes ||
           servicesFromStorage;
+
         if (resolvedServices) {
           setServicesList(resolvedServices);
+        } else {
+          setServicesList(null);
         }
 
         const resolvedClubName =
@@ -386,42 +435,7 @@ const ClubProfileScreen = () => {
     loadClubData();
   }, [profileStatus, user]);
 
-  const MenuOption = ({
-    icon: Icon,
-    title,
-    value,
-    showBadge = false,
-    showArrow = true,
-    onPress,
-  }: any) => (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={onPress ? 0.7 : 1}
-      className="flex-row items-center justify-between py-4">
-      <View className="flex-1 flex-row items-center">
-        <View className="mr-4 rounded-xl bg-[#E237441F] p-2">
-          <Icon size={20} color="#EF4444" />
-        </View>
-        <Text className="flex-1 font-medium text-base text-[#697281]" numberOfLines={1}>
-          {title}
-        </Text>
-      </View>
 
-      <View className="flex-row items-center">
-        {value && <Text className="mr-2 text-sm text-gray-400">{value}</Text>}
-        {showBadge && (
-          <View className="mr-1">
-            <Image
-              source={require('../assets/images/tick.png')}
-              className="h-6 w-6"
-              resizeMode="contain"
-            />
-          </View>
-        )}
-        {showArrow && <ChevronRight size={20} color="#6B7280" />}
-      </View>
-    </TouchableOpacity>
-  );
 
   return (
     <Container>
@@ -496,12 +510,12 @@ const ClubProfileScreen = () => {
             <View className="my-3">
               <LineGradient isWhite={true} />
             </View>
-            <FitnessServicePills services={servicesList || pData?.services || pData?.pendingClubOwner?.services} />
+            <FitnessServicePills services={servicesList} />
           </ImageBackground>
         </View>
 
         {/* Menu Section */}
-        <View className="mb-16 rounded-3xl bg- px-4 py-2">
+        <View className="mb-16 rounded-3xl  px-4 py-2">
           {/* --- DYNAMIC ADDRESS --- */}
           <MenuOption
             onPress={() => router.push('/ClubLocationScreen')}

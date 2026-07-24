@@ -18,16 +18,17 @@ export default function TabLayout() {
         headerShown: false,
         tabBarShowLabel: false,
         tabBarActiveTintColor: '#F6163C',
-        tabBarInactiveTintColor: '#94A3B8',
+        tabBarInactiveTintColor: '#1b55a5ff',
         tabBarItemStyle: {
           justifyContent: 'center',
           alignItems: 'center',
-          paddingTop: Platform.OS === 'android' ? 10 : 10,
+          paddingTop: Platform.OS === 'android' ? 0 : 8,
         },
         tabBarStyle: {
           backgroundColor: 'white',
           borderTopWidth: 1,
-          elevation: 0,
+          borderTopColor: '#F1F5F9',
+          elevation: 8,
           ...Platform.select({
             ios: {
               position: 'absolute',
@@ -35,7 +36,7 @@ export default function TabLayout() {
               paddingBottom: 10,
             },
             android: {
-              height: 65,
+              height: 56,
               paddingBottom: 0,
             },
           }),

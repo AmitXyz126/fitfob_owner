@@ -220,8 +220,14 @@ const Wallet = () => {
     <Container style={{ flex: 1 }}>
       {/* Fixed Top Section */}
       <View>
-        <View className="pb-2 pt-4">
-          <Text className="font-medium text-xl ">Earnings Overview</Text>
+        <View className="flex-row items-center justify-between pb-2 pt-2">
+          <TouchableOpacity
+            onPress={() => router.back()}
+            className="h-10 w-10 items-center justify-center rounded-full border border-slate-200/60 bg-white/80 backdrop-blur-md">
+            <Ionicons name="chevron-back" size={20} color="#1C1C1C" />
+          </TouchableOpacity>
+          <Text className="font-bold text-lg text-slate-800">Earnings Overview</Text>
+          <View className="w-10" />
         </View>
 
         <View className="my-4 flex-row rounded-xl bg-slate-100 p-1">
@@ -336,7 +342,7 @@ const Wallet = () => {
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 100 }} // added spacing for floating tabbar
+        contentContainerStyle={{ paddingBottom: Platform.OS === 'ios' ? 100 : 30 }}
         ListEmptyComponent={
           <View className="items-center justify-center py-20">
             <Ionicons name="receipt-outline" size={48} color="#CBD5E1" />

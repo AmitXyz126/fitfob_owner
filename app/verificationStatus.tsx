@@ -143,7 +143,8 @@ export default function VerificationStatusScreen() {
   });
 
   // Format ID or use a default one
-  const ownerId = user?.id ? `FitfOB-OWNER-${user.id}` : 'FitfOB-OWNER-7294';
+  const ownerId = user?.clubOwnerDetail?.clubId
+  console.log(user , "hey user")
   const ownerEmail = user?.email || profileStatus?.email || 'owner@fitfob.com';
 
   return (
