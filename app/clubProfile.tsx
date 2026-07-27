@@ -13,6 +13,7 @@ import {
   SquarePen,
   FileText,
   Lock,
+  Layers,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Container } from '@/components/Container';
@@ -555,6 +556,13 @@ const ClubProfileScreen = () => {
             icon={Wifi}
             title="Amenities"
             onPress={() => router.push('/clubAmenities')}
+          />
+          <LineGradient />
+
+          <MenuOption
+            icon={Layers}
+            title="Club Types & Services"
+            onPress={() => router.push('/clubServices')}
           />
           <LineGradient />
 
