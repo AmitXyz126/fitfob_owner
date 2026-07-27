@@ -6,7 +6,7 @@ try {
   GoogleSignin = GoogleSigninModule.GoogleSignin;
   googleStatusCodes = GoogleSigninModule.statusCodes;
 } catch (e) {
-  console.warn("Google Sign-In native module not available (expected in Expo Go).");
+  // console.warn("Google Sign-In native module not available (expected in Expo Go).");
 }
 
 const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "";

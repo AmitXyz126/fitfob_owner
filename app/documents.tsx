@@ -12,7 +12,10 @@ import {
   ScrollView,
   TextInput,
   RefreshControl,
+  StatusBar,
+  Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Container } from '@/components/Container';
@@ -55,6 +58,33 @@ export default function DocumentsScreen() {
   const [isUploading, setIsUploading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Helper for clean document title resolution
+  const getCleanDocName = (item: any, fileObj: any, idx: number) => {
+    const possibleName =
+      item?.documentName ||
+      item?.docType ||
+      item?.documentType ||
+      item?.type ||
+      item?.title;
+
+    const ownerName = item?.ownerName || item?.clubOwnerName;
+
+    if (possibleName && possibleName !== item?.name && possibleName !== ownerName) {
+      return possibleName;
+    }
+
+    const fileName = fileObj?.name || fileObj?.originalName;
+    if (fileName && fileName !== ownerName && !fileName.includes('@')) {
+      return fileName;
+    }
+
+    if (item?.name && item?.name !== ownerName && !item?.name?.includes('@')) {
+      return item.name;
+    }
+
+    return `Document #${idx + 1}`;
+  };
+
   // Parse API documents or fallback
   const parsedDocuments: DocumentItem[] = useMemo(() => {
     const rawList =
@@ -74,12 +104,7 @@ export default function DocumentsScreen() {
           item?.uri ||
           '';
 
-        const name =
-          item?.documentName ||
-          item?.name ||
-          item?.title ||
-          fileObj?.name ||
-          `Document #${idx + 1}`;
+        const name = getCleanDocName(item, fileObj, idx);
 
         const rawDate = item?.createdAt || item?.date || item?.updatedAt;
         const formattedDate = rawDate
@@ -246,7 +271,7 @@ export default function DocumentsScreen() {
 
   const renderDocumentItem = ({ item }: { item: DocumentItem }) => {
     return (
-      <View className="mb-3.5 flex-row items-center justify-between rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+      <View className="mb-3.5 flex-row items-center justify-between rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm mx-0.5">
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={() => handleOpenOptions(item)}
@@ -323,7 +348,7 @@ export default function DocumentsScreen() {
           renderItem={renderDocumentItem}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 110 }}
+          contentContainerStyle={{ paddingBottom: 10 }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#F6163C']} />
           }
@@ -393,9 +418,15 @@ export default function DocumentsScreen() {
         transparent={false}
         animationType="fade"
         onRequestClose={() => setPreviewVisible(false)}>
-        <Container style={{ backgroundColor: '#0F172A' }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#0F172A' }}>
+          <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
           {/* Header Bar */}
-          <View className="flex-row items-center justify-between py-3 px-2">
+          <View
+            style={{
+              marginTop: 24,
+              paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 16,
+            }}
+            className="flex-row items-center justify-between pb-3 px-4">
             <TouchableOpacity
               onPress={() => setPreviewVisible(false)}
               className="h-10 w-10 items-center justify-center rounded-full bg-white/20">
@@ -443,7 +474,7 @@ export default function DocumentsScreen() {
               </View>
             )}
           </View>
-        </Container>
+        </SafeAreaView>
       </Modal>
 
       {/* 3. UPLOAD DOCUMENT SELECTION MODAL */}

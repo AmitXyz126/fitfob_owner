@@ -435,8 +435,6 @@ const ClubProfileScreen = () => {
     loadClubData();
   }, [profileStatus, user]);
 
-
-
   return (
     <Container>
       <GymBackgroundAnimation />

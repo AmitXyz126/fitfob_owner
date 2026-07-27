@@ -673,7 +673,9 @@ export default function CheckinsScreen() {
                   <TextInput
                     placeholder="Enter customer ID..."
                     placeholderTextColor="#94A3B8"
-                    keyboardType="numeric"
+                    keyboardType="default"
+                    autoCapitalize="none"
+                    autoCorrect={false}
                     value={manualId}
                     onChangeText={setManualId}
                     className="h-full flex-1 font-semibold text-slate-800 text-sm"
@@ -701,8 +703,12 @@ export default function CheckinsScreen() {
           backdropComponent={renderBackdrop}
           backgroundStyle={{ borderRadius: 28 }}
           onClose={() => {
-            setScanned(false);
-            setManualId('');
+            if (status === 'success') {
+              router.replace('/(tabs)');
+            } else {
+              setScanned(false);
+              setManualId('');
+            }
           }}>
           <BottomSheetView style={{ padding: 24, alignItems: 'center' }}>
             {status === 'success' ? (
@@ -736,7 +742,10 @@ export default function CheckinsScreen() {
 
                 {/* Done Button */}
                 <TouchableOpacity
-                  onPress={() => bottomSheetRef.current?.close()}
+                  onPress={() => {
+                    bottomSheetRef.current?.close();
+                    router.replace('/(tabs)');
+                  }}
                   activeOpacity={0.8}
                   className="mt-8 w-full items-center justify-center rounded-2xl bg-[#F6163C] py-4">
                   <Text className="font-bold text-base text-white">Done</Text>

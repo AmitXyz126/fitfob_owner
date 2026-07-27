@@ -62,7 +62,7 @@ export const userDetailsApi = {
       }
       return data;
     } catch (error: any) {
-      console.log('GET_ONBOARDING_STATUS error in getMe, checking club-owners fallback:', error?.response?.status, error?.message);
+      // console.log('GET_ONBOARDING_STATUS error in getMe, checking club-owners fallback:', error?.response?.status, error?.message);
 
       const currentUserId = useAuthStore.getState().user?.id;
       const currentUserEmail = useAuthStore.getState().user?.email;

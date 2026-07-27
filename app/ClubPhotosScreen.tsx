@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
 import { ChevronLeft, Image as ImageIcon, Plus, X } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Container } from '@/components/Container';
 import * as ImagePicker from 'expo-image-picker';
@@ -243,9 +244,10 @@ const ClubPhotosScreen = () => {
               {!item.isUploading && (
                 <TouchableOpacity 
                   onPress={() => removePhoto(item.id)}
-                  className="absolute top-2 right-2 bg-black/50 rounded-full p-1 z-10"
+                  activeOpacity={0.8}
+                  className="absolute top-2 right-2 h-7 w-7 items-center justify-center rounded-full bg-[#F6163C] border border-white/40 shadow-md z-10"
                 >
-                  <X size={14} color="white" />
+                  <Ionicons name="trash-outline" size={14} color="#FFFFFF" />
                 </TouchableOpacity>
               )}
             </View>
