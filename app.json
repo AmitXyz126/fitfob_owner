@@ -4,17 +4,10 @@
     "slug": "fitFob_owner",
     "version": "1.0.0",
     "jsEngine": "hermes",
-    "scheme": [
-      "fitfob_owner",
-      "fb2349725998870415"
-    ],
+    "scheme": ["fitfob_owner", "fb2349725998870415"],
     "facebookAppId": "2349725998870415",
     "facebookDisplayName": "fitfob_owner",
-    "platforms": [
-      "ios",
-      "android",
-      "web"
-    ],
+    "platforms": ["ios", "android", "web"],
     "web": {
       "bundler": "metro",
       "output": "static",
@@ -24,7 +17,23 @@
       "expo-router",
       "expo-font",
       "@react-native-community/datetimepicker",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.1026944446347-0cmronpk9hvtp7faf5dqcgsv84l2e9ns"
+        }
+      ],
+      [
+        "react-native-fbsdk-next",
+        {
+          "appID": "1017733454437395",
+          "clientToken": "51394908565334eb54ab6530f699c04d",
+          "displayName": "FitFob",
+          "scheme": "fb1017733454437395",
+          "iosUserTrackingPermission": "This identifier will be used to deliver personalized ads to you."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
@@ -37,14 +46,32 @@
       "image": "./assets/splash.png",
       "resizeMode": "contain"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.xyzstudio.fitfob",
       "googleServicesFile": "./GoogleService-Info.plist",
-      "config": {}
+      "config": {
+        "googleMapsApiKey": "AIzaSyB7liTs6ffq-vFE9VZH5rjbQ_ttSSFSb4o"
+      },
+      "infoPlist": {
+        "NSUserTrackingUsageDescription": "This identifier will be used to deliver personalized ads to you.",
+        "SKAdNetworkItems": [
+          {
+            "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "n38lu8286q.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "v9wttpbfk9.skadnetwork"
+          },
+          {
+            "SKAdNetworkIdentifier": "n38lu8286q.skadnetwork"
+          }
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "softwareKeyboardLayoutMode": "pan",
@@ -57,7 +84,8 @@
         "googleMaps": {
           "apiKey": ""
         }
-      }
+      },
+      "permissions": ["android.permission.INTERNET"]
     },
     "extra": {
       "router": {},

@@ -1,5 +1,6 @@
 import { storageAPI } from '@/utility/storage';
 import { create } from 'zustand';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
  interface User {
   id: number;
@@ -20,19 +21,43 @@ interface AuthStore {
 
 const STORAGE_KEY = 'authUser';
 
-export const useAuthStore = create<AuthStore>((set) => ({
+const clearUserDrafts = async () => {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const draftKeys = keys.filter(
+      (k) =>
+        k.includes('onboarding') ||
+        k.includes('club_profile') ||
+        k.includes('authUser')
+    );
+    if (draftKeys.length > 0) {
+      await AsyncStorage.multiRemove(draftKeys);
+    }
+  } catch (e) {
+    console.error('Error clearing user drafts:', e);
+  }
+};
+
+export const useAuthStore = create<AuthStore>((set, get) => ({
   user: null,
 
   setUser: async (user, rememberMe = false) => {
-     set({ user });
-
+    const currentUser = get().user;
     if (!user) {
+      set({ user: null });
       await storageAPI.removeItem(STORAGE_KEY);
+      await clearUserDrafts();
       return;
     }
 
+    if (currentUser && (currentUser.id !== user.id || currentUser.email !== user.email)) {
+      await clearUserDrafts();
+    }
+
+    set({ user });
+
     try {
-       const ttlMinutes = rememberMe ? undefined : 1440;
+      const ttlMinutes = rememberMe ? undefined : 1440;
       await storageAPI.setItem(STORAGE_KEY, JSON.stringify(user), ttlMinutes);
     } catch (error) {
       console.error('Failed to save user to storage', error);
@@ -41,10 +66,12 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
   logOut: async () => {
     try {
-      await storageAPI.removeItem(STORAGE_KEY);
       set({ user: null });
+      await storageAPI.removeItem(STORAGE_KEY);
+      await clearUserDrafts();
     } catch (error) {
       console.error('Logout failed', error);
+      set({ user: null });
     }
   },
 
@@ -53,13 +80,19 @@ export const useAuthStore = create<AuthStore>((set) => ({
       const storedUser = await storageAPI.getItem(STORAGE_KEY);
 
       if (storedUser) {
-         const parsedUser = typeof storedUser === 'string' ? JSON.parse(storedUser) : storedUser;
-
-        set({ user: parsedUser });
+        const parsedUser = typeof storedUser === 'string' ? JSON.parse(storedUser) : storedUser;
+        if (parsedUser && (parsedUser.token || parsedUser.jwt)) {
+          set({ user: parsedUser });
+        } else {
+          set({ user: null });
+        }
+      } else {
+        set({ user: null });
       }
     } catch (error) {
       console.error('Auth initialization failed:', error);
-       await storageAPI.removeItem(STORAGE_KEY);
+      await storageAPI.removeItem(STORAGE_KEY);
+      await clearUserDrafts();
       set({ user: null });
     }
   },

@@ -12,15 +12,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useLoginRequest, useGoogleAuthRequest, useFacebookAuthRequest } from '@/hooks/useAuth';
+import { useFacebookLogin, useGoogleLogin, useLoginRequest } from '@/hooks/useAuth';
 import Toast from 'react-native-toast-message';
 import { useAuthStore } from '@/store/useAuthStore';
-import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
-import * as Facebook from 'expo-auth-session/providers/facebook';
-import * as AuthSession from 'expo-auth-session';
-
-WebBrowser.maybeCompleteAuthSession();
+import { googleAuthService } from '@/services/googleAuth';
+import { facebookAuthService } from '@/services/facebookAuth';
+import GoogleButton from '@/components/modulues/GoogleButton';
+import FacebookButton from '@/components/modulues/FacebookButton';
 
 // 1. Validation Schema
 const loginSchema = z.object({
@@ -35,43 +33,11 @@ export default function Login() {
   const loginMutation = useLoginRequest();
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-
-  // Social Auth Hooks
-  const [googleRequest, googleResponse, googlePromptAsync] = Google.useIdTokenAuthRequest({
-    clientId: '694317966222-fr234kqdgdcn5hm5q9vb5vudqnq8c3b1.apps.googleusercontent.com',
-    redirectUri: 'https://auth.expo.io/@anonymous/fitFob_owner',
-  });
-  const [fbRequest, fbResponse, fbPromptAsync] = Facebook.useAuthRequest({
-    clientId: '1017733454437395',
-    responseType: AuthSession.ResponseType.Token,
-    redirectUri: 'https://auth.expo.io/@anonymous/fitFob_owner',
-  });
-
-  const googleAuthMutation = useGoogleAuthRequest();
-  const facebookAuthMutation = useFacebookAuthRequest();
-
-  // Handle Google Auth Response
-  React.useEffect(() => {
-    if (googleResponse?.type === 'success') {
-      const { idToken } = googleResponse.authentication || {};
-      if (idToken) {
-        googleAuthMutation.mutate({ token: idToken });
-      }
-    }
-  }, [googleResponse]);
-
-  // Handle Facebook Auth Response
-  React.useEffect(() => {
-    if (fbResponse?.type === 'success') {
-      const { accessToken } = fbResponse.authentication || {};
-      if (accessToken) {
-        facebookAuthMutation.mutate({ token: accessToken });
-      }
-    }
-  }, [fbResponse]);
+  const { mutate: googleLogin, isPending: googleIsPending } = useGoogleLogin();
+  const { mutate: facebookLogin, isPending: facebookIsPending } = useFacebookLogin();
 
   // Loading state shortcut
-  const isLoading = loginMutation.isPending || googleAuthMutation.isPending || facebookAuthMutation.isPending;
+  const isLoading = loginMutation.isPending || googleIsPending || facebookIsPending;
 
   // 2. Form Hook Setup
   const {
@@ -84,8 +50,6 @@ export default function Login() {
     defaultValues: { identifier: '', password: '' },
   });
 
-
-  const { setUser } = useAuthStore();
   const onSubmit = (data: LoginFormData) => {
     loginMutation.mutate(data, {
       onSuccess: () => {
@@ -142,6 +106,83 @@ export default function Login() {
       },
     });
   };
+
+   // Handle Google Login
+    const handleGoogleLogin = async () => {
+      console.log('Google Login: Button pressed.');
+      try {
+        console.log('Google Login: Triggering native Google Sign-In flow...');
+        const idToken = await googleAuthService.signIn();
+        console.log('Google Login: Obtained ID Token successfully. Sending to backend...');
+        googleLogin(
+          { idToken },
+          {
+            onSuccess: () => {
+              console.log('Google Login: Backend verification succeeded.');
+              Toast.show({
+                type: 'success',
+                text1: 'Google Login Success',
+                text2: 'Welcome back! 👋',
+              });
+            },
+            onError: (err: any) => {
+              console.error('Google Login: Backend verification failed:', err);
+              Toast.show({
+                type: 'error',
+                text1: 'Google Login Failed',
+                text2: err?.message || 'Google Login failed',
+              });
+            },
+          }
+        );
+      } catch (err: any) {
+        console.error('Google Login: Service error caught:', err);
+        if (err.message && err.message !== "User cancelled the Google Sign-In flow.") {
+          Toast.show({
+            type: 'error',
+            text1: 'Google Login Failed',
+            text2: err?.message || 'Google Login failed',
+          });
+        }
+      }
+    };
+  
+    // Handle Facebook Login
+    const handleFacebookLogin = async () => {
+      console.log('Facebook Login: Button pressed.');
+      try {
+        console.log('Facebook Login: Triggering native Facebook login...');
+        const credentials = await facebookAuthService.signIn();
+        console.log('Facebook Login: Obtained Facebook credentials. Sending to backend...');
+        facebookLogin(credentials, {
+          onSuccess: () => {
+            console.log('Facebook Login: Backend verification succeeded.');
+            Toast.show({
+              type: 'success',
+              text1: 'Facebook Login Success',
+              text2: 'Welcome back! 👋',
+            });
+          },
+          onError: (err: any) => {
+            console.error('Facebook Login: Backend verification failed:', err);
+            Toast.show({
+              type: 'error',
+              text1: 'Facebook Login Failed',
+              text2: err?.message || 'Facebook Login failed',
+            });
+          },
+        });
+      } catch (err: any) {
+        console.error('Facebook Login: Service error caught:', err);
+        if (err.message && !err.message.includes('cancelled')) {
+          Toast.show({
+            type: 'error',
+            text1: 'Facebook Login Failed',
+            text2: err?.message || 'Facebook Login failed',
+          });
+        }
+      }
+    };
 
   return (
     <Container>
@@ -266,20 +307,18 @@ export default function Login() {
         </View>
 
         {/* Social Buttons */}
-        <View className="mb-6 flex-row justify-between mt-2">
-          <TouchableOpacity
-            disabled={isLoading}
-            onPress={() => googlePromptAsync()}
-            className="h-14 flex-[0.47] items-center justify-center rounded-2xl bg-[#F2F2F2]">
-            <Image source={require('../../assets/images/Google.png')} className="h-6 w-6" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            disabled={isLoading}
-            onPress={() => fbPromptAsync()}
-            className="h-14 flex-[0.47] items-center justify-center rounded-2xl bg-[#F2F2F2]">
-            <Image source={require('../../assets/images/Facebook.png')} className="h-6 w-6" />
-          </TouchableOpacity>
-        </View>
+         <View className="mb-6 mt-2 flex-col gap-3">
+                  <GoogleButton
+                    onPress={handleGoogleLogin}
+                    isLoading={googleIsPending}
+                    disabled={isLoading}
+                  />
+                  <FacebookButton
+                    onPress={handleFacebookLogin}
+                    isLoading={facebookIsPending}
+                    disabled={isLoading}
+                  />
+                </View>
 
         {/* Footer */}
         <View className="flex-row justify-center pb-6">

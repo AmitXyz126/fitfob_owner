@@ -3,28 +3,21 @@ import {
   View,
   Text,
   TouchableOpacity,
-  FlatList,
   ActivityIndicator,
-  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useUserDetail } from '@/hooks/useUserDetail';
-import { useIsFocused } from '@react-navigation/native';
-
 interface Props {
   onAddMore: () => void;
 }
 
 export default function OnBoarding4_List({ onAddMore }: Props) {
-  const isFocused = useIsFocused();
   const { documents, isDocsLoading, refetchDocs } = useUserDetail();
 
-  // Auto-refresh when the screen comes into focus
+  // Auto-refresh when the screen mounts
   useEffect(() => {
-    if (isFocused) {
-      refetchDocs();
-    }
-  }, [isFocused]);
+    refetchDocs();
+  }, []);
 
   const docList = documents?.documents || documents?.data || documents || [];
 
@@ -32,7 +25,7 @@ export default function OnBoarding4_List({ onAddMore }: Props) {
     <View
       key={item?.id || item?._id || index.toString()}
       className="mb-3 flex-row items-center rounded-[20px] bg-[#F3F4F6] p-4">
-      <View className="items-center justify-center rounded-xl bg-white p-2 shadow-sm">
+      <View className="items-center justify-center rounded-xl bg-white p-2 border border-slate-100">
         <Ionicons name="document-text-outline" size={28} color="#6B7280" />
         <Text className="mt-[-4px] font-bold text-[8px] uppercase text-gray-500">
           {item?.fileType?.includes('pdf') ? 'PDF' : 'IMG'}
@@ -68,32 +61,23 @@ export default function OnBoarding4_List({ onAddMore }: Props) {
     <View className="flex-1 bg-white">
       <Text className="mb-6 font-bold text-2xl text-[#111827]">Uploaded Documents</Text>
 
-      <FlatList
-        data={docList}
-        renderItem={renderItem}
-        keyExtractor={(item, index) =>
-          item?.id?.toString() || item?._id?.toString() || index.toString()
-        }
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 20 }}
-        ListEmptyComponent={
+      <View className="pb-5">
+        {docList.length === 0 ? (
           <View className="items-center py-10">
             <Text className="text-gray-400">No documents uploaded yet.</Text>
           </View>
-        }
-        refreshControl={
-          <RefreshControl refreshing={isDocsLoading} onRefresh={refetchDocs} tintColor="#F6163C" />
-        }
-        ListFooterComponent={
-          <TouchableOpacity
-            onPress={onAddMore}
-            activeOpacity={0.7}
-            className="mt-2 flex-row items-center justify-center rounded-[15px] border border-dashed border-gray-300 bg-[#F3F4F6] py-4">
-            <Ionicons name="add" size={20} color="#6B7280" />
-            <Text className="ml-2 font-semibold text-[#6B7280]">Add More Documents</Text>
-          </TouchableOpacity>
-        }
-      />
+        ) : (
+          docList.map((item: any, index: number) => renderItem({ item, index }))
+        )}
+
+        <TouchableOpacity
+          onPress={onAddMore}
+          activeOpacity={0.7}
+          className="mt-4 flex-row items-center justify-center rounded-[15px] border border-dashed border-gray-300 bg-[#F3F4F6] py-4">
+          <Ionicons name="add" size={20} color="#6B7280" />
+          <Text className="ml-2 font-semibold text-[#6B7280]">Add More Documents</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }

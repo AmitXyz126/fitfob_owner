@@ -8,6 +8,7 @@ import { KeyboardAwareScrollView } from '@pietile-native-kit/keyboard-aware-scro
 import { useVerifyOtp, useResendOtp } from '@/hooks/useAuth';
 import Toast from 'react-native-toast-message';
 import { useAuthStore } from '@/store/useAuthStore';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function OtpScreen() {
   const router = useRouter();
@@ -15,6 +16,7 @@ export default function OtpScreen() {
   const { mutate: verifyMutation, isPending } = useVerifyOtp();
   const { mutate: resendMutation, isPending: isResending } = useResendOtp();
   const { setUser } = useAuthStore();
+  const queryClient = useQueryClient();
 
   const [timer, setTimer] = useState(60);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -110,6 +112,9 @@ export default function OtpScreen() {
           };
 
           setUser(userWithToken, true);
+
+          // Clear query cache to pull correct details with new token
+          queryClient.clear();
 
           Toast.show({
             type: 'success',
@@ -213,8 +218,9 @@ export default function OtpScreen() {
                 ref={(ref) => {
                   inputRefs.current[index] = ref;
                 }}
-                className={`h-14 w-12 rounded-lg border text-center font-bold text-xl text-slate-900 ${digit ? 'border-[#F6163C]' : 'border-slate-200'
-                  }`}
+                className={`h-14 w-12 rounded-lg border text-center font-bold text-xl text-slate-900 ${
+                  digit ? 'border-[#F6163C]' : 'border-slate-200'
+                }`}
                 keyboardType="number-pad"
                 maxLength={6}
                 value={digit ? digit.slice(-1) : ''}

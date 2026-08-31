@@ -8,9 +8,13 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+import { useAuthStore } from '@/store/useAuthStore';
+
+import { userDetailsApi } from '@/api/userdetailsApi';
 
 export default function Splash() {
   const router = useRouter();
+  const { initializeAuth } = useAuthStore();
 
   // Logo animation values
   const translateY = useSharedValue(40);
@@ -45,11 +49,61 @@ export default function Splash() {
       easing: Easing.inOut(Easing.ease),
     });
 
-    const t = setTimeout(() => {
-      router.replace('/welcome');
-    }, 1500);
+    const checkAuthAndNavigate = async () => {
+      try {
+        await initializeAuth();
+      } catch (error) {
+        console.error('Failed to initialize auth in splash:', error);
+      }
 
-    return () => clearTimeout(t);
+      setTimeout(async () => {
+        const currentUser = useAuthStore.getState().user;
+        if (currentUser && (currentUser.token || currentUser.jwt)) {
+          try {
+            const statusData = await userDetailsApi.getMe();
+            const verificationStatus =
+              statusData?.verification_status ||
+              statusData?.verificationStatus ||
+              currentUser?.verification_status;
+            const status = statusData?.status;
+            const isApproved =
+              statusData?.isApprovedOwner ||
+              verificationStatus === 'approved' ||
+              status === 'approved';
+
+            if (isApproved) {
+              router.replace('/(tabs)');
+              return;
+            }
+
+            if (verificationStatus === 'rejected' || status === 'rejected') {
+              router.replace('/RejectRequestScreen');
+              return;
+            }
+
+            if (
+              status === 'in_review' ||
+              status === 'pending' ||
+              status === 'completed' ||
+              verificationStatus === 'in_review' ||
+              verificationStatus === 'pending'
+            ) {
+              router.replace('/ReviewStatusScreen');
+              return;
+            }
+
+            router.replace('/onBoardingScreen/OnBoardingStep');
+          } catch (e) {
+            console.log('Error checking status in splash, defaulting to tabs:', e);
+            router.replace('/(tabs)');
+          }
+        } else {
+          router.replace('/welcome');
+        }
+      }, 1500);
+    };
+
+    checkAuthAndNavigate();
   }, []);
 
   return (

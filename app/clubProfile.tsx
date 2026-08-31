@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Image, TouchableOpacity, ScrollView, ImageBackground } from 'react-native';
+import React, { useState, useEffect, useRef, memo } from 'react';
+import { View, Text, Image, TouchableOpacity, ScrollView, ImageBackground, Dimensions, Animated, Easing, StyleSheet } from 'react-native';
 import {
   ChevronLeft,
   ChevronRight,
@@ -12,82 +12,433 @@ import {
   LogOut,
   SquarePen,
   FileText,
+  Lock,
+  Layers,
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Container } from '@/components/Container';
 import LineGradient from '@/components/lineGradient/LineGradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MaterialIcons } from '@expo/vector-icons';
- 
+import { MaterialIcons, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { useAuthStore } from '@/store/useAuthStore';
+import { useUserDetail } from '@/hooks/useUserDetail';
+
+const getServiceIcon = (name: string) => {
+  const lower = String(name).toLowerCase();
+  if (lower.includes('gym') || lower.includes('strength')) return 'barbell';
+  if (lower.includes('yoga') || lower.includes('tai chi')) return 'body';
+  if (lower.includes('dance') || lower.includes('salsa') || lower.includes('ballet') || lower.includes('barre')) return 'musical-notes';
+  if (lower.includes('pilates')) return 'accessibility';
+  if (lower.includes('zumba') || lower.includes('hiit') || lower.includes('cardio')) return 'flame';
+  if (lower.includes('spin') || lower.includes('cycle')) return 'bicycle';
+  if (lower.includes('box') || lower.includes('kick') || lower.includes('martial')) return 'fitness';
+  if (lower.includes('aqua') || lower.includes('pool') || lower.includes('swim')) return 'water';
+  if (lower.includes('cross') || lower.includes('climb')) return 'trophy';
+  return 'sparkles';
+};
+
+const FitnessServicePills = memo(({ services }: { services?: any }) => {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.05, duration: 1200, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1200, useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [pulseAnim]);
+
+  let items = services;
+
+  if (!items) return null;
+
+  if (typeof items === 'string') {
+    try {
+      items = JSON.parse(items);
+    } catch {
+      items = [items];
+    }
+  }
+  if (!Array.isArray(items) || items.length === 0) {
+    return null;
+  }
+
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
+      {items.map((item: string, idx: number) => {
+        const iconName = getServiceIcon(item);
+        return (
+          <Animated.View
+            key={`${item}-${idx}`}
+            style={{
+              transform: [{ scale: pulseAnim }],
+            }}>
+            <View className="flex-row items-center rounded-full border border-white/40 bg-white/25 px-3 py-1.5 backdrop-blur-md shadow-sm">
+              <Ionicons name={iconName as any} size={14} color="#FFF" style={{ marginRight: 5 }} />
+              <Text className="font-sans font-bold text-[12px] text-white tracking-wide">{item}</Text>
+            </View>
+          </Animated.View>
+        );
+      })}
+    </ScrollView>
+  );
+});
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+const FLOATING_ICONS = [
+  'dumbbell',
+  'kettlebell',
+  'weight',
+  'heart-flash',
+  'run',
+  'arm-flex',
+  'trophy-outline',
+  'clock-outline',
+];
+
+const PREMIUM_COLORS = [
+  '#F6163C', // Brand Crimson
+  '#FF7A00', // Premium Orange/Amber
+  '#FFD700', // Gold
+  '#10B981', // Energetic Green
+  '#3B82F6', // Focus Blue
+  '#8B5CF6', // Power Purple
+];
+
+const GymBackgroundAnimation = memo(() => {
+  const items = useRef(
+    Array.from({ length: 15 }).map((_, i) => {
+      const boxSize = Math.random() * 20 + 64; // Larger random size from 64 to 84
+      return {
+        id: i,
+        icon: FLOATING_ICONS[i % FLOATING_ICONS.length],
+        color: PREMIUM_COLORS[i % PREMIUM_COLORS.length],
+        boxSize: boxSize,
+        iconSize: boxSize * 0.46,
+        borderRadius: boxSize * 0.28,
+        left: Math.random() * (SCREEN_WIDTH - 90),
+        yAnim: new Animated.Value(SCREEN_HEIGHT + 100),
+        rotAnim: new Animated.Value(0),
+        swayAnim: new Animated.Value(0),
+        opacityAnim: new Animated.Value(0),
+        duration: Math.random() * 5000 + 13000, // 13s to 18s (staggered speed)
+        delay: Math.random() * 5000,
+      };
+    })
+  ).current;
+
+  useEffect(() => {
+    items.forEach((item) => {
+      // Loop sequence
+      const runCycle = (isFirstRun = false) => {
+        item.yAnim.setValue(SCREEN_HEIGHT + 100);
+        item.rotAnim.setValue(0);
+        item.swayAnim.setValue(0);
+        item.opacityAnim.setValue(0);
+
+        Animated.sequence([
+          isFirstRun ? Animated.delay(item.delay) : Animated.delay(0),
+          Animated.parallel([
+            // 1. Move Y (upwards)
+            Animated.timing(item.yAnim, {
+              toValue: -150,
+              duration: item.duration,
+              easing: Easing.linear,
+              useNativeDriver: true,
+            }),
+            // 2. Rotate continuously
+            Animated.timing(item.rotAnim, {
+              toValue: 360,
+              duration: item.duration,
+              easing: Easing.linear,
+              useNativeDriver: true,
+            }),
+            // 3. Opacity (fade in at bottom, stay constant, fade out at top)
+            Animated.sequence([
+              Animated.timing(item.opacityAnim, {
+                toValue: 0.22, // Watermark peak opacity
+                duration: item.duration * 0.15,
+                useNativeDriver: true,
+              }),
+              Animated.delay(item.duration * 0.7),
+              Animated.timing(item.opacityAnim, {
+                toValue: 0,
+                duration: item.duration * 0.15,
+                useNativeDriver: true,
+              }),
+            ]),
+            // 4. Sway left and right dynamically ("idr udr")
+            Animated.sequence([
+              Animated.timing(item.swayAnim, {
+                toValue: Math.random() * 40 + 20, // Sway right
+                duration: item.duration * 0.25,
+                easing: Easing.inOut(Easing.ease),
+                useNativeDriver: true,
+              }),
+              Animated.timing(item.swayAnim, {
+                toValue: -(Math.random() * 40 + 20), // Sway left
+                duration: item.duration * 0.5,
+                easing: Easing.inOut(Easing.ease),
+                useNativeDriver: true,
+              }),
+              Animated.timing(item.swayAnim, {
+                toValue: 0,
+                duration: item.duration * 0.25,
+                easing: Easing.inOut(Easing.ease),
+                useNativeDriver: true,
+              }),
+            ]),
+          ]),
+        ]).start(() => {
+          // Restart loop immediately without delay on subsequent loops
+          runCycle(false);
+        });
+      };
+
+      runCycle(true);
+    });
+  }, [items]);
+
+  return (
+    <View style={[StyleSheet.absoluteFillObject, { zIndex: -1 }]} pointerEvents="none">
+      {items.map((item) => {
+        const spin = item.rotAnim.interpolate({
+          inputRange: [0, 360],
+          outputRange: ['0deg', '360deg'],
+        });
+
+        return (
+          <Animated.View
+            key={item.id}
+            style={{
+              position: 'absolute',
+              left: item.left,
+              width: item.boxSize,
+              height: item.boxSize,
+              alignItems: 'center',
+              justifyContent: 'center',
+              transform: [
+                { translateY: item.yAnim },
+                { translateX: item.swayAnim },
+                { rotate: spin },
+              ],
+              opacity: item.opacityAnim,
+            }}
+          >
+            <MaterialCommunityIcons name={item.icon as any} size={item.iconSize} color={item.color} />
+          </Animated.View>
+        );
+      })}
+    </View>
+  );
+});
+const MenuOption = memo(({
+  icon: Icon,
+  title,
+  value,
+  showBadge = false,
+  showArrow = true,
+  onPress,
+}: any) => (
+  <TouchableOpacity
+    onPress={onPress}
+    activeOpacity={onPress ? 0.7 : 1}
+    className="flex-row items-center justify-between py-4">
+    <View className="flex-1 flex-row items-center">
+      <View className="mr-4 rounded-xl bg-[#E237441F] p-2">
+        <Icon size={20} color="#EF4444" />
+      </View>
+      <Text className="flex-1 font-medium text-base text-[#697281]" numberOfLines={1}>
+        {title}
+      </Text>
+    </View>
+
+    <View className="flex-row items-center">
+      {value && <Text className="mr-2 text-sm text-gray-400">{value}</Text>}
+      {showBadge && (
+        <View className="mr-1">
+          <Image
+            source={require('../assets/images/tick.png')}
+            className="h-6 w-6"
+            resizeMode="contain"
+          />
+        </View>
+      )}
+      {showArrow && <ChevronRight size={20} color="#6B7280" />}
+    </View>
+  </TouchableOpacity>
+));
+
 const ClubProfileScreen = () => {
   const router = useRouter();
 
   // --- States for Dynamic Data ---
-  const [clubInfo, setClubInfo] = useState({
+  const { user } = useAuthStore();
+  const { profileStatus } = useUserDetail();
+  const pData = profileStatus?.data || profileStatus || {};
+
+  const [clubInfo, setClubInfo] = useState<{
+    name: string;
+    image: string | null;
+    address: string;
+  }>({
     name: 'Loading...',
     image: null,
     address: 'Fetching address...',
   });
 
+  const getDisplayName = () => {
+    const rawName = profileStatus?.ownerName || user?.username || 'User';
+    const namePart = rawName.includes('@') ? rawName.split('@')[0] : rawName;
+    if (/^\+?[0-9]+$/.test(namePart)) {
+      return 'User';
+    }
+    const cleanedName = namePart
+      .replace(/[0-9]/g, '')
+      .replace(/[._-]/g, ' ')
+      .split(' ')
+      .filter(Boolean)
+      .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+    return cleanedName || 'User';
+  };
+
+  const ownerName = getDisplayName();
+  const ownerEmail = user?.email || profileStatus?.email || 'owner@fitfob.com';
+
+  const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
+  const [servicesList, setServicesList] = useState<any>(null);
+
+  const getImageUriString = (val: any): string => {
+    if (!val) return '';
+    let str = '';
+    if (typeof val === 'string') {
+      str = val;
+    } else if (typeof val === 'object') {
+      str = val.uri || val.url || val.path || val.src || '';
+    }
+    if (!str) return '';
+    if (str.startsWith('/')) {
+      const baseUrl = process.env.EXPO_PUBLIC_API_URL || '';
+      if (baseUrl) {
+        const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+        return `${cleanBase}${str}`;
+      }
+    }
+    return str;
+  };
+
   // --- Fetch Data from Onboarding ---
   useEffect(() => {
     const loadClubData = async () => {
       try {
+        let logoFromStorage: any = null;
+        let addressFromStorage: string | null = null;
+        let clubNameFromStorage: string | null = null;
+        let servicesFromStorage: string[] | null = null;
+
         const savedData = await AsyncStorage.getItem('club_profile');
         if (savedData) {
           const parsedData = JSON.parse(savedData);
-          setClubInfo({
-            name: parsedData.clubName || 'Anytime Fitness Gym',
-            image: parsedData.image || null,
-            address: parsedData.address || '1234 Park Street, Mohali',
-          });
+          if (parsedData.image) logoFromStorage = parsedData.image;
+          if (parsedData.logo) logoFromStorage = parsedData.logo;
+          if (parsedData.address) addressFromStorage = parsedData.address;
+          if (parsedData.clubName) clubNameFromStorage = parsedData.clubName;
+          if (parsedData.services) servicesFromStorage = parsedData.services;
         }
+
+        const userKey = profileStatus?.id || profileStatus?.pendingClubOwnerId || user?.id || user?.email || '';
+        const keys = await AsyncStorage.getAllKeys();
+
+        // Step 1
+        const step1Keys = keys.filter((k) => k.includes('onboarding_step1_data'));
+        let step1Key = userKey ? step1Keys.find((k) => k.includes(String(userKey))) : null;
+        if (step1Key) {
+          const step1Json = await AsyncStorage.getItem(step1Key);
+          if (step1Json) {
+            const parsedStep1 = JSON.parse(step1Json);
+            if (!logoFromStorage) {
+              logoFromStorage = parsedStep1.image || parsedStep1.logo || parsedStep1.logoUrl || parsedStep1.logoId;
+            }
+            if (!clubNameFromStorage) {
+              clubNameFromStorage = parsedStep1.clubName || parsedStep1.name;
+            }
+          }
+        }
+
+        // Step 3 (Services & Amenities)
+        const step3Keys = keys.filter((k) => k.includes('onboarding_step3_data'));
+        let step3Key = userKey ? step3Keys.find((k) => k.includes(String(userKey))) : null;
+        if (step3Key && !servicesFromStorage) {
+          const step3Json = await AsyncStorage.getItem(step3Key);
+          if (step3Json) {
+            const parsedStep3 = JSON.parse(step3Json);
+            if (parsedStep3.fitnessTypes && Array.isArray(parsedStep3.fitnessTypes)) {
+              servicesFromStorage = parsedStep3.fitnessTypes;
+            } else if (parsedStep3.services) {
+              servicesFromStorage = parsedStep3.services;
+            }
+          }
+        }
+
+        const pData = profileStatus?.data || profileStatus || {};
+        const rawLogo =
+          pData?.logoUrl ||
+          pData?.logo ||
+          pData?.logo_url ||
+          pData?.pendingClubOwner?.logoUrl ||
+          pData?.pendingClubOwner?.logo ||
+          logoFromStorage ||
+          null;
+
+        const finalLogoUri = getImageUriString(rawLogo);
+
+        setProfileImageUri(finalLogoUri || null);
+        setImageError(false);
+
+        const resolvedServices =
+          pData?.services ||
+          pData?.fitnessTypes ||
+          pData?.pendingClubOwner?.services ||
+          pData?.pendingClubOwner?.fitnessTypes ||
+          servicesFromStorage;
+
+        if (resolvedServices) {
+          setServicesList(resolvedServices);
+        } else {
+          setServicesList(null);
+        }
+
+        const resolvedClubName =
+          pData?.clubName ||
+          pData?.club_name ||
+          pData?.pendingClubOwner?.clubName ||
+          clubNameFromStorage ||
+          'Fitness Club';
+
+        setClubInfo({
+          name: resolvedClubName,
+          image: finalLogoUri,
+          address: pData?.clubAddress || addressFromStorage || 'Your Club Location',
+        });
       } catch (error) {
-        console.error('Failed to load club data', error);
+        console.error('Failed to load club profile data', error);
       }
     };
     loadClubData();
-  }, []);
-
-  const MenuOption = ({
-    icon: Icon,
-    title,
-    value,
-    showBadge = false,
-    showArrow = true,
-    onPress,
-  }: any) => (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={onPress ? 0.7 : 1}
-      className="flex-row items-center justify-between py-4">
-      <View className="flex-1 flex-row items-center">
-        <View className="mr-4 rounded-xl bg-[#E237441F] p-2">
-          <Icon  size={20} color="#EF4444"  />
-        </View>
-        <Text className="flex-1 font-medium text-base text-[#697281]" numberOfLines={1}>
-          {title}
-        </Text>
-      </View>
-
-      <View className="flex-row items-center">
-        {value && <Text className="mr-2 text-sm text-gray-400">{value}</Text>}
-        {showBadge && (
-          <View className="mr-1">
-            <Image
-              source={require('../assets/images/tick.png')}
-              className="h-6 w-6"
-              resizeMode="contain"
-            />
-          </View>
-        )}
-        {showArrow && <ChevronRight size={20} color="#6B7280" />}
-      </View>
-    </TouchableOpacity>
-  );
+  }, [profileStatus, user]);
 
   return (
     <Container>
+      <GymBackgroundAnimation />
       {/* Header */}
       <View className="relative mb-4 flex-row items-center py-4">
         <TouchableOpacity onPress={() => router.back()} className="absolute left-0 z-10 p-2">
@@ -106,7 +457,7 @@ const ClubProfileScreen = () => {
         <View className="mb-2 overflow-hidden rounded-[16px]">
           <ImageBackground
             source={require('../assets/images/bgprofile.png')}
-            className=" justify-center p-4"
+            className="justify-center p-4"
             resizeMode="cover">
             <View className="flex-row items-center">
               <View className="relative">
@@ -115,13 +466,15 @@ const ClubProfileScreen = () => {
                   onPress={() => router.push('/EditClubDetails')}>
                   <View className="h-16 w-16 items-center justify-center rounded-full border-2 border-white/50 bg-white/30">
                     <Image
-                      // --- DYNAMIC IMAGE ---
+                      // --- DYNAMIC IMAGE WITH FALLBACK ON ERROR ---
                       source={
-                        clubInfo.image
-                          ? { uri: clubInfo.image }
-                          : { uri: 'https://i.pravatar.cc/100?u=fitness' }
+                        profileImageUri && !imageError
+                          ? { uri: profileImageUri }
+                          : require('../assets/images/fitfob_profile.png')
                       }
+                      onError={() => setImageError(true)}
                       className="h-14 w-14 rounded-full"
+                      resizeMode={profileImageUri && !imageError ? 'cover' : 'contain'}
                     />
 
                     <View className="absolute bottom-0 right-0 rounded-full border border-white bg-[#F6163C] p-1">
@@ -129,29 +482,39 @@ const ClubProfileScreen = () => {
                     </View>
                   </View>
                 </TouchableOpacity>
-                <TouchableOpacity className="absolute -bottom-1 -right-1 rounded-full bg-white p-1.5 shadow-md">
+                <TouchableOpacity
+                  onPress={() => router.push('/EditClubDetails')}
+                  className="absolute -bottom-1 -right-1 rounded-full bg-white p-1.5 shadow-md">
                   <SquarePen size={14} color="#EF4444" strokeWidth={2.5} />
                 </TouchableOpacity>
               </View>
 
               <View className="ml-4 flex-1">
-                <View className="flex-row items-center">
-                  {/* --- DYNAMIC NAME --- */}
-                  <Text className="mr-2 font-bold text-xl text-white">{clubInfo.name}</Text>
-                  <Image className="h-5 w-5" source={require('../assets/images/white-tick.png')} />
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-row items-center">
+                    {/* --- DYNAMIC NAME --- */}
+                    <Text className="mr-2 font-bold text-xl text-white">{ownerName}</Text>
+                    <Image className="h-5 w-5" source={require('../assets/images/white-tick.png')} />
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => router.push('/EditClubDetails')}
+                    className="flex-row items-center rounded-full bg-white/20 px-3 py-1 border border-white/30">
+                    <SquarePen size={12} color="#FFF" style={{ marginRight: 4 }} />
+                    <Text className="font-semibold text-[11px] text-white">Edit Details</Text>
+                  </TouchableOpacity>
                 </View>
-                <Text className="text-sm text-white/90">anytimefitnessgym@gmail.com</Text>
+                <Text className="text-sm text-white/90">{ownerEmail}</Text>
               </View>
             </View>
-            <View className="my-4">
+            <View className="my-3">
               <LineGradient isWhite={true} />
             </View>
-            <Text className="text-[14px] font-normal text-white">Gym, Yoga, Dance, Pilates</Text>
+            <FitnessServicePills services={servicesList} />
           </ImageBackground>
         </View>
 
         {/* Menu Section */}
-        <View className="mb-16 rounded-3xl bg- px-4 py-2">
+        <View className="mb-16 rounded-3xl  px-4 py-2">
           {/* --- DYNAMIC ADDRESS --- */}
           <MenuOption
             onPress={() => router.push('/ClubLocationScreen')}
@@ -171,19 +534,36 @@ const ClubProfileScreen = () => {
             icon={ShieldCheck}
             title="Verification Status"
             showBadge={true}
-            showArrow={false}
+            showArrow={true}
+            onPress={() => router.push('/verificationStatus')}
           />
           <LineGradient />
 
           <MenuOption
             icon={FileText}
             title="Documents"
+            onPress={() => router.push('/documents')}
           />
           <LineGradient />
-          <MenuOption icon={Clock} title="Timings" />
+          <MenuOption
+            icon={Clock}
+            title="Timings"
+            onPress={() => router.push('/clubTimings')}
+          />
           <LineGradient />
 
-          <MenuOption icon={Wifi} title="Amenities" />
+          <MenuOption
+            icon={Wifi}
+            title="Amenities"
+            onPress={() => router.push('/clubAmenities')}
+          />
+          <LineGradient />
+
+          <MenuOption
+            icon={Layers}
+            title="Club Types & Services"
+            onPress={() => router.push('/clubServices')}
+          />
           <LineGradient />
 
           <MenuOption
@@ -191,18 +571,32 @@ const ClubProfileScreen = () => {
             title="Your Account"
             onPress={() => router.push('/ManageBankScreen')}
           />
-        </View>
+          <LineGradient />
 
+          <MenuOption
+            icon={Lock}
+            title="Change Password"
+            onPress={() => router.push('/ChangePasswordScreen')}
+          />
+        </View>
+      </ScrollView>
+
+      {/* Logout Button (Fixed at bottom) */}
+      <View className="bg-white py-4 border-t border-slate-50">
         <TouchableOpacity
           onPress={async () => {
+            await useAuthStore.getState().logOut();
             await AsyncStorage.clear();
-            router.replace('../../');
+            if (router.canGoBack()) {
+              router.dismissAll();
+            }
+            router.replace('/welcome');
           }}
-          className=" mt-10 flex-row items-center justify-center rounded-[8px] bg-[#F8F8F8] py-4">
+          className="flex-row items-center justify-center rounded-[8px] bg-[#F8F8F8] py-4">
           <LogOut size={20} color="#94A3B8" />
           <Text className="ml-2 font-bold text-base text-gray-400">Logout</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </View>
     </Container>
   );
 };

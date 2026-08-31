@@ -1,10 +1,11 @@
 /* eslint-disable no-unused-expressions */
-import React, { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Platform, Modal } from 'react-native';
+import { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Platform, Modal, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import LineGradient from '../lineGradient/LineGradient';
 import { useUserDetail } from '@/hooks/useUserDetail';
+import { useAuthStore } from '@/store/useAuthStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Props interface for TypeScript safety
@@ -15,9 +16,10 @@ interface OnBoarding3Props {
 
 const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
   const { initialData } = props;
-  const { submitStep4, userData } = useUserDetail();
+  const { submitStep4, profileStatus: userData } = useUserDetail();
+  const { user } = useAuthStore();
   const userId = userData?.id || userData?.pendingClubOwnerId;
-  const STORAGE_KEY = `@onboarding_step3_data_${userId || 'guest'}`;
+  const STORAGE_KEY = `@onboarding_step3_data_${userId || user?.id || user?.email || 'guest'}`;
 
   // --- NEW STATE FOR CLUB CATEGORY ---
   const [clubCategory, setClubCategory] = useState('Luxury');
@@ -37,13 +39,24 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
 
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // 1. Initial Load from initialData (Parent/API) or Local Storage
+  // 1. Initial Load from Local Storage (Priority 1) or initialData (Fallback)
   useEffect(() => {
     const initData = async () => {
-      // Priority 1: initialData (from Parent/API)
+      if (isInitialized) return;
+
+      const saved = await AsyncStorage.getItem(STORAGE_KEY);
       const data = initialData || userData;
 
-      if (data && data.clubCategory) {
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setClubCategory(parsed.clubCategory || 'Luxury');
+        setFitnessTypes(parsed.fitnessTypes || ['Gym']);
+        setAmenities(parsed.amenities || ['Parking', 'Wi-Fi']);
+        setStartTime(parsed.startTime || new Date().setHours(5, 0));
+        setEndTime(parsed.endTime || new Date().setHours(22, 0));
+        setWeekdayRange(parsed.weekdayRange || 'Monday to Friday');
+        setWeekendRange(parsed.weekendRange || 'Saturday & Sunday');
+      } else if (data && data.clubCategory) {
         setClubCategory(data.clubCategory);
         setFitnessTypes(data.services || []);
         setAmenities(data.facilities || []);
@@ -57,22 +70,8 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
         }
         setWeekdayRange(data.weekday || 'Monday to Friday');
         setWeekendRange(data.weekend || 'Saturday & Sunday');
-        setIsInitialized(true);
-      } else if (!isInitialized) {
-        // Priority 2: Local Storage Draft (only if no server data yet)
-        const saved = await AsyncStorage.getItem(STORAGE_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          setClubCategory(parsed.clubCategory || 'Luxury');
-          setFitnessTypes(parsed.fitnessTypes || ['Gym']);
-          setAmenities(parsed.amenities || ['Parking', 'Wi-Fi']);
-          setStartTime(parsed.startTime || new Date().setHours(5, 0));
-          setEndTime(parsed.endTime || new Date().setHours(22, 0));
-          setWeekdayRange(parsed.weekdayRange || 'Monday to Friday');
-          setWeekendRange(parsed.weekendRange || 'Saturday & Sunday');
-        }
-        setIsInitialized(true);
       }
+      setIsInitialized(true);
     };
     initData();
   }, [initialData, userData, isInitialized, STORAGE_KEY]);
@@ -135,7 +134,7 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
     return { time: `${strHours}:${strMinutes}`, ampm };
   };
 
-  // --- FIXED: EXPOSE SAVE METHOD WITH SUCCESS CALLBACK ---
+  // --- FIXED: EXPOSE SAVE METHOD WITH SUCCESS CALLBACK AND VALIDATIONS ---
   useImperativeHandle(ref, () => ({
     getFormData: () => ({
       clubCategory,
@@ -147,6 +146,22 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
       weekendRange,
     }),
     handleSave: () => {
+      // ⚠️ Validation Check for Fitness Club Type (At least 1 required e.g. Gym)
+      if (!fitnessTypes || fitnessTypes.length === 0) {
+        return Alert.alert(
+          'Required',
+          'Please select at least one fitness service (e.g. Gym or Yoga).'
+        );
+      }
+
+      // ⚠️ Validation Check for Amenities (At least 1 required)
+      if (!amenities || amenities.length === 0) {
+        return Alert.alert(
+          'Required',
+          'Please select at least one amenity (e.g. Parking or Wi-Fi).'
+        );
+      }
+
       const payload = {
         clubCategory: clubCategory,
         services: fitnessTypes,
@@ -171,12 +186,13 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
   }));
 
   const onTimeChange = (event: any, selectedDate?: Date) => {
+    const currentPicker = showPicker;
     if (Platform.OS === 'android') {
       setShowPicker(null);
     }
-    if (selectedDate) {
-      if (showPicker === 'start') setStartTime(selectedDate.getTime());
-      if (showPicker === 'end') setEndTime(selectedDate.getTime());
+    if (selectedDate && currentPicker) {
+      if (currentPicker === 'start') setStartTime(selectedDate.getTime());
+      if (currentPicker === 'end') setEndTime(selectedDate.getTime());
     }
   };
 
@@ -235,30 +251,63 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
           <Text className="mb-2 ml-1 font-sans text-sm font-normal text-[#697281]">
             Type of Fitness club
           </Text>
-          {['Gym', 'Yoga', 'Pilates', 'Dance', 'Kickboxing', 'Zumba', 'Climbing', 'Spin'].map(
-            (item) => (
-              <CheckboxItem
-                key={item}
-                label={item}
-                isSelected={fitnessTypes.includes(item)}
-                onPress={() => toggleSelection(item, fitnessTypes, setFitnessTypes)}
-              />
-            )
-          )}
+          {[
+            'Gym',
+            'Yoga',
+            'Dance',
+            'Pilates',
+            'Kickboxing',
+            'Zumba',
+            'Spin',
+            'Barre',
+            'Aqua Aerobics',
+            'Martial Arts',
+            'Salsa',
+            'Strength Training',
+            'CrossFit',
+            'Tai Chi',
+            'Boxing',
+            'HIIT',
+            'Ballet',
+            'Climbing',
+          ].map((item) => (
+            <CheckboxItem
+              key={item}
+              label={item}
+              isSelected={fitnessTypes.includes(item)}
+              onPress={() => toggleSelection(item, fitnessTypes, setFitnessTypes)}
+            />
+          ))}
         </View>
 
         <View className="mb-6">
           <Text className="mb-2 ml-1 font-sans text-sm font-normal text-[#697281]">Amenities</Text>
-          {['Parking', 'Wi-Fi', 'Showers', 'AC', 'Trainers', 'Pool', 'Restrooms', 'Breakfast'].map(
-            (item) => (
-              <CheckboxItem
-                key={item}
-                label={item}
-                isSelected={amenities.includes(item)}
-                onPress={() => toggleSelection(item, amenities, setAmenities)}
-              />
-            )
-          )}
+          {[
+            'Bar',
+            'Pet-Friendly',
+            '24-Hour Reception',
+            'Parking',
+            'Wi-Fi',
+            'AC',
+            'Breakfast',
+            'Airport Shuttle',
+            'Laundry',
+            'Restrooms',
+            'Pool',
+            'Gym',
+            'Room',
+            'Conference',
+            'Spa',
+            'Showers',
+            'Trainers',
+          ].map((item) => (
+            <CheckboxItem
+              key={item}
+              label={item}
+              isSelected={amenities.includes(item)}
+              onPress={() => toggleSelection(item, amenities, setAmenities)}
+            />
+          ))}
         </View>
 
         <View className="mb-10">
@@ -369,15 +418,14 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
                 }}
                 className="flex-row items-center justify-between border-b border-slate-50 py-5">
                 <Text
-                  className={`text-[16px] ${
-                    (showCategoryModal
-                      ? clubCategory
-                      : showDayModal === 'weekday'
-                        ? weekdayRange
-                        : weekendRange) === option
-                      ? 'font-bold text-[#F6163C]'
-                      : 'text-slate-700'
-                  }`}>
+                  className={`text-[16px] ${(showCategoryModal
+                    ? clubCategory
+                    : showDayModal === 'weekday'
+                      ? weekdayRange
+                      : weekendRange) === option
+                    ? 'font-bold text-[#F6163C]'
+                    : 'text-slate-700'
+                    }`}>
                   {option}
                 </Text>
                 {(showCategoryModal
@@ -385,8 +433,8 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
                   : showDayModal === 'weekday'
                     ? weekdayRange
                     : weekendRange) === option && (
-                  <Ionicons name="checkmark-circle" size={24} color="#F6163C" />
-                )}
+                    <Ionicons name="checkmark-circle" size={24} color="#F6163C" />
+                  )}
               </TouchableOpacity>
             ))}
           </View>

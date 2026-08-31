@@ -12,16 +12,55 @@ import OnBoarding5 from '@/components/screen/OnBoarding5';
 import { KeyboardAwareScrollView } from '@pietile-native-kit/keyboard-aware-scrollview';
 import { useRouter } from 'expo-router';
 import { useState, useRef, useEffect } from 'react';
-import { TouchableOpacity, View } from 'react-native';
+import { TouchableOpacity, View, ActivityIndicator, BackHandler } from 'react-native';
 import { useUserDetail } from '@/hooks/useUserDetail';
 import { useAuthStore } from '@/store/useAuthStore';
+import GymLoader from '@/components/GymLoader';
+import { useMutationState } from '@tanstack/react-query';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function OnBoardingStep() {
   const router = useRouter();
+  const pendingMutations = useMutationState({
+    filters: { status: 'pending' },
+  });
+  const isLoading = pendingMutations.length > 0;
   const [step, setStep] = useState(1);
   const [subStep, setSubStep] = useState(1);
+  const [hasCheckedDocuments, setHasCheckedDocuments] = useState(false);
   const totalSteps = 5;
   const { user } = useAuthStore();
+
+  // --- Step Mapping Helpers (Backend vs Frontend) ---
+  const mapApiStepToFrontend = (apiStep: number) => {
+    switch (apiStep) {
+      case 1:
+        return { step: 1, subStep: 1 };
+      case 2:
+        return { step: 2, subStep: 1 };
+      case 3:
+        return { step: 2, subStep: 2 };
+      case 4:
+        return { step: 3, subStep: 1 };
+      case 5:
+        return { step: 4, subStep: 1 };
+      case 6:
+        return { step: 4, subStep: 2 };
+      case 7:
+        return { step: 5, subStep: 1 };
+      default:
+        return { step: 1, subStep: 1 };
+    }
+  };
+
+  const mapFrontendToApiStep = (stepVal: number, subStepVal: number) => {
+    if (stepVal === 1) return 1;
+    if (stepVal === 2) return subStepVal === 1 ? 2 : 3;
+    if (stepVal === 3) return 4;
+    if (stepVal === 4) return subStepVal === 1 ? 5 : 6;
+    if (stepVal === 5) return 7;
+    return 1;
+  };
 
   // --- 1. Centralized Parent State ---
   const [formData, setFormData] = useState<any>({});
@@ -41,6 +80,8 @@ export default function OnBoardingStep() {
     submitStep7,
     confirmDocs,
     profileStatus,
+    isFetchingStatus,
+    documents,
   } = useUserDetail();
 
   // --- 2. Sync Global State with API Once ---
@@ -51,62 +92,166 @@ export default function OnBoardingStep() {
       setFormData(profileStatus);
       setIsDataSynced(true);
 
-      if (profileStatus.currentStep && profileStatus.currentStep > 1) {
-        setStep(profileStatus.currentStep);
-      }
+      const loadSavedProgress = async () => {
+        try {
+          const savedStep = await AsyncStorage.getItem(`@onboarding_current_step_${user?.id}`);
+          const savedSubStep = await AsyncStorage.getItem(`@onboarding_current_substep_${user?.id}`);
+
+          const apiStep = profileStatus.currentStep || 1;
+          const backendMapped = mapApiStepToFrontend(apiStep);
+
+          if (savedStep) {
+            const parsedStep = parseInt(savedStep);
+            const parsedSubStep = savedSubStep ? parseInt(savedSubStep) : 1;
+            const savedApiVal = mapFrontendToApiStep(parsedStep, parsedSubStep);
+
+            if (savedApiVal >= apiStep && parsedStep <= 5) {
+              setStep(parsedStep);
+              setSubStep(parsedSubStep);
+              return;
+            }
+          }
+
+          setStep(backendMapped.step);
+          setSubStep(backendMapped.subStep);
+        } catch (e) {
+          console.log('Error loading onboarding progress', e);
+        }
+      };
+
+      loadSavedProgress();
     }
-  }, [profileStatus]);
+  }, [profileStatus, user]);
+
+  // --- Save Onboarding Progress ---
+  useEffect(() => {
+    if (!user?.id) return;
+    const saveProgress = async () => {
+      try {
+        await AsyncStorage.setItem(`@onboarding_current_step_${user.id}`, String(step));
+        await AsyncStorage.setItem(`@onboarding_current_substep_${user.id}`, String(subStep));
+      } catch (e) {
+        console.log('Error saving onboarding progress', e);
+      }
+    };
+    saveProgress();
+  }, [step, subStep, user]);
+
+  // Hardware Back Handler for incomplete onboarding
+  useEffect(() => {
+    const onBackPress = () => {
+      const isCompleted =
+        profileStatus?.status === 'completed' ||
+        profileStatus?.status === 'approved' ||
+        profileStatus?.isApprovedOwner ||
+        profileStatus?.verification_status === 'approved' ||
+        profileStatus?.verification_status === 'pending';
+
+      if (!isCompleted && step === 1 && subStep === 1) {
+        useAuthStore.getState().logOut().then(() => {
+          router.replace('/welcome');
+        });
+        return true;
+      }
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [step, subStep, profileStatus]);
 
   //  useEffect
   useEffect(() => {
     if (!user) return;
     if (!profileStatus) return;
-    console.log(user, 'user data');
-    console.log(profileStatus, 'profile status');
-    const { status } = profileStatus;
+    const { status, isApprovedOwner } = profileStatus;
 
-    if (status === 'completed') {
-      if (user.verification_status === 'rejected') {
-        router.replace('/RejectRequestScreen');
-        return;
-      }
+    const verificationStatus =
+      profileStatus.verification_status ||
+      profileStatus.verificationStatus ||
+      user.verification_status;
 
-      if (user.verification_status === 'pending') {
-        router.replace('/ReviewStatusScreen');
-        return;
+    // 1. Approved status -> Home Page (tabs)
+    if (isApprovedOwner || verificationStatus === 'approved' || status === 'approved') {
+      if (router.canGoBack()) {
+        router.dismissAll();
       }
+      router.replace('/(tabs)');
+      return;
+    }
 
-      if (user.verification_status === 'approved') {
-        router.replace('/(tabs)');
-        return;
+    // 2. Rejected status -> Reject Request Screen
+    if (verificationStatus === 'rejected' || status === 'rejected') {
+      if (router.canGoBack()) {
+        router.dismissAll();
       }
-    } else if (status === 'draft') {
+      router.replace('/RejectRequestScreen');
+      return;
+    }
+
+    // 3. In Review / Pending / Completed -> Review Status Screen
+    if (
+      status === 'in_review' ||
+      status === 'pending' ||
+      status === 'completed' ||
+      verificationStatus === 'in_review' ||
+      verificationStatus === 'pending'
+    ) {
+      if (router.canGoBack()) {
+        router.dismissAll();
+      }
+      router.replace('/ReviewStatusScreen');
+      return;
+    }
+
+    // 4. Draft status -> Onboarding
+    if (status === 'draft') {
       if (!isDataSynced) {
-        setStep(profileStatus?.currentStep || 1);
+        const backendMapped = mapApiStepToFrontend(profileStatus?.currentStep || 1);
+        setStep(backendMapped.step);
+        setSubStep(backendMapped.subStep);
       }
-    } else {
-      router.replace('/onBoardingScreen/OnBoardingStep');
     }
   }, [user, profileStatus]);
+
+  useEffect(() => {
+    if (step === 4 && documents && !hasCheckedDocuments) {
+      const docList = documents?.documents || documents?.data || documents || [];
+      if (docList.length > 0) {
+        setSubStep(2);
+      }
+      setHasCheckedDocuments(true);
+    } else if (step !== 4 && hasCheckedDocuments) {
+      setHasCheckedDocuments(false);
+    }
+  }, [step, documents, hasCheckedDocuments]);
+
+  if (isFetchingStatus && !profileStatus) {
+    return (
+      <Container>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
+          <ActivityIndicator size="large" color="#F6163C" />
+        </View>
+      </Container>
+    );
+  }
 
   const updateFormData = (newData: any) => {
     setFormData((prev: any) => ({ ...prev, ...newData }));
   };
 
-  const isLoading =
-    submitStep1.isPending ||
-    submitStep3.isPending ||
-    submitStep4.isPending ||
-    submitStep7.isPending ||
-    confirmDocs.isPending;
+
 
   const handleNext = async () => {
+
     if (step === 1) {
+
       const data = onboarding1Ref.current?.getFormData();
+      console.log(data, 'data');
       if (data) updateFormData(data);
       onboarding1Ref.current?.handleSave();
       return;
-    }    if (step === 2) {
+    } if (step === 2) {
       if (subStep === 1) {
         setSubStep(2);
       } else {
@@ -146,12 +291,13 @@ export default function OnBoardingStep() {
     if (step === 2 && subStep === 2) return 'Confirm & Proceed';
     if (step === 3) return 'Save & Continue';
     if (step === 4) return subStep === 1 ? 'Upload Document' : 'Next Step';
- 
+
     return 'Next';
   };
 
   return (
     <Container>
+      <GymLoader visible={isLoading} />
       {/* Progress Bar */}
       <View className="ios:mt-1 mt-4 flex-row justify-between bg-white pb-4 ">
         {[1, 2, 3, 4, 5].map((item) => {
@@ -161,19 +307,22 @@ export default function OnBoardingStep() {
               : item < step
                 ? 'bg-[#FFC1C1] h-3'
                 : 'border h-3 border-gray-200';
+
+          const maxAllowedFrontendStep = mapApiStepToFrontend(profileStatus?.currentStep || 1).step;
+
           return (
             <TouchableOpacity
               key={item}
               onPress={() => {
-                if (item <= (profileStatus?.currentStep || step)) {
+                if (item <= maxAllowedFrontendStep) {
                   setStep(item);
                   setSubStep(1);
                 }
               }}
               activeOpacity={0.7}
-              disabled={item > (profileStatus?.currentStep || 1) && item > step}
+              disabled={item > maxAllowedFrontendStep && item > step}
               className="mx-1 flex-1 justify-center">
-              <View className={`w-full rounded-full ${bgColor}`} /> 
+              <View className={`w-full rounded-full ${bgColor}`} />
 
             </TouchableOpacity>
           );
@@ -189,7 +338,7 @@ export default function OnBoardingStep() {
           {step === 1 && (
             <OnBoarding1 ref={onboarding1Ref} initialData={formData} onNext={() => setStep(2)} />
           )}
-                                       
+
           {step === 2 &&
             (subStep === 1 ? (
               <OnBoarding2_Part2 onConfirm={() => setSubStep(2)} />
@@ -226,6 +375,15 @@ export default function OnBoardingStep() {
                     setSubStep(2);
                   }
                 }}
+                onBack={() => {
+                  const docList = documents?.documents || documents?.data || documents || [];
+                  if (docList.length > 0) {
+                    setSubStep(2);
+                  } else {
+                    setStep(3);
+                    setSubStep(1);
+                  }
+                }}
               />
             ) : (
               <OnBoarding4_List onAddMore={() => setSubStep(1)} />
@@ -234,7 +392,7 @@ export default function OnBoardingStep() {
           {step === 5 && <OnBoarding5 ref={onboarding5Ref} initialData={formData} />}
         </View>
 
-        {!(step === 2 && subStep === 1) && (
+        {!(step === 2 && subStep === 1) && !(step === 4 && subStep === 1) && (
           <View className="bg-white pb-8 pt-4">
             <Button
               title={getButtonTitle()}

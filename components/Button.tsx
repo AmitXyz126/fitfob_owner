@@ -13,7 +13,7 @@ export const Button = forwardRef<View, ButtonProps>(
 
     const isDisabled = touchableProps.disabled;
     const isSecondary = variant === 'secondary';
-    
+
 
     return (
       <TouchableOpacity
@@ -21,10 +21,10 @@ export const Button = forwardRef<View, ButtonProps>(
         activeOpacity={0.7}
         {...touchableProps}
         className={`flex-row items-center justify-center rounded-2xl p-4 w-full ${isDisabled
-            ? 'bg-[#E5E7EB]'
-            : isSecondary
-              ? 'bg-slate-50 border border-slate-100'
-              : 'bg-[#F6163C]'
+          ? 'bg-[#E5E7EB]'
+          : isSecondary
+            ? 'bg-slate-50 border border-slate-100'
+            : 'bg-[#F6163C]'
           } ${touchableProps.className}`}
       >
         {icon && (

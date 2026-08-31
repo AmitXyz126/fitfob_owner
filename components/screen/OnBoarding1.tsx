@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import React, { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
+import  { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,11 +17,10 @@ import { useAuthStore } from '@/store/useAuthStore';
  
 const OnBoarding1 = forwardRef(({ initialData, onNext }: any, ref) => {
   const { profileStatus, submitStep1 } = useUserDetail();
-  const userId = profileStatus?.id || profileStatus?.pendingClubOwnerId;
-  const STORAGE_KEY = `@onboarding_step1_data_${userId || 'guest'}`;
-  const isSubmitting = submitStep1.isPending;
-
   const { user } = useAuthStore();
+  const userId = profileStatus?.id || profileStatus?.pendingClubOwnerId;
+  const STORAGE_KEY = `@onboarding_step1_data_${userId || user?.id || user?.email || 'guest'}`;
+  const isSubmitting = submitStep1.isPending;
 
   const [clubName, setClubName] = useState('');
   const [ownerName, setOwnerName] = useState('');
@@ -34,25 +33,31 @@ const OnBoarding1 = forwardRef(({ initialData, onNext }: any, ref) => {
   // Use a flag to ensure single initialization
   const [isInitialized, setIsInitialized] = useState(false);
 
-  console.log(user, 'get');
+console.log (ref ,"ref")
+console.log(initialData,"initialdata")
+ 
   // 1. Initialize logic
   useEffect(() => {
-    if (!userId || !STORAGE_KEY) return;
-
     const initData = async () => {
       if (initialData && (initialData.clubName || initialData.ownerName)) {
         setClubName(initialData.clubName || '');
         setOwnerName(initialData.ownerName || '');
         setPhone(initialData.phoneNumber || '');
         setEmail(initialData.email || '');
-        setImage(initialData.image || initialData.logoUrl || null);
 
         const logoVal = initialData.logoId || initialData.logo;
-
         if (logoVal && typeof logoVal === 'object') {
           setLogoId(logoVal);
+          if (logoVal.uri) {
+            setImage(logoVal.uri);
+          } else {
+            setImage(initialData.image || initialData.logoUrl || null);
+          }
+        } else {
+          setImage(initialData.image || initialData.logoUrl || logoVal || null);
         }
-      } else {
+        setIsInitialized(true);
+      } else if (!isInitialized) {
         const savedData = await AsyncStorage.getItem(STORAGE_KEY);
         if (savedData) {
           const parsed = JSON.parse(savedData);
@@ -61,15 +66,14 @@ const OnBoarding1 = forwardRef(({ initialData, onNext }: any, ref) => {
           setPhone(parsed.phoneNumber || '');
           setEmail(parsed.email || '');
           setImage(parsed.image || null);
-          setLogoId(parsed.logoId);
+          setLogoId(parsed.logoId || null);
         }
+        setIsInitialized(true);
       }
-
-      setIsInitialized(true);
     };
 
     initData();
-  }, [userId]);
+  }, [userId, initialData, isInitialized, STORAGE_KEY]);
 
   // 2. Continuous draft backup
   useEffect(() => {
@@ -111,10 +115,6 @@ const OnBoarding1 = forwardRef(({ initialData, onNext }: any, ref) => {
 
       setImage(asset.uri);
       setLogoId(fileToUpload);
-      if (asset && fileToUpload) {
-        setImage(asset.uri);
-        setLogoId(fileToUpload);
-      }
       if (!fileToUpload.uri) {
         setIsImageLoading(false);
         return Alert.alert('Error', 'Unable to process the selected image. Please try again.');
@@ -130,42 +130,51 @@ const OnBoarding1 = forwardRef(({ initialData, onNext }: any, ref) => {
   // --- VALIDATION & API SUBMIT LOGIC ---
 
   useImperativeHandle(ref, () => ({
-   handleSave: () => {
-  if (!image) return Alert.alert('Required', 'Please upload a club logo');
-  if (!clubName.trim()) return Alert.alert('Required', 'Club Name is required');
-  if (!ownerName.trim()) return Alert.alert('Required', 'Owner Name is required');
+    handleSave: () => {
+      const logoToUse =
+        LogoId ||
+        (image
+          ? typeof image === 'object'
+            ? image
+            : typeof image === 'string' && (image.startsWith('file://') || image.startsWith('content://'))
+              ? { uri: image, name: `logo_${Date.now()}.jpg`, type: 'image/jpeg' }
+              : image
+          : null);
 
-   const finalEmail = email.trim() || user?.email || '';
-  const finalPhone = phone.trim() || user?.phoneNumber || '';
+      if (!image && !logoToUse) return Alert.alert('Required', 'Please upload a club logo');
+      if (!clubName.trim()) return Alert.alert('Required', 'Club Name is required');
+      if (!ownerName.trim()) return Alert.alert('Required', 'Owner Name is required');
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
- 
-  const hasValidPhone = finalPhone.length >= 10;
-  const hasValidEmail = finalEmail.length > 0 && emailRegex.test(finalEmail);
- 
-  if (!hasValidPhone && !hasValidEmail) {
-    return Alert.alert(
-      'Required',
-      'Please provide either a valid 10-digit phone number or a valid email address.'
-    );
-  }
+      const finalEmail = email.trim() || user?.email || '';
+      const finalPhone = phone.trim() || user?.phoneNumber || '';
 
-  if (!LogoId) return Alert.alert('Required', 'Please upload a club logo');
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const digitsCount = finalPhone.replace(/[^0-9]/g, '').length;
 
-  const payload = {
-    clubName: clubName.trim(),
-    ownerName: ownerName.trim(),
-    phone: finalPhone,
-    email: finalEmail,
-    logo: LogoId,
-  };
+      const hasValidPhone = digitsCount >= 10;
+      const hasValidEmail = finalEmail.length > 0 && emailRegex.test(finalEmail);
 
-  submitStep1.mutate(payload, {
-    onSuccess: () => {
-       if (onNext) onNext();
+      if (!hasValidPhone && !hasValidEmail) {
+        return Alert.alert(
+          'Required',
+          'Please provide either a valid 10-digit phone number or a valid email address.'
+        );
+      }
+
+      const payload = {
+        clubName: clubName.trim(),
+        ownerName: ownerName.trim(),
+        phone: finalPhone,
+        email: finalEmail,
+        logo: logoToUse,
+      };
+
+      submitStep1.mutate(payload, {
+        onSuccess: () => {
+          if (onNext) onNext();
+        },
+      });
     },
-  });
-},
     getFormData: () => ({
       clubName,
       ownerName,
@@ -278,7 +287,7 @@ const OnBoarding1 = forwardRef(({ initialData, onNext }: any, ref) => {
             value={email || user?.email || ''}
             selectTextOnFocus={false}
             onChangeText={setEmail}
-            editable={false}
+            editable={!isSubmitting}
             keyboardType="email-address"
             placeholder="Enter email address"
             placeholderTextColor="#94A3B8"

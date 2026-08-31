@@ -1,5 +1,6 @@
-import axios from 'axios';
+import axios, { isAxiosError } from 'axios';
 import { ENDPOINTS } from './endpoint';
+import apiInstance from './apiInstance';
  
 
 const api = axios.create({
@@ -126,24 +127,50 @@ export const resetPasswordApi = async (payload: any) => {
   }
 };
 
-// 5. Google Authentication
-export const googleAuthApi = async (payload: { token: string }) => {
-  try {
-    const response = await api.post(ENDPOINTS.GOOGLE_AUTH, payload);
-    return response.data;
-  } catch (error: any) {
-    console.error('❌ Google Auth API Error:', error.response?.data || error.message);
-    throw error;
-  }
-};
+export interface GoogleLoginPayload {
+  idToken: string;
+}
 
-// 6. Facebook Authentication
-export const facebookAuthApi = async (payload: { token: string }) => {
+export interface FacebookLoginPayload {
+  accessToken: string;
+  userID: string;
+}
+
+export async function googleLoginApi(payload: GoogleLoginPayload) {
   try {
-    const response = await api.post(ENDPOINTS.FACEBOOK_AUTH, payload);
+    const response = await axios.post(ENDPOINTS.GOOGLE_AUTH, payload);
     return response.data;
-  } catch (error: any) {
-    console.error('❌ Facebook Auth API Error:', error.response?.data || error.message);
-    throw error;
+  } catch (error) {
+    if (isAxiosError(error)) {
+      const msg =
+        error.response?.data.error?.message ??
+        error.response?.data?.message ??
+        'Google login failed';
+      console.error('Google Login API error:', msg);
+      throw new Error(msg);
+    }
+    throw new Error('An unexpected error occurred during Google login');
   }
+}
+
+export async function facebookLoginApi(payload: FacebookLoginPayload) {
+  try {
+    const response = await axios.post(ENDPOINTS.FACEBOOK_AUTH, payload);
+    return response.data;
+  } catch (error) {
+    if (isAxiosError(error)) {
+      const msg =
+        error.response?.data.error?.message ??
+        error.response?.data?.message ??
+        'Facebook login failed';
+      console.error('Facebook Login API error:', msg);
+      throw new Error(msg);
+    }
+    throw new Error('An unexpected error occurred during Facebook login');
+  }
+}
+
+export const changePasswordApi = async (payload: { oldPassword: string; newPassword: string }) => {
+  const response = await apiInstance.post(ENDPOINTS.CHANGE_PASSWORD, payload);
+  return response.data;
 };

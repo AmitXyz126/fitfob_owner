@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   forgotResendOtpApi,
   forgotSendOtpApi,
@@ -8,8 +8,9 @@ import {
   resetPasswordApi,
   signupStep1Api,
   verifyOtpApi,
-  googleAuthApi,
-  facebookAuthApi,
+  facebookLoginApi,
+  googleLoginApi,
+  changePasswordApi,
 } from '@/api/authApi';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter } from 'expo-router';
@@ -49,35 +50,39 @@ export const useResendOtp = () => {
 export const useVerifyOtp = () => {
   return useMutation({
     mutationFn: verifyOtpApi,
-   
+
   });
 };
 export const useLoginRequest = () => {
   const { setUser } = useAuthStore();
   const router = useRouter();
-return useMutation({
-  mutationFn: loginUserApi,
-  onSuccess: (data) => {
-    if (data && data.jwt && data.user) {
-      console.log('✅ Login Success:', data.user.username);
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: loginUserApi,
+    onSuccess: (data) => {
+      if (data && data.jwt && data.user) {
+        console.log('✅ Login Success:', data.user.username);
 
-      const userWithToken = {
-        ...data.user,
-        token: data.jwt,
-      };
+        const userWithToken = {
+          ...data.user,
+          token: data.jwt,
+        };
+        setUser(userWithToken, true);
 
-      setUser(userWithToken, true);
-      console.log(userWithToken, 'usr Data');
+        // Clear query cache to pull correct details with new token
+        queryClient.clear();
 
-      // 🚀 Always go to onboarding flow checker
-      router.replace('/onBoardingScreen/OnBoardingStep');
-    }
-  },
+        if (router.canGoBack()) {
+          router.dismissAll();
+        }
+        router.replace('/onBoardingScreen/OnBoardingStep');
+      }
+    },
 
-  onError: (error: any) => {
-    console.error('❌ Login Error:', error.response?.data || error.message);
-  },
-});
+    onError: (error: any) => {
+      console.error('❌ Login Error:', error.response?.data || error.message);
+    },
+  });
 };
 
 export const useForgotSendOtp = () => {
@@ -155,12 +160,13 @@ export const useResetPassword = () => {
   });
 };
 
-export const useGoogleAuthRequest = () => {
+export const useGoogleLogin = () => {
   const { setUser } = useAuthStore();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: googleAuthApi,
+    mutationFn: googleLoginApi,
     onSuccess: (data) => {
       if (data && data.jwt && data.user) {
         console.log('✅ Google Auth Success:', data.user.username || data.user.email);
@@ -172,11 +178,13 @@ export const useGoogleAuthRequest = () => {
 
         setUser(userWithToken, true);
 
-        if (!userWithToken.isVerified) {
-          router.replace('/onBoardingScreen/OnBoardingStep');
-        } else {
-          router.replace('/(tabs)');
+        // Clear query cache to pull correct details with new token
+        queryClient.clear();
+
+        if (router.canGoBack()) {
+          router.dismissAll();
         }
+        router.replace('/onBoardingScreen/OnBoardingStep');
       } else {
         console.warn('⚠️ API Success but missing fields in response:', data);
         router.replace('/auth/Login');
@@ -194,12 +202,13 @@ export const useGoogleAuthRequest = () => {
   });
 };
 
-export const useFacebookAuthRequest = () => {
+export const useFacebookLogin = () => {
   const { setUser } = useAuthStore();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: facebookAuthApi,
+    mutationFn: facebookLoginApi,
     onSuccess: (data) => {
       if (data && data.jwt && data.user) {
         console.log('✅ Facebook Auth Success:', data.user.username || data.user.email);
@@ -211,11 +220,13 @@ export const useFacebookAuthRequest = () => {
 
         setUser(userWithToken, true);
 
-        if (!userWithToken.isVerified) {
-          router.replace('/onBoardingScreen/OnBoardingStep');
-        } else {
-          router.replace('/(tabs)');
+        // Clear query cache to pull correct details with new token
+        queryClient.clear();
+
+        if (router.canGoBack()) {
+          router.dismissAll();
         }
+        router.replace('/onBoardingScreen/OnBoardingStep');
       } else {
         console.warn('⚠️ API Success but missing fields in response:', data);
         router.replace('/auth/Login');
@@ -232,3 +243,11 @@ export const useFacebookAuthRequest = () => {
     },
   });
 };
+
+export const useChangePassword = () => {
+  return useMutation({
+    mutationFn: changePasswordApi,
+  });
+};
+
+

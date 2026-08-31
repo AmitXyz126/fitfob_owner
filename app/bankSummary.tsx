@@ -6,28 +6,28 @@ import { Container } from '@/components/Container';
 import LineGradient from '@/components/lineGradient/LineGradient';
 import { Button } from '@/components/Button';
 
+const DetailRow = ({
+  label,
+  value,
+  isLast = false,
+}: {
+  label: string;
+  value: any;
+  isLast?: boolean;
+}) => (
+  <View className="mb-4">
+    <View className="pb-3">
+      <Text className="mb-1 font-medium text-xs text-gray-400">{label}</Text>
+      <Text className="font-bold text-base text-gray-800">{value || 'N/A'}</Text>
+    </View>
+
+    {!isLast && <LineGradient />}
+  </View>
+);
+
 const BankSummaryScreen = () => {
   const router = useRouter();
   const params = useLocalSearchParams();
-
-  const DetailRow = ({
-    label,
-    value,
-    isLast = false,
-  }: {
-    label: string;
-    value: any;
-    isLast?: boolean;
-  }) => (
-    <View className="mb-4">
-      <View className="pb-3">
-        <Text className="mb-1 font-medium text-xs text-gray-400">{label}</Text>
-        <Text className="font-bold text-base text-gray-800">{value || 'N/A'}</Text>
-      </View>
-
-      {!isLast && <LineGradient />}
-    </View>
-  );
 
   return (
     <Container>

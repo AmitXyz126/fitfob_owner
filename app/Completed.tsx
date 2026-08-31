@@ -25,9 +25,9 @@ const Completed = () => {
           </View>
         </View>
       </View>
-        <View className="mb-6 px-4">
-          <Button title={'Finish'} onPress={() => router.replace('/ReviewStatusScreen')} />
-        </View>
+      <View className="mb-6 px-4">
+        <Button title={'Finish'} onPress={() => router.replace('/ReviewStatusScreen')} />
+      </View>
     </Container>
   );
 };
