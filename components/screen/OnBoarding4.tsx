@@ -17,7 +17,10 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useUserDetail } from '@/hooks/useUserDetail';
+import { useAuthStore } from '@/store/useAuthStore';
+import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export interface OnBoarding4Handle {
   openModal: () => void;
@@ -30,13 +33,15 @@ interface Props {
 }
 
 const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
+  const router = useRouter();
   const isFocused = useIsFocused();
   const { onUploadSuccess, onUploadDone, onBack } = props;
   const { uploadDoc, refetch } = useUserDetail();
 
   const [activeTab, setActiveTab] = useState<'camera' | 'file'>('camera');
   const [docName, setDocName] = useState('');
-  const [selectedFile, setSelectedFile] = useState<any>(null);
+  const [selectedFiles, setSelectedFiles] = useState<any[]>([]);
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
 
   const cameraRef = useRef<CameraView>(null);
@@ -74,12 +79,16 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
       setIsCapturing(true);
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
       if (photo) {
-        setScannedData({
+        const fileObj = {
+          id: `${Date.now()}_${Math.random()}`,
           uri: photo.uri,
           name: `camera_${Date.now()}.jpg`,
           type: 'image/jpeg',
-        });
-        if (!docName) setDocName('Govt Document');
+          docName: docName.trim() || `Scanned Document ${selectedFiles.length + 1}`,
+        };
+        setSelectedFiles((prev) => [...prev, fileObj]);
+        setScannedData(fileObj);
+        setDocName('');
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to capture photo');
@@ -101,16 +110,26 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
       quality: 0.8,
     });
-    if (!result.canceled) {
-      const asset = result.assets[0];
-      setSelectedFile({
+    if (!result.canceled && result.assets.length > 0) {
+      const newFiles = result.assets.map((asset, idx) => ({
+        id: `${Date.now()}_${idx}_${Math.random()}`,
         uri: asset.uri,
-        name: asset.fileName || `photo_${Date.now()}.jpg`,
+        name: asset.fileName || `photo_${Date.now()}_${idx + 1}.jpg`,
         type: asset.mimeType || 'image/jpeg',
-      });
-      setDocName(asset.fileName ? asset.fileName.split('.')[0] : 'Govt Document');
+        size: asset.fileSize,
+        docName: docName.trim()
+          ? result.assets.length === 1
+            ? docName.trim()
+            : `${docName.trim()} ${idx + 1}`
+          : asset.fileName
+          ? asset.fileName.split('.')[0]
+          : `Govt Document ${selectedFiles.length + idx + 1}`,
+      }));
+      setSelectedFiles((prev) => [...prev, ...newFiles]);
+      setDocName('');
     }
   };
 
@@ -118,12 +137,26 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: ['image/*', 'application/pdf'],
+        multiple: true,
         copyToCacheDirectory: true,
       });
-      if (!result.canceled) {
-        const file = result.assets[0];
-        setSelectedFile(file);
-        setDocName(file.name.split('.')[0]);
+      if (!result.canceled && result.assets.length > 0) {
+        const newFiles = result.assets.map((file, idx) => ({
+          id: `${Date.now()}_${idx}_${Math.random()}`,
+          uri: file.uri,
+          name: file.name,
+          type: file.mimeType || 'application/pdf',
+          size: file.size,
+          docName: docName.trim()
+            ? result.assets.length === 1
+              ? docName.trim()
+              : `${docName.trim()} ${idx + 1}`
+            : file.name
+            ? file.name.split('.')[0]
+            : `Govt Document ${selectedFiles.length + idx + 1}`,
+        }));
+        setSelectedFiles((prev) => [...prev, ...newFiles]);
+        setDocName('');
       }
     } catch (err) {
       Alert.alert('Error', 'Failed to select document.');
@@ -138,32 +171,61 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
     ]);
   };
 
-  const handleFinalUpload = async () => {
-    const fileToUpload = activeTab === 'camera' ? scannedData : selectedFile;
-    if (!docName.trim()) {
-      return Alert.alert('Required', 'Please enter a document name.');
-    }
-    if (!fileToUpload) {
-      return Alert.alert('Required', 'Please scan or select a document file.');
-    }
+  const removeFile = (id: string) => {
+    setSelectedFiles((prev) => prev.filter((item) => item.id !== id));
+  };
 
-    uploadDoc.mutate(
-      { name: docName.trim(), file: fileToUpload },
-      {
-        onSuccess: async (data) => {
-          await refetch();
-          setScannedData(null);
-          setSelectedFile(null);
-          setDocName('');
-          if (onUploadDone) onUploadDone(data);
-          if (onUploadSuccess) onUploadSuccess(data);
-        },
-        onError: (error: any) => {
-          Alert.alert('Upload Error', error.response?.data?.message || 'Failed to upload');
-        },
-      }
+  const updateFileDocName = (id: string, text: string) => {
+    setSelectedFiles((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, docName: text } : item))
     );
   };
+
+  const handleFinalUpload = async () => {
+    if (selectedFiles.length === 0) {
+      return Alert.alert('Required', 'Please scan or select at least one document file.');
+    }
+
+    for (let i = 0; i < selectedFiles.length; i++) {
+      if (!selectedFiles[i].docName || !selectedFiles[i].docName.trim()) {
+        return Alert.alert(
+          'Required',
+          `Please enter a document name for file #${i + 1} (${selectedFiles[i].name})`
+        );
+      }
+    }
+
+    try {
+      for (let i = 0; i < selectedFiles.length; i++) {
+        setUploadingIndex(i + 1);
+        const item = selectedFiles[i];
+        await uploadDoc.mutateAsync({
+          name: item.docName.trim(),
+          file: {
+            uri: item.uri,
+            name: item.name,
+            type: item.type,
+          },
+        });
+      }
+
+      await refetch();
+      setScannedData(null);
+      setSelectedFiles([]);
+      setDocName('');
+      setUploadingIndex(null);
+      if (onUploadDone) onUploadDone(null);
+      if (onUploadSuccess) onUploadSuccess(null);
+    } catch (error: any) {
+      setUploadingIndex(null);
+      Alert.alert(
+        'Upload Error',
+        error.response?.data?.message || error.message || 'Failed to upload document(s)'
+      );
+    }
+  };
+
+  const isUploading = uploadingIndex !== null || uploadDoc.isPending;
 
   return (
     <ScrollView
@@ -171,9 +233,15 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
       className="bg-white"
       showsVerticalScrollIndicator={false}>
       {/* Title Header */}
-      <View className="mb-6 flex-row items-center">
-      
+      <View className="mb-6 flex-row items-center justify-between">
         <Text className="font-bold text-[24px] text-[#1C1C1C]">Upload Govt Document</Text>
+        {selectedFiles.length > 0 && (
+          <View className="rounded-full bg-red-50 px-3 py-1 border border-red-100">
+            <Text className="font-bold text-xs text-[#F6163C]">
+              {selectedFiles.length} {selectedFiles.length === 1 ? 'File' : 'Files'} Selected
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Tabs */}
@@ -208,21 +276,23 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
         </TouchableOpacity>
       </View>
 
-      {/* Input Field (Document Name) */}
-      <View className="mb-6">
-        <Text className="mb-2 ml-1 text-sm font-semibold text-slate-500">Document Name</Text>
-        <TextInput
-          value={docName}
-          onChangeText={setDocName}
-          placeholder="e.g. Aadhar Card, License, PAN"
-          placeholderTextColor="#94A3B8"
-          className="h-14 w-full rounded-2xl border border-slate-100 bg-[#F8FAFC] px-5 font-semibold text-slate-900"
-          editable={!uploadDoc.isPending}
-        />
-      </View>
+      {/* Default Document Name Input (used for new selections) */}
+      {selectedFiles.length === 0 && (
+        <View className="mb-6">
+          <Text className="mb-2 ml-1 text-sm font-semibold text-slate-500">Document Name</Text>
+          <TextInput
+            value={docName}
+            onChangeText={setDocName}
+            placeholder="e.g. Aadhar Card, License, PAN"
+            placeholderTextColor="#94A3B8"
+            className="h-14 w-full rounded-2xl border border-slate-100 bg-[#F8FAFC] px-5 font-semibold text-slate-900"
+            editable={!isUploading}
+          />
+        </View>
+      )}
 
       {/* Content Body Based on Tab */}
-      <View className="mb-8">
+      <View className="mb-6">
         {activeTab === 'camera' ? (
           // Camera Tab
           <View className="relative h-80 w-full overflow-hidden rounded-[30px] border border-slate-100 bg-slate-900">
@@ -238,7 +308,7 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
                     onPress={resetCameraCapture}
                     className="rounded-full px-6 py-2 border border-white/30"
                     style={styles.retakeBtnBg}>
-                    <Text className="font-bold text-sm text-white">Retake Photo</Text>
+                    <Text className="font-bold text-sm text-white">Scan Another Photo</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -303,75 +373,164 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
         ) : (
           // File / PDF Tab
           <View>
-            {selectedFile ? (
-              // Selected File Preview Card
-              <View className="flex-row items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 p-5">
-                <View className="flex-1 flex-row items-center">
-                  <View className="items-center justify-center rounded-xl bg-white p-3 border border-slate-100">
-                    <Ionicons
-                      name={
-                        selectedFile.type?.includes('pdf')
-                          ? 'document-text'
-                          : 'image'
-                      }
-                      size={28}
-                      color="#F6163C"
-                    />
-                  </View>
-                  <View className="ml-4 flex-1">
-                    <Text className="font-bold text-[15px] text-slate-800" numberOfLines={1}>
-                      {selectedFile.name}
-                    </Text>
-                    {selectedFile.size && (
-                      <Text className="mt-0.5 text-xs text-slate-400">
-                        {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
-                      </Text>
-                    )}
-                  </View>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setSelectedFile(null)}
-                  className="ml-3 h-8 w-8 items-center justify-center rounded-full bg-slate-100">
-                  <Ionicons name="trash-outline" size={18} color="#EF4444" />
-                </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleSelectSource}
+              activeOpacity={0.7}
+              style={[styles.dashedBorderBox, { borderStyle: 'dashed' }]}
+              className="h-44 items-center justify-center rounded-[30px] border-2 border-slate-200 p-6">
+              <View className="h-12 w-12 items-center justify-center rounded-full mb-2" style={styles.cloudIconWrapperBg}>
+                <Ionicons name="cloud-upload" size={24} color="#F6163C" />
               </View>
-            ) : (
-              // Dashed File Upload Select Box
-              <TouchableOpacity
-                onPress={handleSelectSource}
-                activeOpacity={0.7}
-                style={[styles.dashedBorderBox, { borderStyle: 'dashed' }]}
-                className="h-56 items-center justify-center rounded-[30px] border-2 border-slate-200 p-6">
-                <View className="h-12 w-12 items-center justify-center rounded-full mb-4" style={styles.cloudIconWrapperBg}>
-                  <Ionicons name="cloud-upload" size={24} color="#F6163C" />
-                </View>
-                <Text className="font-bold text-base text-slate-700">Choose PDF or Image File</Text>
-                <Text className="mt-1 text-center text-xs text-slate-400">
-                  Browse and select from gallery or documents storage
-                </Text>
-              </TouchableOpacity>
-            )}
+              <Text className="font-bold text-base text-slate-700">
+                {selectedFiles.length > 0 ? 'Select More PDF or Image Files' : 'Choose PDF or Image Files'}
+              </Text>
+              <Text className="mt-1 text-center text-xs text-slate-400">
+                Select one or multiple files from gallery or storage
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>
+
+      {/* Selected Files Queue */}
+      {selectedFiles.length > 0 && (
+        <View className="mb-6">
+          <View className="mb-3 flex-row items-center justify-between">
+            <Text className="font-bold text-slate-800 text-base">Selected Documents to Upload</Text>
+            <TouchableOpacity onPress={handleSelectSource} activeOpacity={0.7}>
+              <Text className="font-bold text-xs text-[#F6163C]">+ Add More</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View className="space-y-3">
+            {selectedFiles.map((file, idx) => (
+              <View
+                key={file.id || idx}
+                className="rounded-2xl border border-slate-100 bg-[#F8FAFC] p-4">
+                <View className="flex-row items-center justify-between">
+                  <View className="flex-1 flex-row items-center">
+                    <View className="items-center justify-center rounded-xl bg-white p-2.5 border border-slate-100">
+                      <Ionicons
+                        name={file.type?.includes('pdf') ? 'document-text' : 'image'}
+                        size={24}
+                        color="#F6163C"
+                      />
+                    </View>
+                    <View className="ml-3 flex-1">
+                      <Text className="font-semibold text-slate-700 text-xs" numberOfLines={1}>
+                        {file.name}
+                      </Text>
+                      {file.size && (
+                        <Text className="text-[10px] text-slate-400">
+                          {(file.size / (1024 * 1024)).toFixed(2)} MB
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => removeFile(file.id)}
+                    disabled={isUploading}
+                    className="ml-2 h-8 w-8 items-center justify-center rounded-full bg-slate-200/60">
+                    <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Editable Document Name for this file */}
+                <View className="mt-3">
+                  <Text className="text-[11px] font-semibold text-slate-400 mb-1">
+                    Document Name #{idx + 1}
+                  </Text>
+                  <TextInput
+                    value={file.docName}
+                    onChangeText={(text) => updateFileDocName(file.id, text)}
+                    placeholder="e.g. Aadhar Card, GST, License"
+                    placeholderTextColor="#94A3B8"
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-900"
+                    editable={!isUploading}
+                  />
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
 
       {/* Main Upload Button at the bottom */}
       <View className="mt-auto pb-8">
         <TouchableOpacity
           onPress={handleFinalUpload}
-          disabled={uploadDoc.isPending}
+          disabled={isUploading}
           activeOpacity={0.8}
-          className="h-14 w-full flex-row items-center justify-center rounded-2xl bg-[#F6163C]"
+          className={`h-14 w-full flex-row items-center justify-center rounded-2xl ${
+            isUploading ? 'bg-slate-400' : 'bg-[#F6163C]'
+          }`}
           style={styles.uploadBtnShadow}>
-          {uploadDoc.isPending ? (
-            <ActivityIndicator color="white" />
+          {isUploading ? (
+            <View className="flex-row items-center">
+              <ActivityIndicator color="white" />
+              <Text className="ml-3 font-bold text-[15px] text-white">
+                {uploadingIndex
+                  ? `Uploading ${uploadingIndex} of ${selectedFiles.length}...`
+                  : 'Uploading...'}
+              </Text>
+            </View>
           ) : (
             <>
               <Ionicons name="cloud-upload-outline" size={20} color="white" />
-              <Text className="ml-2 font-bold text-[16px] text-white">Upload Document</Text>
+              <Text className="ml-2 font-bold text-[16px] text-white">
+                {selectedFiles.length <= 1
+                  ? 'Upload Document'
+                  : `Upload ${selectedFiles.length} Documents`}
+              </Text>
             </>
           )}
         </TouchableOpacity>
+
+        <View className="mt-5 flex-row items-center my-2">
+          <LinearGradient
+            colors={['transparent', '#F6163C']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={{ flex: 1, height: 1.5 }}
+          />
+          <View className="px-3 flex-row items-center">
+            <TouchableOpacity
+              onPress={async () => {
+                try {
+                  await useAuthStore.getState().logOut();
+                } catch (e) {
+                  console.log(e);
+                } finally {
+                  router.replace('/auth/Login');
+                }
+              }}
+              activeOpacity={0.7}
+              className="px-1 py-0.5">
+              <Text className="text-xs font-bold text-[#F6163C]">Log In</Text>
+            </TouchableOpacity>
+            <Text className="mx-1.5 text-slate-300">|</Text>
+            <TouchableOpacity
+              onPress={async () => {
+                try {
+                  await useAuthStore.getState().logOut();
+                } catch (e) {
+                  console.log(e);
+                } finally {
+                  router.replace('/auth/SignUp');
+                }
+              }}
+              activeOpacity={0.7}
+              className="px-1 py-0.5">
+              <Text className="text-xs font-bold text-[#F6163C]">Sign Up</Text>
+            </TouchableOpacity>
+          </View>
+          <LinearGradient
+            colors={['#F6163C', 'transparent']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={{ flex: 1, height: 1.5 }}
+          />
+        </View>
       </View>
     </ScrollView>
   );

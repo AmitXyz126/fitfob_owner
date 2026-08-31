@@ -9,18 +9,21 @@ import {
   Alert,
   TextInput,
 } from 'react-native';
-import MapView, { UrlTile } from 'react-native-maps';
+import { LocationMapPicker, LocationMapPickerHandle } from '@/components/LocationMapPicker';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import { useRouter } from 'expo-router';
 import { useUserDetail } from '@/hooks/useUserDetail';
 import { useAuthStore } from '@/store/useAuthStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 
 interface OnBoarding2Props {
   onConfirm: () => void;
 }
 
 const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
+  const router = useRouter();
   const { profileStatus, submitStep2 } = useUserDetail();
   const { user } = useAuthStore();
   const userId = profileStatus?.id || profileStatus?.pendingClubOwnerId;
@@ -42,47 +45,50 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
   const [locationInfo, setLocationInfo] = useState({
     name: 'Fetching location...',
     address: 'Please wait...',
+    clubAddress: '',
+    city: '',
+    state: '',
+    pincode: '',
   });
 
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<LocationMapPickerHandle>(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // --- 1. Load Saved Data ---
+  // --- 1. Load Saved Data or Current Location ---
   useEffect(() => {
     const loadSavedMap = async () => {
       try {
-        if (profileStatus?.latitude && profileStatus?.longitude) {
+        // Fetch current live GPS location by default
+        const gotCurrent = await getCurrentLocation();
+
+        // Fallback to saved profile coordinates if GPS not acquired
+        if (!gotCurrent && profileStatus?.latitude && profileStatus?.longitude) {
           const lat = parseFloat(profileStatus.latitude);
           const lng = parseFloat(profileStatus.longitude);
-          const newRegion = {
-            latitude: lat,
-            longitude: lng,
-            latitudeDelta: 0.005,
-            longitudeDelta: 0.005,
-          };
-          setRegion(newRegion);
-          getAddressFromCoords(lat, lng);
-          setIsInitialized(true);
-        } else if (!isInitialized) {
-          const savedData = await AsyncStorage.getItem(STORAGE_KEY);
-          if (savedData) {
-            const parsed = JSON.parse(savedData);
-            setRegion(parsed.region);
-            setLocationInfo(parsed.locationInfo);
-            setSearchQuery(parsed.locationInfo.address);
-          } else {
-            await getCurrentLocation();
+          if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+            const newRegion = {
+              latitude: lat,
+              longitude: lng,
+              latitudeDelta: 0.005,
+              longitudeDelta: 0.005,
+            };
+            setRegion(newRegion);
+            mapRef.current?.animateToRegion(newRegion);
+            getAddressFromCoords(lat, lng);
           }
-          setIsInitialized(true);
         }
       } catch (e) {
         console.log('Error loading map storage', e);
       } finally {
+        setIsInitialized(true);
         setIsLocalLoaded(true);
       }
     };
-    loadSavedMap();
-  }, [STORAGE_KEY, profileStatus, isInitialized]);
+
+    if (!isInitialized) {
+      loadSavedMap();
+    }
+  }, [isInitialized]);
 
   // --- 2. Free OSM Reverse Geocoding  ---
   const getAddressFromCoords = async (lat: number, lng: number) => {
@@ -95,7 +101,7 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
         `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
         {
           headers: {
-            'User-Agent': 'gym-app',
+            'User-Agent': 'fitfob-owner-app/1.0',
             'Accept-Language': 'en',
           },
         }
@@ -103,10 +109,16 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
 
       const data = await res.json();
 
-      if (data) {
+      if (data && data.address) {
         const address = data.display_name;
 
         const name =
+          data.address?.building ||
+          data.address?.amenity ||
+          data.address?.shop ||
+          data.address?.office ||
+          data.address?.leisure ||
+          data.address?.commercial ||
           data.address?.road ||
           data.address?.suburb ||
           data.address?.city ||
@@ -115,46 +127,71 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
         const locationData = {
           name,
           address,
-
           clubAddress:
             data.address?.road ||
             data.address?.neighbourhood ||
             data.address?.suburb ||
-            '',
-
+            address,
           city:
             data.address?.city ||
             data.address?.town ||
             data.address?.village ||
             '',
-
           state: data.address?.state || '',
-
           pincode: data.address?.postcode || '',
         };
 
-        setLocationInfo({
-          name: locationData.name,
-          address: locationData.address,
-        });
-
+        setLocationInfo(locationData);
         setSearchQuery(address);
+      } else {
+        // Native fallback if OSM returned no address
+        const nativePlaces = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+        if (nativePlaces && nativePlaces.length > 0) {
+          const p = nativePlaces[0];
+          const name = p.name || p.street || p.district || p.subregion || 'Selected Location';
+          const fullAddr = [p.name, p.street, p.subregion, p.district, p.city, p.region, p.postalCode]
+            .filter(Boolean)
+            .join(', ');
 
-        await AsyncStorage.setItem(
-          STORAGE_KEY,
-          JSON.stringify({
-            region: {
-              latitude: lat,
-              longitude: lng,
-              latitudeDelta: 0.005,
-              longitudeDelta: 0.005,
-            },
-            locationInfo: locationData,
-          })
-        );
+          const locationData = {
+            name,
+            address: fullAddr || name,
+            clubAddress: p.street || p.name || fullAddr || '',
+            city: p.city || p.region || '',
+            state: p.region || '',
+            pincode: p.postalCode || '',
+          };
+
+          setLocationInfo(locationData);
+          setSearchQuery(fullAddr || name);
+        }
       }
     } catch (err) {
-      console.log('Reverse geocode error', err);
+      console.log('OSM geocode error, trying native geocoder fallback:', err);
+      try {
+        const nativePlaces = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+        if (nativePlaces && nativePlaces.length > 0) {
+          const p = nativePlaces[0];
+          const name = p.name || p.street || p.district || p.subregion || 'Selected Location';
+          const fullAddr = [p.name, p.street, p.subregion, p.district, p.city, p.region, p.postalCode]
+            .filter(Boolean)
+            .join(', ');
+
+          const locationData = {
+            name,
+            address: fullAddr || name,
+            clubAddress: p.street || p.name || fullAddr || '',
+            city: p.city || p.region || '',
+            state: p.region || '',
+            pincode: p.postalCode || '',
+          };
+
+          setLocationInfo(locationData);
+          setSearchQuery(fullAddr || name);
+        }
+      } catch (geoErr) {
+        console.log('Native geocode error:', geoErr);
+      }
     } finally {
       setIsReverseGeocoding(false);
     }
@@ -223,38 +260,71 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
 
   };
 
-  const getCurrentLocation = async () => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
+  const getCurrentLocation = async (): Promise<boolean> => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
 
-    if (status !== "granted") {
-      Alert.alert("Permission denied");
-      return;
+      if (status !== 'granted') {
+        Alert.alert('Permission denied', 'Please grant location permission to detect your current location.');
+        return false;
+      }
+
+      let location = null;
+      try {
+        location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+      } catch {
+        try {
+          location = await Location.getLastKnownPositionAsync();
+        } catch {
+          // ignore
+        }
+      }
+
+      if (location?.coords) {
+        const newRegion = {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
+        };
+
+        setRegion(newRegion);
+        mapRef.current?.animateToRegion(newRegion);
+        getAddressFromCoords(newRegion.latitude, newRegion.longitude);
+        return true;
+      }
+    } catch (err) {
+      console.log('GPS Location Error:', err);
     }
-
-    const location = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.High,
-    });
-
-    const newRegion = {
-      latitude: location.coords.latitude,
-      longitude: location.coords.longitude,
-      latitudeDelta: 0.005,
-      longitudeDelta: 0.005,
-    };
-
-    setRegion(newRegion);
-
-    mapRef.current?.animateToRegion(newRegion, 1000);
-
-    getAddressFromCoords(newRegion.latitude, newRegion.longitude);
+    return false;
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (isReverseGeocoding) return;
     const payload = {
       latitude: region.latitude.toString(),
       longitude: region.longitude.toString(),
     };
+
+    try {
+      await AsyncStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          region: {
+            latitude: region.latitude,
+            longitude: region.longitude,
+            latitudeDelta: 0.005,
+            longitudeDelta: 0.005,
+          },
+          locationInfo: locationInfo,
+        })
+      );
+    } catch (e) {
+      console.log('Error saving map data to storage:', e);
+    }
+
     submitStep2.mutate(payload, {
       onSuccess: () => {
         onConfirm();
@@ -310,14 +380,12 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
 
       {/* Map View Section */}
       <View className="relative z-10 h-[400px] w-full overflow-hidden rounded-3xl border border-slate-200 bg-gray-100">
-        <MapView
+        <LocationMapPicker
           ref={mapRef}
           style={{ flex: 1 }}
-          region={region}
+          initialRegion={region}
           onRegionChangeComplete={onRegionChangeComplete}
-          mapType="none">
-          <UrlTile urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png" maximumZ={19} />
-        </MapView>
+        />
 
         {/* Center Marker */}
         <View
@@ -364,6 +432,52 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
             <Text className="font-bold text-white">Confirm & Proceed</Text>
           )}
         </TouchableOpacity>
+
+        <View className="mt-5 flex-row items-center my-2">
+          <LinearGradient
+            colors={['transparent', '#F6163C']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={{ flex: 1, height: 1.5 }}
+          />
+          <View className="px-3 flex-row items-center">
+            <TouchableOpacity
+              onPress={async () => {
+                try {
+                  await useAuthStore.getState().logOut();
+                } catch (e) {
+                  console.log(e);
+                } finally {
+                  router.replace('/auth/Login');
+                }
+              }}
+              activeOpacity={0.7}
+              className="px-1 py-0.5">
+              <Text className="text-xs font-bold text-[#F6163C]">Log In</Text>
+            </TouchableOpacity>
+            <Text className="mx-1.5 text-slate-300">|</Text>
+            <TouchableOpacity
+              onPress={async () => {
+                try {
+                  await useAuthStore.getState().logOut();
+                } catch (e) {
+                  console.log(e);
+                } finally {
+                  router.replace('/auth/SignUp');
+                }
+              }}
+              activeOpacity={0.7}
+              className="px-1 py-0.5">
+              <Text className="text-xs font-bold text-[#F6163C]">Sign Up</Text>
+            </TouchableOpacity>
+          </View>
+          <LinearGradient
+            colors={['#F6163C', 'transparent']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={{ flex: 1, height: 1.5 }}
+          />
+        </View>
       </View>
     </View>
   );

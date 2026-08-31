@@ -115,6 +115,7 @@ export default function SignUp() {
   const {
     control,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
@@ -160,8 +161,30 @@ export default function SignUp() {
       },
       onError: (error: any) => {
         console.log('Signup Error Detail:', error?.response?.data || error.message);
-        const msg = error?.response?.data?.message || error?.message;
-        Toast.show({ type: 'error', text1: 'Signup Failed', text2: msg });
+        const serverMsg =
+          error?.response?.data?.error?.message ||
+          error?.response?.data?.message ||
+          error?.message ||
+          'Signup failed. Please try again.';
+
+        if (
+          serverMsg.toLowerCase().includes('already exists') ||
+          serverMsg.toLowerCase().includes('user') ||
+          serverMsg.toLowerCase().includes('identifier')
+        ) {
+          setError('identifier', {
+            type: 'manual',
+            message: serverMsg,
+          });
+        }
+
+        Toast.show({
+          type: 'error',
+          text1: 'Signup Failed',
+          text2: serverMsg,
+          position: 'top',
+          visibilityTime: 4000,
+        });
       },
     });
   };
@@ -186,10 +209,15 @@ export default function SignUp() {
           },
           onError: (err: any) => {
             console.error('Google Login: Backend verification failed:', err);
+            const msg =
+              err?.response?.data?.error?.message ||
+              err?.response?.data?.message ||
+              err?.message ||
+              'Google Login failed';
             Toast.show({
               type: 'error',
               text1: 'Google Login Failed',
-              text2: err?.message || 'Google Login failed',
+              text2: msg,
             });
           },
         }
@@ -224,10 +252,15 @@ export default function SignUp() {
         },
         onError: (err: any) => {
           console.error('Facebook Login: Backend verification failed:', err);
+          const msg =
+            err?.response?.data?.error?.message ||
+            err?.response?.data?.message ||
+            err?.message ||
+            'Facebook Login failed';
           Toast.show({
             type: 'error',
             text1: 'Facebook Login Failed',
-            text2: err?.message || 'Facebook Login failed',
+            text2: msg,
           });
         },
       });

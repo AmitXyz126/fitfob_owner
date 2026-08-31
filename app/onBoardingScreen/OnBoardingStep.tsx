@@ -12,12 +12,13 @@ import OnBoarding5 from '@/components/screen/OnBoarding5';
 import { KeyboardAwareScrollView } from '@pietile-native-kit/keyboard-aware-scrollview';
 import { useRouter } from 'expo-router';
 import { useState, useRef, useEffect } from 'react';
-import { TouchableOpacity, View, ActivityIndicator, BackHandler } from 'react-native';
+import { TouchableOpacity, View, Text, ActivityIndicator, BackHandler } from 'react-native';
 import { useUserDetail } from '@/hooks/useUserDetail';
 import { useAuthStore } from '@/store/useAuthStore';
 import GymLoader from '@/components/GymLoader';
 import { useMutationState } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function OnBoardingStep() {
   const router = useRouter();
@@ -286,6 +287,26 @@ export default function OnBoardingStep() {
     }
   };
 
+  const handleBackToLogin = async () => {
+    try {
+      await useAuthStore.getState().logOut();
+    } catch (e) {
+      console.log('Error logging out:', e);
+    } finally {
+      router.replace('/auth/Login');
+    }
+  };
+
+  const handleSignUp = async () => {
+    try {
+      await useAuthStore.getState().logOut();
+    } catch (e) {
+      console.log('Error logging out:', e);
+    } finally {
+      router.replace('/auth/SignUp');
+    }
+  };
+
   const getButtonTitle = () => {
     if (step === 5) return 'Submit Photos';
     if (step === 2 && subStep === 2) return 'Confirm & Proceed';
@@ -335,13 +356,15 @@ export default function OnBoardingStep() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
         <View className="mt-5 flex-1">
-          {step === 1 && (
-            <OnBoarding1 ref={onboarding1Ref} initialData={formData} onNext={() => setStep(2)} />
-          )}
+          {step === 1 && <OnBoarding1 ref={onboarding1Ref} initialData={formData} />}
 
           {step === 2 &&
             (subStep === 1 ? (
-              <OnBoarding2_Part2 onConfirm={() => setSubStep(2)} />
+              <OnBoarding2_Part2
+                onConfirm={() => {
+                  setSubStep(2);
+                }}
+              />
             ) : (
               <OnBoarding2_Details
                 ref={onboarding2DetailsRef}
@@ -400,6 +423,29 @@ export default function OnBoardingStep() {
               loading={isLoading}
               disabled={isLoading}
             />
+            <View className="mt-5 flex-row items-center my-2">
+              <LinearGradient
+                colors={['transparent', '#F6163C']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={{ flex: 1, height: 1.5 }}
+              />
+              <View className="px-3 flex-row items-center">
+                <TouchableOpacity onPress={handleBackToLogin} activeOpacity={0.7} className="px-1 py-0.5">
+                  <Text className="text-xs font-bold text-[#F6163C]">Log In</Text>
+                </TouchableOpacity>
+                <Text className="mx-1.5 text-slate-300">|</Text>
+                <TouchableOpacity onPress={handleSignUp} activeOpacity={0.7} className="px-1 py-0.5">
+                  <Text className="text-xs font-bold text-[#F6163C]">Sign Up</Text>
+                </TouchableOpacity>
+              </View>
+              <LinearGradient
+                colors={['#F6163C', 'transparent']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={{ flex: 1, height: 1.5 }}
+              />
+            </View>
           </View>
         )}
       </KeyboardAwareScrollView>

@@ -94,7 +94,6 @@ export const userDetailsApi = {
         console.log('Error fetching club-owners in getMe fallback:', e);
       }
 
-      console.log('ℹ️ New user with no onboarding/owner record yet. Directing to onboarding step 1...');
       return {
         status: 'draft',
         currentStep: 1,

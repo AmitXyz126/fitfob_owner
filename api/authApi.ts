@@ -34,6 +34,7 @@ export const resendOtpApi = async (payload: { identifier: string; signupToken: s
   } catch (error: any) {
     console.error('❌ Resend OTP API Error:', error.response?.data || error.message);
     throw error;
+
   }
 };
 

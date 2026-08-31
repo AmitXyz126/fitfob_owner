@@ -14,7 +14,7 @@ import {
 import { ChevronLeft, Target } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Container } from '@/components/Container';
-import MapView, { UrlTile } from 'react-native-maps';
+import { LocationMapPicker, LocationMapPickerHandle } from '@/components/LocationMapPicker';
 import * as Location from 'expo-location';
 import { Button } from '@/components/Button';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -29,7 +29,7 @@ const ClubLocationScreen = () => {
   const { user } = useAuthStore();
   const { profileStatus, updateClubOwner, submitStep2 } = useUserDetail();
 
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<LocationMapPickerHandle>(null);
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -135,9 +135,15 @@ const ClubLocationScreen = () => {
 
       const data = await res.json();
 
-      if (data) {
+      if (data && data.address) {
         const address = data.display_name || 'Selected Location';
         const name =
+          data.address?.building ||
+          data.address?.amenity ||
+          data.address?.shop ||
+          data.address?.office ||
+          data.address?.leisure ||
+          data.address?.commercial ||
           data.address?.road ||
           data.address?.suburb ||
           data.address?.city ||
@@ -162,9 +168,50 @@ const ClubLocationScreen = () => {
 
         setLocationInfo(locationData);
         setSearchQuery(address);
+      } else {
+        const nativePlaces = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+        if (nativePlaces && nativePlaces.length > 0) {
+          const p = nativePlaces[0];
+          const name = p.name || p.street || p.district || p.subregion || 'Selected Location';
+          const fullAddr = [p.name, p.street, p.subregion, p.district, p.city, p.region, p.postalCode]
+            .filter(Boolean)
+            .join(', ');
+
+          setLocationInfo({
+            name,
+            address: fullAddr || name,
+            clubAddress: p.street || p.name || fullAddr || '',
+            city: p.city || p.region || '',
+            state: p.region || '',
+            pincode: p.postalCode || '',
+          });
+          setSearchQuery(fullAddr || name);
+        }
       }
     } catch (err) {
-      console.log('Reverse geocode error', err);
+      console.log('Reverse geocode error, trying native fallback:', err);
+      try {
+        const nativePlaces = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+        if (nativePlaces && nativePlaces.length > 0) {
+          const p = nativePlaces[0];
+          const name = p.name || p.street || p.district || p.subregion || 'Selected Location';
+          const fullAddr = [p.name, p.street, p.subregion, p.district, p.city, p.region, p.postalCode]
+            .filter(Boolean)
+            .join(', ');
+
+          setLocationInfo({
+            name,
+            address: fullAddr || name,
+            clubAddress: p.street || p.name || fullAddr || '',
+            city: p.city || p.region || '',
+            state: p.region || '',
+            pincode: p.postalCode || '',
+          });
+          setSearchQuery(fullAddr || name);
+        }
+      } catch (geoErr) {
+        console.log('Native geocode error:', geoErr);
+      }
     } finally {
       setIsReverseGeocoding(false);
     }
@@ -237,20 +284,32 @@ const ClubLocationScreen = () => {
         return;
       }
 
-      let currentLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-      const { latitude, longitude } = currentLocation.coords;
+      let currentLocation = null;
+      try {
+        currentLocation = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+      } catch {
+        try {
+          currentLocation = await Location.getLastKnownPositionAsync();
+        } catch {
+          // ignore
+        }
+      }
 
-      const newRegion = {
-        ...region,
-        latitude,
-        longitude,
-      };
+      if (currentLocation?.coords) {
+        const { latitude, longitude } = currentLocation.coords;
 
-      setRegion(newRegion);
-      mapRef.current?.animateToRegion(newRegion, 1000);
-      await getAddressFromCoords(latitude, longitude);
+        const newRegion = {
+          ...region,
+          latitude,
+          longitude,
+        };
+
+        setRegion(newRegion);
+        mapRef.current?.animateToRegion(newRegion);
+        await getAddressFromCoords(latitude, longitude);
+      }
     } catch (error) {
       console.log('Error getting current location:', error);
     } finally {
@@ -451,17 +510,12 @@ const ClubLocationScreen = () => {
 
           {/* Interactive Map View */}
           <View className="relative z-10 h-[380px] w-full overflow-hidden rounded-[32px] border border-slate-200 bg-gray-100">
-            <MapView
+            <LocationMapPicker
               ref={mapRef}
               style={{ width: '100%', height: '100%' }}
-              region={region}
+              initialRegion={region}
               onRegionChangeComplete={onRegionChangeComplete}
-              mapType="none">
-              <UrlTile
-                urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-                maximumZ={19}
-              />
-            </MapView>
+            />
 
             {/* Center Pin Marker */}
             <View
