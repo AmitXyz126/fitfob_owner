@@ -2,19 +2,23 @@ import { userDetailsApi } from '@/api/userdetailsApi';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import Toast from 'react-native-toast-message';
+import { useAuthStore } from '@/store/useAuthStore';
 
 export const useUserDetail = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
+  const userKey = user?.id || user?.email || 'guest';
 
-   const {
+  const {
     data: profileStatus,
     isLoading: isFetchingStatus,
     refetch,
     isRefetching,
   } = useQuery({
-    queryKey: ['club-owner-me'],
+    queryKey: ['club-owner-me', userKey],
     queryFn: userDetailsApi.getMe,
     retry: 1,
+    enabled: !!user,
   });
 
   const {
@@ -22,8 +26,9 @@ export const useUserDetail = () => {
     isLoading: isDocsLoading,
     refetch: refetchDocs,
   } = useQuery({
-    queryKey: ['club-owner-docs'],
+    queryKey: ['club-owner-docs', userKey],
     queryFn: userDetailsApi.getDocuments,
+    enabled: !!user,
   });
 
   const submitStep1 = useMutation({

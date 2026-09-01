@@ -76,7 +76,9 @@
     "android": {
       "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png"
+        "foregroundImage": "./assets/adaptive-icon.png",
+  
+        "backgroundColor": "#FFFFFF"
       },
       "package": "com.xyzstudio.fitfob",
       "googleServicesFile": "./google-services.json",

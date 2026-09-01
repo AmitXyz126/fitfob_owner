@@ -144,9 +144,10 @@ export default function OnBoardingStep() {
       const isCompleted =
         profileStatus?.status === 'completed' ||
         profileStatus?.status === 'approved' ||
+        profileStatus?.status === 'in_review' ||
         profileStatus?.isApprovedOwner ||
         profileStatus?.verification_status === 'approved' ||
-        profileStatus?.verification_status === 'pending';
+        profileStatus?.verification_status === 'in_review';
 
       if (!isCompleted && step === 1 && subStep === 1) {
         useAuthStore.getState().logOut().then(() => {
@@ -190,13 +191,12 @@ export default function OnBoardingStep() {
       return;
     }
 
-    // 3. In Review / Pending / Completed -> Review Status Screen
+    // 3. In Review / Completed -> Review Status Screen
     if (
       status === 'in_review' ||
-      status === 'pending' ||
       status === 'completed' ||
       verificationStatus === 'in_review' ||
-      verificationStatus === 'pending'
+      verificationStatus === 'completed'
     ) {
       if (router.canGoBack()) {
         router.dismissAll();
@@ -205,13 +205,11 @@ export default function OnBoardingStep() {
       return;
     }
 
-    // 4. Draft status -> Onboarding
-    if (status === 'draft') {
-      if (!isDataSynced) {
-        const backendMapped = mapApiStepToFrontend(profileStatus?.currentStep || 1);
-        setStep(backendMapped.step);
-        setSubStep(backendMapped.subStep);
-      }
+    // 4. Incomplete Onboarding (draft / pending) -> Onboarding
+    if (!isDataSynced) {
+      const backendMapped = mapApiStepToFrontend(profileStatus?.currentStep || 1);
+      setStep(backendMapped.step);
+      setSubStep(backendMapped.subStep);
     }
   }, [user, profileStatus]);
 
@@ -356,7 +354,16 @@ export default function OnBoardingStep() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
         <View className="mt-5 flex-1">
-          {step === 1 && <OnBoarding1 ref={onboarding1Ref} initialData={formData} />}
+          {step === 1 && (
+            <OnBoarding1
+              ref={onboarding1Ref}
+              initialData={formData}
+              onNext={() => {
+                setStep(2);
+                setSubStep(1);
+              }}
+            />
+          )}
 
           {step === 2 &&
             (subStep === 1 ? (

@@ -36,6 +36,7 @@ export const userDetailsApi = {
         'Content-Type': 'multipart/form-data',
         Accept: 'application/json',
       },
+      transformRequest: (data) => data,
     });
 
     return response.data;
@@ -43,21 +44,53 @@ export const userDetailsApi = {
 
   getMe: async () => {
     try {
+      const currentUser = useAuthStore.getState().user;
+      const currentUserEmail = currentUser?.email ? String(currentUser.email).toLowerCase().trim() : '';
+
       const response = await api.get(ENDPOINTS.GET_ONBOARDING_STATUS);
       const data = response.data;
       if (data) {
-        const isApproved =
-          data.isApprovedOwner === true ||
-          data.verification_status === 'approved' ||
-          data.verificationStatus === 'approved' ||
-          data.status === 'approved';
-        return {
+        const details = data.details || (data.data ? data.data : {});
+        const recordEmail = (details.email || data.email || data.user?.email)
+          ? String(details.email || data.email || data.user?.email).toLowerCase().trim()
+          : '';
+
+        // Safety check: If API returns a record for a different user email, ignore it and treat as fresh draft
+        if (recordEmail && currentUserEmail && recordEmail !== currentUserEmail) {
+          console.warn(`⚠️ [getMe] Email mismatch: backend record is for (${recordEmail}), but logged in user is (${currentUserEmail}). Defaulting to fresh draft.`);
+          return {
+            status: 'draft',
+            currentStep: 1,
+            isApprovedOwner: false,
+            verification_status: 'draft',
+            email: currentUserEmail,
+          };
+        }
+
+        const mergedData = {
+          ...details,
           ...data,
+        };
+
+        const currentStep = data.currentStep ?? details.currentStep ?? 1;
+        const realStatus = details.status || (data.status === 'pending' ? 'draft' : data.status) || 'draft';
+
+        const isApproved =
+          mergedData.isApprovedOwner === true ||
+          mergedData.verification_status === 'approved' ||
+          mergedData.verificationStatus === 'approved' ||
+          realStatus === 'approved';
+
+        return {
+          ...mergedData,
+          id: details.id || data.id || data.pendingClubOwnerId,
+          pendingClubOwnerId: details.id || data.id || data.pendingClubOwnerId,
+          currentStep,
+          status: realStatus,
           isApprovedOwner: isApproved,
-          status: data.status || 'draft',
           verification_status: isApproved
             ? 'approved'
-            : data.verification_status || data.verificationStatus || (data.status === 'draft' ? 'draft' : 'pending'),
+            : mergedData.verification_status || mergedData.verificationStatus || (realStatus === 'in_review' || realStatus === 'completed' ? 'in_review' : 'draft'),
         };
       }
       return data;
@@ -129,7 +162,9 @@ export const userDetailsApi = {
       {
         headers: {
           'Content-Type': 'multipart/form-data',
+          Accept: 'application/json',
         },
+        transformRequest: (data) => data,
       }
     );
 
@@ -193,6 +228,7 @@ export const userDetailsApi = {
         'Content-Type': 'multipart/form-data',
         Accept: 'application/json',
       },
+      transformRequest: (data) => data,
     });
 
     return response.data;

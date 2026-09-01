@@ -83,10 +83,9 @@ export default function Splash() {
 
             if (
               status === 'in_review' ||
-              status === 'pending' ||
               status === 'completed' ||
               verificationStatus === 'in_review' ||
-              verificationStatus === 'pending'
+              verificationStatus === 'completed'
             ) {
               router.replace('/ReviewStatusScreen');
               return;

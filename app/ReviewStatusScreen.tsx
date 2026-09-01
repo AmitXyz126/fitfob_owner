@@ -5,11 +5,13 @@ import { router } from 'expo-router';
 import { useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useUserDetail } from '@/hooks/useUserDetail';
+import { useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
 
 export default function ReviewStatusScreen() {
-  const { user } = useAuthStore();
+  const { user, logOut } = useAuthStore();
   const { profileStatus, isFetchingStatus, refetch } = useUserDetail();
+  const queryClient = useQueryClient();
 
   const isApproved =
     profileStatus?.isApprovedOwner === true ||
@@ -25,6 +27,20 @@ export default function ReviewStatusScreen() {
       router.replace('/(tabs)');
     }
   }, [isApproved]);
+
+  const handleLogout = async () => {
+    try {
+      queryClient.clear();
+      await logOut();
+    } catch (e) {
+      console.log('Error logging out from review screen:', e);
+    } finally {
+      if (router.canGoBack()) {
+        router.dismissAll();
+      }
+      router.replace('/welcome');
+    }
+  };
 
   const handleCheckStatus = async () => {
     try {
@@ -59,19 +75,20 @@ export default function ReviewStatusScreen() {
 
   return (
     <Container style={{ flex: 1 }}>
-      {/* Back Button */}
-      <TouchableOpacity
-        className="ml-2 mt-5 w-10 p-2"
-        onPress={() => {
-          if (router.canGoBack()) {
-            router.back();
-          } else {
-            router.replace('/auth/Login');
-          }
-        }}
-        activeOpacity={0.7}>
-        <Ionicons name="chevron-back" size={24} color="#CBD5E1" />
-      </TouchableOpacity>
+      {/* Header with Back / Logout */}
+      <View className="flex-row items-center justify-between px-2 mt-4">
+        <TouchableOpacity
+          className="p-2 flex-row items-center"
+          onPress={handleLogout}
+          activeOpacity={0.7}>
+          <Ionicons name="chevron-back" size={24} color="#64748B" />
+         
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={handleLogout} activeOpacity={0.7} className="px-3 py-1">
+          <Text className="text-xs font-bold text-[#F6163C]">Switch Account</Text>
+        </TouchableOpacity>
+      </View>
 
       <View className="flex-1 items-center justify-center px-6">
         <Text className="text-center font-bold font-sans text-[24px] leading-8 text-[#1C1C1C]">
