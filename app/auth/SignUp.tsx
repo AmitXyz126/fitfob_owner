@@ -44,6 +44,7 @@ const validatePasswordSecurity = (identifier: string, password: string): string 
       const sub = lowerBase.substring(i, i + 4);
       if (lowerPassword.includes(sub)) {
         return 'Password too similar to your identifier.';
+        
       }
     }
   }

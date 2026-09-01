@@ -218,8 +218,9 @@ export default function OtpScreen() {
                 ref={(ref) => {
                   inputRefs.current[index] = ref;
                 }}
-                className={`h-14 w-12 rounded-lg border text-center font-bold text-xl text-slate-900 ${digit ? 'border-[#F6163C]' : 'border-slate-200'
-                  }`}
+                className={`h-14 w-12 rounded-lg border text-center font-bold text-xl text-slate-900 ${
+                  digit ? 'border-[#F6163C]' : 'border-slate-200'
+                }`}
                 keyboardType="number-pad"
                 maxLength={6}
                 value={digit ? digit.slice(-1) : ''}

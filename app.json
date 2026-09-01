@@ -4,17 +4,10 @@
     "slug": "fitFob_owner",
     "version": "1.0.0",
     "jsEngine": "hermes",
-    "scheme": [
-      "fitfob_owner",
-      "fb2349725998870415"
-    ],
+    "scheme": ["fitfob_owner", "fb2349725998870415"],
     "facebookAppId": "2349725998870415",
     "facebookDisplayName": "fitfob_owner",
-    "platforms": [
-      "ios",
-      "android",
-      "web"
-    ],
+    "platforms": ["ios", "android", "web"],
     "web": {
       "bundler": "metro",
       "output": "static",
@@ -24,6 +17,7 @@
       "expo-router",
       "expo-font",
       "@react-native-community/datetimepicker",
+      "expo-web-browser",
       [
         "@react-native-google-signin/google-signin",
         {
@@ -52,9 +46,7 @@
       "image": "./assets/splash.png",
       "resizeMode": "contain"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.xyzstudio.fitfob",
