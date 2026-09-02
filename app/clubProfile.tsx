@@ -21,7 +21,8 @@ import LineGradient from '@/components/lineGradient/LineGradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useUserDetail } from '@/hooks/useUserDetail';
+import { useUserDetail, useClubOwnerMe } from '@/hooks/useUserDetail';
+import { userDetailsApi } from '@/api/userdetailsApi';
 
 const getServiceIcon = (name: string) => {
   const lower = String(name).toLowerCase();
@@ -282,7 +283,7 @@ const ClubProfileScreen = () => {
   // --- States for Dynamic Data ---
   const { user } = useAuthStore();
   const { profileStatus } = useUserDetail();
-  const pData = profileStatus?.data || profileStatus || {};
+  const { data: myOwnerData } = useClubOwnerMe();
 
   const [clubInfo, setClubInfo] = useState<{
     name: string;
@@ -315,7 +316,31 @@ const ClubProfileScreen = () => {
 
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
-  const [servicesList, setServicesList] = useState<any>(null);
+  const [servicesList, setServicesList] = useState<string[]>([]);
+  const [amenitiesList, setAmenitiesList] = useState<string[]>([]);
+  const [clubCategory, setClubCategory] = useState<string>('');
+
+  const parseArrayData = (val: any): string[] => {
+    if (!val) return [];
+    if (Array.isArray(val)) {
+      return val.map((item) => String(item).trim()).filter(Boolean);
+    }
+    if (typeof val === 'string') {
+      const trimmed = val.trim();
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) {
+            return parsed.map((item) => String(item).trim()).filter(Boolean);
+          }
+        } catch (e) {
+          // fallback
+        }
+      }
+      return trimmed.split(',').map((item) => item.trim()).filter(Boolean);
+    }
+    return [];
+  };
 
   const getImageUriString = (val: any): string => {
     if (!val) return '';
@@ -336,14 +361,16 @@ const ClubProfileScreen = () => {
     return str;
   };
 
-  // --- Fetch Data from Onboarding ---
+  // --- Fetch Data from React Query Cached Hook ---
   useEffect(() => {
     const loadClubData = async () => {
       try {
         let logoFromStorage: any = null;
         let addressFromStorage: string | null = null;
         let clubNameFromStorage: string | null = null;
-        let servicesFromStorage: string[] | null = null;
+        let servicesFromStorage: string[] = [];
+        let amenitiesFromStorage: string[] = [];
+        let categoryFromStorage: string = '';
 
         const savedData = await AsyncStorage.getItem('club_profile');
         if (savedData) {
@@ -352,17 +379,18 @@ const ClubProfileScreen = () => {
           if (parsedData.logo) logoFromStorage = parsedData.logo;
           if (parsedData.address) addressFromStorage = parsedData.address;
           if (parsedData.clubName) clubNameFromStorage = parsedData.clubName;
-          if (parsedData.services) servicesFromStorage = parsedData.services;
+          if (parsedData.services) servicesFromStorage = parseArrayData(parsedData.services);
+          if (parsedData.amenities) amenitiesFromStorage = parseArrayData(parsedData.amenities);
+          if (parsedData.clubCategory) categoryFromStorage = parsedData.clubCategory;
         }
 
-        const userKey = profileStatus?.id || profileStatus?.pendingClubOwnerId || user?.id || user?.email || '';
         const keys = await AsyncStorage.getAllKeys();
 
         // Step 1
         const step1Keys = keys.filter((k) => k.includes('onboarding_step1_data'));
-        let step1Key = userKey ? step1Keys.find((k) => k.includes(String(userKey))) : null;
-        if (step1Key) {
-          const step1Json = await AsyncStorage.getItem(step1Key);
+        if (step1Keys.length > 0) {
+          const lastStep1Key = step1Keys[step1Keys.length - 1];
+          const step1Json = await AsyncStorage.getItem(lastStep1Key);
           if (step1Json) {
             const parsedStep1 = JSON.parse(step1Json);
             if (!logoFromStorage) {
@@ -376,24 +404,40 @@ const ClubProfileScreen = () => {
 
         // Step 3 (Services & Amenities)
         const step3Keys = keys.filter((k) => k.includes('onboarding_step3_data'));
-        let step3Key = userKey ? step3Keys.find((k) => k.includes(String(userKey))) : null;
-        if (step3Key && !servicesFromStorage) {
-          const step3Json = await AsyncStorage.getItem(step3Key);
+        if (step3Keys.length > 0) {
+          const lastStep3Key = step3Keys[step3Keys.length - 1];
+          const step3Json = await AsyncStorage.getItem(lastStep3Key);
           if (step3Json) {
             const parsedStep3 = JSON.parse(step3Json);
-            if (parsedStep3.fitnessTypes && Array.isArray(parsedStep3.fitnessTypes)) {
-              servicesFromStorage = parsedStep3.fitnessTypes;
-            } else if (parsedStep3.services) {
-              servicesFromStorage = parsedStep3.services;
+            if (servicesFromStorage.length === 0) {
+              servicesFromStorage = parseArrayData(parsedStep3.fitnessTypes || parsedStep3.services);
+            }
+            if (amenitiesFromStorage.length === 0) {
+              amenitiesFromStorage = parseArrayData(parsedStep3.amenities || parsedStep3.facilities);
+            }
+            if (!categoryFromStorage) {
+              categoryFromStorage = parsedStep3.clubCategory || '';
             }
           }
         }
 
-        const pData = profileStatus?.data || profileStatus || {};
+        const pData = myOwnerData || profileStatus?.data || profileStatus || {};
+
+        // Resolve Logo Image
         const rawLogo =
+          myOwnerData?.logoUrl ||
+          myOwnerData?.logo ||
+          myOwnerData?.logo_url ||
+          myOwnerData?.image ||
+          user?.clubOwnerDetail?.logoUrl ||
+          user?.clubOwnerDetail?.logo ||
+          user?.clubOwnerDetail?.image ||
+          user?.logoUrl ||
+          user?.logo ||
+          pData?.clubOwnerDetail?.logoUrl ||
+          pData?.clubOwnerDetail?.logo ||
           pData?.logoUrl ||
           pData?.logo ||
-          pData?.logo_url ||
           pData?.pendingClubOwner?.logoUrl ||
           pData?.pendingClubOwner?.logo ||
           logoFromStorage ||
@@ -404,37 +448,77 @@ const ClubProfileScreen = () => {
         setProfileImageUri(finalLogoUri || null);
         setImageError(false);
 
-        const resolvedServices =
+        // Resolve Services
+        const rawServices =
+          myOwnerData?.services ||
+          myOwnerData?.fitnessTypes ||
           pData?.services ||
           pData?.fitnessTypes ||
           pData?.pendingClubOwner?.services ||
           pData?.pendingClubOwner?.fitnessTypes ||
+          user?.clubOwnerDetail?.services ||
+          user?.clubOwnerDetail?.fitnessTypes ||
           servicesFromStorage;
 
-        if (resolvedServices) {
-          setServicesList(resolvedServices);
-        } else {
-          setServicesList(null);
-        }
+        const resolvedServices = parseArrayData(rawServices);
+        setServicesList(resolvedServices.length > 0 ? resolvedServices : servicesFromStorage);
 
+        // Resolve Amenities
+        const rawAmenities =
+          myOwnerData?.facilities ||
+          myOwnerData?.amenities ||
+          pData?.facilities ||
+          pData?.amenities ||
+          pData?.pendingClubOwner?.facilities ||
+          pData?.pendingClubOwner?.amenities ||
+          user?.clubOwnerDetail?.facilities ||
+          user?.clubOwnerDetail?.amenities ||
+          amenitiesFromStorage;
+
+        const resolvedAmenities = parseArrayData(rawAmenities);
+        setAmenitiesList(resolvedAmenities.length > 0 ? resolvedAmenities : amenitiesFromStorage);
+
+        // Resolve Club Category
+        const resolvedCategory =
+          myOwnerData?.clubCategory ||
+          myOwnerData?.category ||
+          pData?.clubCategory ||
+          pData?.category ||
+          pData?.pendingClubOwner?.clubCategory ||
+          user?.clubOwnerDetail?.clubCategory ||
+          categoryFromStorage ||
+          '';
+
+        setClubCategory(resolvedCategory);
+
+        // Resolve Club Name & Address
         const resolvedClubName =
+          myOwnerData?.clubName ||
+          myOwnerData?.name ||
           pData?.clubName ||
           pData?.club_name ||
           pData?.pendingClubOwner?.clubName ||
           clubNameFromStorage ||
           'Fitness Club';
 
+        const resolvedAddress =
+          myOwnerData?.clubAddress ||
+          myOwnerData?.address ||
+          pData?.clubAddress ||
+          addressFromStorage ||
+          'Your Club Location';
+
         setClubInfo({
           name: resolvedClubName,
           image: finalLogoUri,
-          address: pData?.clubAddress || addressFromStorage || 'Your Club Location',
+          address: resolvedAddress,
         });
       } catch (error) {
-        console.error('Failed to load club profile data', error);
+        console.error('Failed to load club profile data:', error);
       }
     };
     loadClubData();
-  }, [profileStatus, user]);
+  }, [myOwnerData, profileStatus, user]);
 
   return (
     <Container>
@@ -458,6 +542,7 @@ const ClubProfileScreen = () => {
           <ImageBackground
             source={require('../assets/images/bgprofile.png')}
             className="justify-center p-4"
+            fadeDuration={0}
             resizeMode="cover">
             <View className="flex-row items-center">
               <View className="relative">
@@ -472,6 +557,7 @@ const ClubProfileScreen = () => {
                           ? { uri: profileImageUri }
                           : require('../assets/images/fitfob_profile.png')
                       }
+                      fadeDuration={0}
                       onError={() => setImageError(true)}
                       className="h-14 w-14 rounded-full"
                       resizeMode={profileImageUri && !imageError ? 'cover' : 'contain'}
@@ -555,6 +641,7 @@ const ClubProfileScreen = () => {
           <MenuOption
             icon={Wifi}
             title="Amenities"
+            value={amenitiesList.length > 0 ? `${amenitiesList.length} Active` : undefined}
             onPress={() => router.push('/clubAmenities')}
           />
           <LineGradient />
@@ -562,6 +649,13 @@ const ClubProfileScreen = () => {
           <MenuOption
             icon={Layers}
             title="Club Types & Services"
+            value={
+              clubCategory
+                ? `${clubCategory} • ${servicesList.length} Services`
+                : servicesList.length > 0
+                ? `${servicesList.length} Services`
+                : undefined
+            }
             onPress={() => router.push('/clubServices')}
           />
           <LineGradient />

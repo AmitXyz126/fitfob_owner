@@ -19,7 +19,9 @@ import { router } from 'expo-router';
 
 type TabType = 'Daily' | 'Weekly' | 'Monthly';
 
-const DATA = [
+// DUMMY TRANSACTIONS DATA (COMMENTED OUT FOR LIVE DATA / EMPTY STATE)
+/*
+const DUMMY_DATA = [
   // Daily Transactions
   {
     id: '1',
@@ -123,9 +125,12 @@ const DATA = [
     type: 'Monthly',
   },
 ];
+*/
+
+const DATA: any[] = [];
 
 const Wallet = () => {
-  const [activeTab, setActiveTab] = useState<TabType>('Monthly');
+  const [activeTab, setActiveTab] = useState<TabType>('Daily');
 
   // Filter & Search states
   const [showFilters, setShowFilters] = useState(false);
@@ -344,9 +349,27 @@ const Wallet = () => {
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: Platform.OS === 'ios' ? 100 : 30 }}
         ListEmptyComponent={
-          <View className="items-center justify-center py-20">
-            <Ionicons name="receipt-outline" size={48} color="#CBD5E1" />
-            <Text className="mt-4 font-semibold text-slate-400">No transactions match filters.</Text>
+          <View className="items-center justify-center py-4">
+            <Image
+              source={require('../../assets/images/wallet_empty.png')}
+              className="h-80 w-80"
+              resizeMode="contain"
+            />
+            <Text className="mt-1 text-center font-bold text-lg text-slate-900">
+              No Transactions Yet
+            </Text>
+            <Text className="mt-1 px-8 text-center text-xs leading-5 text-slate-500">
+              {isAnyFilterActive
+                ? 'No payout transactions match your search or filters.'
+                : 'All your member pass earnings and payouts will appear right here.'}
+            </Text>
+            {isAnyFilterActive && (
+              <TouchableOpacity
+                onPress={clearAllFilters}
+                className="mt-4 rounded-full bg-[#F6163C] px-5 py-2.5 shadow-sm">
+                <Text className="font-semibold text-xs text-white">Clear Filters</Text>
+              </TouchableOpacity>
+            )}
           </View>
         }
       />

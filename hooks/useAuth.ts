@@ -12,9 +12,66 @@ import {
   googleLoginApi,
   changePasswordApi,
 } from '@/api/authApi';
+import { userDetailsApi } from '@/api/userdetailsApi';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
+
+export const navigateAfterAuth = async (user: any, router: any) => {
+  // 1. Direct check on login response user object: if clubOwnerDetail is non-null
+  if (user?.clubOwnerDetail !== null && user?.clubOwnerDetail !== undefined) {
+    console.log('✅ clubOwnerDetail present in login response, fetching /api/club-owner/me & routing to /(tabs)');
+    await userDetailsApi.getMyClubOwner();
+    router.replace('/(tabs)');
+    return;
+  }
+
+  // 2. Query getMe() API for profile/verification status (approved, rejected, in_review, etc.)
+  try {
+    const statusData = await userDetailsApi.getMe();
+    const verificationStatus =
+      statusData?.verification_status ||
+      statusData?.verificationStatus ||
+      user?.verification_status;
+    const status = statusData?.status;
+
+    const isApproved =
+      (statusData?.clubOwnerDetail !== null && statusData?.clubOwnerDetail !== undefined) ||
+      statusData?.isApprovedOwner === true ||
+      verificationStatus === 'approved' ||
+      status === 'approved';
+
+    if (isApproved) {
+      console.log('✅ User approved via getMe, fetching /api/club-owner/me & routing to /(tabs)');
+      await userDetailsApi.getMyClubOwner();
+      router.replace('/(tabs)');
+      return;
+    }
+
+    if (verificationStatus === 'rejected' || status === 'rejected') {
+      console.log('❌ User verification rejected, routing to /RejectRequestScreen');
+      router.replace('/RejectRequestScreen');
+      return;
+    }
+
+    if (
+      status === 'in_review' ||
+      status === 'completed' ||
+      verificationStatus === 'in_review' ||
+      verificationStatus === 'completed'
+    ) {
+      console.log('⏳ User application in review, routing to /ReviewStatusScreen');
+      router.replace('/ReviewStatusScreen');
+      return;
+    }
+  } catch (error) {
+    console.error('Error fetching onboarding status after auth:', error);
+  }
+
+  // 3. Fallback: details null & onboarding incomplete -> OnBoardingStep
+  console.log('ℹ️ Incomplete onboarding, routing to /onBoardingScreen/OnBoardingStep');
+  router.replace('/onBoardingScreen/OnBoardingStep');
+};
 
 export const useSignupRequest = () => {
   return useMutation({
@@ -72,10 +129,7 @@ export const useLoginRequest = () => {
         // Clear query cache to pull correct details with new token
         queryClient.clear();
 
-        if (router.canGoBack()) {
-          router.dismissAll();
-        }
-        router.replace('/onBoardingScreen/OnBoardingStep');
+        navigateAfterAuth(userWithToken, router);
       }
     },
 
@@ -181,10 +235,7 @@ export const useGoogleLogin = () => {
         // Clear query cache to pull correct details with new token
         queryClient.clear();
 
-        if (router.canGoBack()) {
-          router.dismissAll();
-        }
-        router.replace('/onBoardingScreen/OnBoardingStep');
+        navigateAfterAuth(userWithToken, router);
       } else {
         console.warn('⚠️ API Success but missing fields in response:', data);
         router.replace('/auth/Login');
@@ -223,10 +274,7 @@ export const useFacebookLogin = () => {
         // Clear query cache to pull correct details with new token
         queryClient.clear();
 
-        if (router.canGoBack()) {
-          router.dismissAll();
-        }
-        router.replace('/onBoardingScreen/OnBoardingStep');
+        navigateAfterAuth(userWithToken, router);
       } else {
         console.warn('⚠️ API Success but missing fields in response:', data);
         router.replace('/auth/Login');

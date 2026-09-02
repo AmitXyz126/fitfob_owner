@@ -1,6 +1,7 @@
 import api from './apiInstance';
 import { ENDPOINTS } from './endpoint';
 import { useAuthStore } from '@/store/useAuthStore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface PhotoFile {
   uri: string;
@@ -239,12 +240,14 @@ export const userDetailsApi = {
     return response.data;
   },
 
-  getDocuments: async () => {
-    try {
-      const response = await api.get(ENDPOINTS.MY_DOCUMENTS);
-      if (response.data) return response.data;
-    } catch (e) {
-      console.log('MY_DOCUMENTS endpoint error, using pending-club-owner fallback:', e);
+  getDocuments: async (isApprovedOwner: boolean = false) => {
+    if (isApprovedOwner) {
+      try {
+        const response = await api.get(ENDPOINTS.MY_DOCUMENTS);
+        if (response.data) return response.data;
+      } catch (e) {
+        console.log('MY_DOCUMENTS endpoint error, using pending-club-owner fallback:', e);
+      }
     }
     const response = await api.get(ENDPOINTS.Get);
     return response.data;
@@ -277,5 +280,29 @@ export const userDetailsApi = {
       data: payloadData,
     });
     return response.data;
+  },
+
+  getVerificationStatus: async () => {
+    const response = await api.get(ENDPOINTS.VERIFICATION_STATUS);
+    return response.data;
+  },
+
+  getMyClubOwner: async () => {
+    try {
+      const response = await api.get(ENDPOINTS.MY_CLUB_OWNER);
+      const ownerData = response.data?.data || response.data || null;
+
+      if (ownerData) {
+        try {
+          await AsyncStorage.setItem('club_owner_me', JSON.stringify(ownerData));
+        } catch (e) {
+          console.log('Error caching club_owner_me in AsyncStorage:', e);
+        }
+        return ownerData;
+      }
+    } catch (e: any) {
+      console.log('Error fetching MY_CLUB_OWNER (/api/club-owner/me):', e?.response?.status || e?.message);
+    }
+    return null;
   },
 };

@@ -17,7 +17,9 @@ import Animated, {
   Extrapolation,
 } from 'react-native-reanimated';
 
-const RECENT_CHECKINS = [
+// DUMMY RECENT CHECKINS DATA (COMMENTED OUT FOR LIVE DATA / EMPTY STATE)
+/*
+const DUMMY_RECENT_CHECKINS = [
   {
     id: '1',
     name: 'Tina Sharma',
@@ -67,6 +69,9 @@ const RECENT_CHECKINS = [
     color: '#EAB308',
   },
 ];
+*/
+
+const RECENT_CHECKINS: any[] = [];
 
 const ITEM_SIZE = 84;
 
@@ -157,8 +162,10 @@ const getImageUriString = (val: any): string => {
   let str = '';
   if (typeof val === 'string') {
     str = val;
+  } else if (Array.isArray(val) && val.length > 0) {
+    return getImageUriString(val[0]);
   } else if (typeof val === 'object') {
-    str = val.uri || val.url || val.path || val.src || '';
+    str = val.logoUrl || val.url || val.uri || val.path || val.src || '';
   }
   if (!str) return '';
   if (str.startsWith('/')) {
@@ -219,11 +226,27 @@ const HomeScreen = () => {
 
         const pData = profileStatus?.data || profileStatus || {};
         const rawLogo =
+          user?.clubOwnerDetail?.logoUrl ||
+          user?.clubOwnerDetail?.logo ||
+          user?.clubOwnerDetail?.logo_url ||
+          user?.clubOwnerDetail?.clubLogo ||
+          user?.clubOwnerDetail?.image ||
+          user?.logoUrl ||
+          user?.logo ||
+          user?.logo_url ||
+          pData?.clubOwnerDetail?.logoUrl ||
+          pData?.clubOwnerDetail?.logo ||
+          pData?.clubOwnerDetail?.logo_url ||
+          pData?.clubOwnerDetail?.clubLogo ||
           pData?.logoUrl ||
           pData?.logo ||
           pData?.logo_url ||
           pData?.pendingClubOwner?.logoUrl ||
           pData?.pendingClubOwner?.logo ||
+          profileStatus?.clubOwnerDetail?.logoUrl ||
+          profileStatus?.clubOwnerDetail?.logo ||
+          profileStatus?.logoUrl ||
+          profileStatus?.logo ||
           logoFromStorage ||
           null;
 
@@ -235,8 +258,20 @@ const HomeScreen = () => {
         if (oNameFromStorage) setStoredOwnerName(oNameFromStorage);
 
         // Persist fresh profileStatus into club_profile for app restarts/re-logins
-        const cNameApi = pData?.clubName || pData?.club_name || pData?.pendingClubOwner?.clubName;
-        const oNameApi = pData?.ownerName || pData?.owner_name || pData?.pendingClubOwner?.ownerName;
+        const cNameApi =
+          user?.clubOwnerDetail?.clubName ||
+          pData?.clubOwnerDetail?.clubName ||
+          pData?.clubName ||
+          pData?.club_name ||
+          pData?.pendingClubOwner?.clubName;
+
+        const oNameApi =
+          user?.clubOwnerDetail?.ownerName ||
+          pData?.clubOwnerDetail?.ownerName ||
+          pData?.ownerName ||
+          pData?.owner_name ||
+          pData?.pendingClubOwner?.ownerName;
+
         if (cNameApi || oNameApi || finalLogoUri) {
           const updatedStorage = {
             ...(savedData ? JSON.parse(savedData) : {}),
@@ -266,6 +301,9 @@ const HomeScreen = () => {
   const getDisplayName = () => {
     const pData = profileStatus?.data || profileStatus || {};
     const rawName =
+      user?.clubOwnerDetail?.ownerName ||
+      user?.clubOwnerDetail?.name ||
+      pData?.clubOwnerDetail?.ownerName ||
       pData?.ownerName ||
       pData?.owner_name ||
       pData?.pendingClubOwner?.ownerName ||
@@ -303,7 +341,13 @@ const HomeScreen = () => {
 
   const ownerName = getDisplayName();
   const pData = profileStatus?.data || profileStatus || {};
-  const clubName = pData?.clubName || pData?.club_name || storedClubName || 'Fitfob fitness Club';
+  const clubName =
+    user?.clubOwnerDetail?.clubName ||
+    pData?.clubOwnerDetail?.clubName ||
+    pData?.clubName ||
+    pData?.club_name ||
+    storedClubName ||
+    'Fitfob fitness Club';
   const greeting = getGreeting();
 
   return (
@@ -464,7 +508,7 @@ const HomeScreen = () => {
         </View>
 
         {/* Title */}
-        <View className="mb-4 flex-row items-center justify-between">
+        <View className=" flex-row items-center justify-between">
           <Text className="font-bold text-lg text-slate-900">Recent Check-ins</Text>
           <TouchableOpacity onPress={() => router.push('/ViewAllScreen')}>
             <Text className="rounded-full bg-[#F6163C] px-4 py-2.5 font-normal leading-4 text-white">
@@ -474,25 +518,41 @@ const HomeScreen = () => {
         </View>
       </View>
 
-      {/* --- SCROLLABLE LIST WITH STACKING CARD SCROLL ANIMATION --- */}
-      <Animated.FlatList
-        data={RECENT_CHECKINS}
-        keyExtractor={(item) => item.id}
-        onScroll={scrollHandler}
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingBottom: Platform.OS === 'ios' ? 100 : 20,
-        }}
-        renderItem={({ item, index }) => (
-          <CheckinItem
-            item={item}
-            index={index}
-            scrollY={scrollY}
-            onSelect={(selected: any) => setSelectedMember({ ...selected, verified: true })}
+      {/* --- SCROLLABLE LIST WITH STACKING CARD SCROLL ANIMATION / EMPTY STATE --- */}
+      {RECENT_CHECKINS.length === 0 ? (
+        <View className="items-center justify-center ">
+          <Image
+            source={require('../../assets/images/empty_checkins.png')}
+            className="h-72 w-72"
+            resizeMode="contain"
           />
-        )}
-      />
+          <Text className="mt-1 text-center font-bold text-lg text-slate-900">
+            No Recent Check-ins Yet
+          </Text>
+          <Text className="mt-1 px-6 text-center text-[12px] leading-5 text-slate-500">
+            When members check in to your gym, their live activity and details will appear right here.
+          </Text>
+        </View>
+      ) : (
+        <Animated.FlatList
+          data={RECENT_CHECKINS}
+          keyExtractor={(item) => item.id}
+          onScroll={scrollHandler}
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            paddingBottom: Platform.OS === 'ios' ? 100 : 20,
+          }}
+          renderItem={({ item, index }) => (
+            <CheckinItem
+              item={item}
+              index={index}
+              scrollY={scrollY}
+              onSelect={(selected: any) => setSelectedMember({ ...selected, verified: true })}
+            />
+          )}
+        />
+      )}
 
       {/* --- MEMBER DETAIL BOTTOM SHEET --- */}
       <Modal

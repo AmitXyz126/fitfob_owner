@@ -17,11 +17,13 @@ interface LocationMapPickerProps {
   initialRegion: Region;
   onRegionChangeComplete: (region: Region) => void;
   onRequestLocation?: () => void;
+  onMapTouchStart?: () => void;
+  onMapTouchEnd?: () => void;
   style?: any;
 }
 
 export const LocationMapPicker = forwardRef<LocationMapPickerHandle, LocationMapPickerProps>(
-  ({ initialRegion, onRegionChangeComplete, onRequestLocation, style }, ref) => {
+  ({ initialRegion, onRegionChangeComplete, onRequestLocation, onMapTouchStart, onMapTouchEnd, style }, ref) => {
     const webViewRef = useRef<WebView>(null);
     const mapReadyRef = useRef<boolean>(false);
     const pendingRegionRef = useRef<Region | null>(null);
@@ -192,6 +194,19 @@ export const LocationMapPicker = forwardRef<LocationMapPickerHandle, LocationMap
                 }
               }
 
+              // Post touch events to React Native to disallow outer ScrollView scrolling
+              document.addEventListener('touchstart', function(e) {
+                if (window.ReactNativeWebView) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'touchStart' }));
+                }
+              }, { passive: true });
+
+              document.addEventListener('touchend', function(e) {
+                if (window.ReactNativeWebView) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'touchEnd' }));
+                }
+              }, { passive: true });
+
               // Send region change when user drags or zooms
               var isProgrammaticMove = false;
               map.on('moveend', function() {
@@ -241,6 +256,10 @@ export const LocationMapPicker = forwardRef<LocationMapPickerHandle, LocationMap
           if (pendingRegionRef.current) {
             applyRegion(pendingRegionRef.current);
           }
+        } else if (data && data.type === 'touchStart') {
+          if (onMapTouchStart) onMapTouchStart();
+        } else if (data && data.type === 'touchEnd') {
+          if (onMapTouchEnd) onMapTouchEnd();
         } else if (data && data.type === 'regionChange') {
           if (onRegionChangeComplete) {
             onRegionChangeComplete({
@@ -260,11 +279,28 @@ export const LocationMapPicker = forwardRef<LocationMapPickerHandle, LocationMap
       }
     };
 
+    const disallowParentScroll = (e: any) => {
+      if (e?.nativeEvent && typeof (e.target as any)?.requestDisallowInterceptTouchEvent === 'function') {
+        (e.target as any).requestDisallowInterceptTouchEvent(true);
+      }
+      if (onMapTouchStart) onMapTouchStart();
+    };
+
     return (
       <View
         style={[styles.container, style]}
-        onStartShouldSetResponderCapture={() => true}
-        onMoveShouldSetResponderCapture={() => true}
+        onStartShouldSetResponder={() => true}
+        onMoveShouldSetResponder={() => true}
+        onResponderGrant={disallowParentScroll}
+        onResponderMove={disallowParentScroll}
+        onResponderRelease={() => {
+          if (onMapTouchEnd) onMapTouchEnd();
+        }}
+        onTouchStart={disallowParentScroll}
+        onTouchMove={disallowParentScroll}
+        onTouchEnd={() => {
+          if (onMapTouchEnd) onMapTouchEnd();
+        }}
       >
         <WebView
           ref={webViewRef}

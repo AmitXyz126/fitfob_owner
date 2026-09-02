@@ -4,6 +4,21 @@ import { router } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { useAuthStore } from '@/store/useAuthStore';
 
+export const useClubOwnerMe = (enabled: boolean = true) => {
+  const { user } = useAuthStore();
+  const userKey = user?.id || user?.email || 'guest';
+
+  return useQuery({
+    queryKey: ['my-club-owner-me', userKey],
+    queryFn: userDetailsApi.getMyClubOwner,
+    enabled: !!user && enabled,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+  });
+};
+
 export const useUserDetail = () => {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
@@ -18,17 +33,20 @@ export const useUserDetail = () => {
     queryKey: ['club-owner-me', userKey],
     queryFn: userDetailsApi.getMe,
     retry: 1,
-    enabled: !!user,
+    enabled: !!user && (user.clubOwnerDetail === null || user.clubOwnerDetail === undefined),
   });
+
+  const isApprovedOwner = Boolean(user?.clubOwnerDetail?.id || user?.clubOwnerDetail?.clubName);
 
   const {
     data: documents,
     isLoading: isDocsLoading,
     refetch: refetchDocs,
   } = useQuery({
-    queryKey: ['club-owner-docs', userKey],
-    queryFn: userDetailsApi.getDocuments,
+    queryKey: ['club-owner-docs', userKey, isApprovedOwner],
+    queryFn: () => userDetailsApi.getDocuments(isApprovedOwner),
     enabled: !!user,
+    retry: 1,
   });
 
   const submitStep1 = useMutation({
@@ -182,6 +200,10 @@ export const useUserDetail = () => {
     },
   });
 
+  const checkVerificationStatus = useMutation({
+    mutationFn: () => userDetailsApi.getVerificationStatus(),
+  });
+
   return {
     profileStatus,
     isFetchingStatus,
@@ -195,6 +217,7 @@ export const useUserDetail = () => {
     confirmDocs,
     submitStep7,
     updateClubOwner,
+    checkVerificationStatus,
     documents,
     isDocsLoading,
     refetchDocs,

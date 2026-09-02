@@ -59,6 +59,13 @@ export default function Splash() {
       setTimeout(async () => {
         const currentUser = useAuthStore.getState().user;
         if (currentUser && (currentUser.token || currentUser.jwt)) {
+          // If clubOwnerDetail is NOT null in stored user, redirect to /(tabs) directly without calling GET_ONBOARDING_STATUS
+          if (currentUser.clubOwnerDetail !== null && currentUser.clubOwnerDetail !== undefined) {
+            console.log('✅ clubOwnerDetail is NOT null in stored user -> Directing to /(tabs) WITHOUT calling GET_ONBOARDING_STATUS');
+            router.replace('/(tabs)');
+            return;
+          }
+
           try {
             const statusData = await userDetailsApi.getMe();
             const verificationStatus =
@@ -66,7 +73,9 @@ export default function Splash() {
               statusData?.verificationStatus ||
               currentUser?.verification_status;
             const status = statusData?.status;
+            const clubOwnerDetail = statusData?.clubOwnerDetail || currentUser?.clubOwnerDetail;
             const isApproved =
+              (clubOwnerDetail !== null && clubOwnerDetail !== undefined) ||
               statusData?.isApprovedOwner ||
               verificationStatus === 'approved' ||
               status === 'approved';

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
- import {
+import React from 'react';
+import {
   View,
   Text,
   TouchableOpacity,
@@ -8,15 +9,21 @@
   Linking,
   Alert,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
+
+import { Rejection3DIllustration } from '@/components/Rejection3DIllustration';
 
 const RejectRequestScreen = () => {
+  const params = useLocalSearchParams<{ reason?: string }>();
+  const rejectionReason = params?.reason || null;
+
   // Function to handle Email
   const handleEmail = () => {
-    const email = 'Amit@gmail.com';
+    const email = 'support@fitfob.com';
     Linking.openURL(`mailto:${email}`).catch(() => {
       Alert.alert('Error', 'Could not open email app');
     });
@@ -35,72 +42,117 @@ const RejectRequestScreen = () => {
       <StatusBar barStyle="dark-content" />
 
       {/* Header */}
-      <View className="px-4 py-2">
-        <TouchableOpacity 
+      <View className="flex-row items-center justify-between px-4 py-2">
+        <TouchableOpacity
           activeOpacity={0.7}
           onPress={() => router.replace('/auth/Login')}
-        >
-          <Ionicons name="chevron-back" size={24} color="#CBD5E1" />
+          className="p-1">
+          <Ionicons name="chevron-back" size={24} color="#64748B" />
         </TouchableOpacity>
       </View>
 
-      <ScrollView 
+      <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ flexGrow: 1 }}
-      >
-        <View className="flex-1 px-6 pt-10 pb-6 justify-center">
-        <View className="mb-8 items-center justify-center">
-          <Image
-            source={require('../assets/images/cancel.png')}
-            style={{ width: 120, height: 120 }}
-            resizeMode="contain"
-          />
-        </View>
+        contentContainerStyle={{ flexGrow: 1 }}>
+        <View className="flex-1 justify-center px-6 pb-6 pt-2">
+          
+          {/* Brand New 3D Vector SVG Rejection Graphic */}
+          <Rejection3DIllustration />
 
-        <Text className="mb-4 text-center font-bold font-sans text-[24px] leading-8 text-[#1C1C1C] ">
-          Your Request Was Not Approved
-        </Text>
+          {/* Rejection Message */}
+          <Text className="mb-2 text-center font-sans text-[24px] font-bold leading-8 text-[#1C1C1C]">
+            Application Rejected
+          </Text>
 
-        <Text className="mb-10 px-2 text-center text-[12px] font-normal leading-4 text-[#697281]">
-          Unfortunately, your club request was not approved by the admin. If you&rsquo;d like to
-          apply again, please contact the admin using the email or phone number below.
-        </Text>
+          <Text className="mb-6 px-2 text-center font-sans text-[13px] font-normal leading-6 text-[#697281]">
+            Unfortunately, your club owner submission could not be verified by the admin team.
+          </Text>
 
-        <View className="w-full">
-          <Text className="mb-4 font-sans font-medium text-[18px] text-[#1C1C1C]">Contact:</Text>
-
-          {/* Email Clickable Field */}
-          <TouchableOpacity
-            onPress={handleEmail}
-            activeOpacity={0.6}
-            className="mb-4 h-16 w-full flex-row items-center rounded-2xl border border-[#EBF1F3] bg-white px-4">
-            <View className="mr-3 rounded-xl  p-2.5">
-              <MaterialCommunityIcons name="email" size={24} color="#64748B" />
+          {/* Rejection Reason Card */}
+          <View className="mb-6 w-full rounded-2xl border border-red-200 bg-red-50/80 p-4">
+            <View className="flex-row items-center gap-2">
+              <Ionicons name="alert-circle" size={20} color="#F6163C" />
+              <Text className="font-bold text-sm text-[#F6163C]">Rejection Reason:</Text>
             </View>
-            <Text className=" font-medium text-[15px] text-[#697281]">Amit@gmail.com</Text>
-          </TouchableOpacity>
+            <Text className="mt-2 font-medium text-xs text-slate-700 leading-5">
+              {rejectionReason || 'Your submitted details or documents did not meet verification guidelines.'}
+            </Text>
+          </View>
 
-          {/* Phone Clickable Field */}
-          <TouchableOpacity
-            onPress={handleCall}
-            activeOpacity={0.6}
-            className="h-16 w-full flex-row items-center rounded-2xl border border-[#EBF1F3] bg-white px-4">
-            <View className="mr-1 rounded-xl  p-2.5">
-              <MaterialCommunityIcons name="phone" size={24} color="#64748B" />
-            </View>
-            <Text className=" font-medium text-[15px] text-[#697281]">+91 90000 00000</Text>
-          </TouchableOpacity>
+          {/* Contact Section */}
+          <View className="w-full">
+            <Text className="mb-3 font-sans text-[15px] font-bold text-[#1C1C1C]">
+              Contact Support:
+            </Text>
+
+            {/* Email Field */}
+            <TouchableOpacity
+              onPress={handleEmail}
+              activeOpacity={0.7}
+              style={{
+                shadowColor: '#0F172A',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.04,
+                shadowRadius: 6,
+                elevation: 2,
+              }}
+              className="mb-3.5 h-16 w-full flex-row items-center rounded-2xl border border-slate-100 bg-white px-4">
+              <View className="mr-3 items-center justify-center rounded-xl bg-rose-50 p-2.5">
+                <MaterialCommunityIcons name="email-outline" size={22} color="#F6163C" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-[11px] font-semibold text-slate-400">Email Admin</Text>
+                <Text className="text-[14px] font-bold text-slate-800">support@fitfob.com</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
+            </TouchableOpacity>
+
+            {/* Phone Field */}
+            <TouchableOpacity
+              onPress={handleCall}
+              activeOpacity={0.7}
+              style={{
+                shadowColor: '#0F172A',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.04,
+                shadowRadius: 6,
+                elevation: 2,
+              }}
+              className="h-16 w-full flex-row items-center rounded-2xl border border-slate-100 bg-white px-4">
+              <View className="mr-3 items-center justify-center rounded-xl bg-rose-50 p-2.5">
+                <MaterialCommunityIcons name="phone-outline" size={22} color="#F6163C" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-[11px] font-semibold text-slate-400">Call Support</Text>
+                <Text className="text-[14px] font-bold text-slate-800">+91 90000 00000</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
 
-      {/* Close Button - Fixed at bottom */}
-      <View className="px-6 py-4">
+      {/* Action Buttons - Fixed at bottom */}
+      <View className="gap-2.5 px-6 py-4">
+        <TouchableOpacity
+          onPress={() => router.replace('/onBoardingScreen/OnBoardingStep')}
+          activeOpacity={0.8}
+          style={{
+            shadowColor: '#F6163C',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.25,
+            shadowRadius: 8,
+            elevation: 4,
+          }}
+          className="h-14 w-full flex-row items-center justify-center rounded-2xl bg-[#F6163C]">
+          <Text className="font-bold text-[16px] text-white">Re-apply / Edit Submission</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity
           onPress={() => router.replace('/auth/Login')}
           activeOpacity={0.8}
-          className="h-16 w-full items-center justify-center rounded-2xl bg-[#F2F2F2]">
-          <Text className="font-bold text-[16px] text-[#64748B]">Close</Text>
+          className="h-12 w-full items-center justify-center rounded-2xl border border-slate-200 bg-slate-50">
+          <Text className="font-bold text-[14px] text-slate-600">Back to Login</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

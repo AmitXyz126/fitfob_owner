@@ -3,7 +3,14 @@ import React, { useRef } from 'react';
 import { View, PanResponder } from 'react-native';
 import { CustomTabBar } from '@/components/CustomTabBar';
 
-const TABS = ['/index', '/checkins', '/wallet'];
+const TABS = ['index', 'checkins', 'wallet'];
+
+const getActiveTabIndex = (path: string) => {
+  if (!path || path === '/' || path === '/(tabs)' || path.includes('index')) return 0;
+  if (path.includes('checkins')) return 1;
+  if (path.includes('wallet')) return 2;
+  return 0;
+};
 
 export default function TabLayout() {
   const router = useRouter();
@@ -13,22 +20,22 @@ export default function TabLayout() {
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Allow horizontal swipe gestures across screen
-        return Math.abs(gestureState.dx) > 35 && Math.abs(gestureState.dy) < 35;
+        const { dx, dy } = gestureState;
+        return Math.abs(dx) > 18 && Math.abs(dx) > Math.abs(dy) * 1.5;
       },
       onPanResponderRelease: (_, gestureState) => {
-        const currentPath = pathname === '/' ? '/index' : pathname;
-        const currentIndex = TABS.findIndex((t) => currentPath.includes(t.replace('/', '')));
+        const { dx, vx } = gestureState;
+        const currentIndex = getActiveTabIndex(pathname);
 
-        if (gestureState.dx < -60) {
+        if (dx < -35 || (dx < -18 && vx < -0.2)) {
           // Swiped Left -> Go Next Tab
-          if (currentIndex >= 0 && currentIndex < TABS.length - 1) {
-            router.navigate(TABS[currentIndex + 1] as any);
+          if (currentIndex < TABS.length - 1) {
+            router.navigate(`/(tabs)/${TABS[currentIndex + 1]}` as any);
           }
-        } else if (gestureState.dx > 60) {
+        } else if (dx > 35 || (dx > 18 && vx > 0.2)) {
           // Swiped Right -> Go Prev Tab
           if (currentIndex > 0) {
-            router.navigate(TABS[currentIndex - 1] as any);
+            router.navigate(`/(tabs)/${TABS[currentIndex - 1]}` as any);
           }
         }
       },

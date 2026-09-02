@@ -20,9 +20,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 interface OnBoarding2Props {
   onConfirm: () => void;
+  onMapTouchStart?: () => void;
+  onMapTouchEnd?: () => void;
 }
 
-const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
+const OnBoarding2_Part2 = ({ onConfirm, onMapTouchStart, onMapTouchEnd }: OnBoarding2Props) => {
   const router = useRouter();
   const { profileStatus, submitStep2 } = useUserDetail();
   const { user } = useAuthStore();
@@ -90,13 +92,111 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
     }
   }, [isInitialized]);
 
-  // --- 2. Free OSM Reverse Geocoding  ---
+  // --- 2. Reverse Geocoding (Native First, OSM Fallback) ---
   const getAddressFromCoords = async (lat: number, lng: number) => {
     if (!lat || !lng) return;
 
     setIsReverseGeocoding(true);
 
     try {
+      // 1. Try Native Geocoder first (Google Play Services / Apple CoreLocation)
+      let nativePlaces: Location.LocationGeocodedAddress[] | null = null;
+      try {
+        nativePlaces = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+      } catch (nativeErr) {
+        console.log('Native reverseGeocodeAsync error:', nativeErr);
+      }
+
+      if (nativePlaces && nativePlaces.length > 0) {
+        const p = nativePlaces[0];
+
+        let rawBuilding = (p.name || '').trim();
+        let rawStreetNumber = (p.streetNumber || '').trim();
+        let rawStreet = (p.street || '').trim();
+        let rawSubregion = (p.subregion || '').trim();
+
+        // If p.name equals p.street or p.subregion or p.city, ignore rawBuilding
+        if (
+          rawBuilding.toLowerCase() === rawStreet.toLowerCase() ||
+          rawBuilding.toLowerCase() === rawSubregion.toLowerCase() ||
+          rawBuilding.toLowerCase() === (p.city || '').toLowerCase()
+        ) {
+          rawBuilding = '';
+        }
+
+        // If rawStreet equals rawSubregion (e.g. street is "Sector 91" and subregion is "Sector 91"), ignore rawStreet
+        if (rawStreet.toLowerCase() === rawSubregion.toLowerCase()) {
+          rawStreet = '';
+        }
+
+        // Build plot/building identifier without duplication
+        let buildingOrHouse = '';
+        if (rawStreetNumber && rawBuilding) {
+          if (rawStreetNumber.toLowerCase() === rawBuilding.toLowerCase()) {
+            buildingOrHouse = /^\d+$/.test(rawStreetNumber) ? `Plot ${rawStreetNumber}` : rawStreetNumber;
+          } else if (rawBuilding.toLowerCase().includes(rawStreetNumber.toLowerCase())) {
+            buildingOrHouse = rawBuilding;
+          } else {
+            buildingOrHouse = `${rawStreetNumber}, ${rawBuilding}`;
+          }
+        } else if (rawStreetNumber) {
+          buildingOrHouse = /^\d+$/.test(rawStreetNumber) ? `Plot ${rawStreetNumber}` : rawStreetNumber;
+        } else if (rawBuilding) {
+          buildingOrHouse = /^\d+$/.test(rawBuilding) ? `Plot ${rawBuilding}` : rawBuilding;
+        }
+
+        const parts: string[] = [];
+        const addUniquePart = (val?: string | null) => {
+          if (!val || typeof val !== 'string') return;
+          const trimmed = val.trim();
+          if (!trimmed) return;
+
+          const lowerTrimmed = trimmed.toLowerCase();
+          const isDup = parts.some((existing) => {
+            const lowerExisting = existing.toLowerCase();
+            return (
+              lowerExisting === lowerTrimmed ||
+              (lowerTrimmed.length > 3 && lowerExisting.includes(lowerTrimmed)) ||
+              (lowerExisting.length > 3 && lowerTrimmed.includes(lowerExisting))
+            );
+          });
+
+          if (!isDup) {
+            parts.push(trimmed);
+          }
+        };
+
+        addUniquePart(buildingOrHouse);
+        addUniquePart(rawStreet);
+        addUniquePart(rawSubregion);
+        addUniquePart(p.district);
+        addUniquePart(p.city);
+        addUniquePart(p.region);
+        if (p.postalCode) addUniquePart(p.postalCode);
+        addUniquePart(p.country);
+
+        const titleName = buildingOrHouse
+          ? `${buildingOrHouse}${rawSubregion ? ', ' + rawSubregion : ''}`
+          : parts[0] || 'Selected Location';
+
+        const fullAddr = parts.join(', ');
+
+        const locationData = {
+          name: titleName,
+          address: fullAddr || titleName,
+          clubAddress: parts.slice(0, Math.min(3, parts.length)).join(', ') || fullAddr,
+          city: p.city || p.subregion || p.district || '',
+          state: p.region || '',
+          pincode: p.postalCode || '',
+        };
+
+        setLocationInfo(locationData);
+        setSearchQuery(fullAddr || titleName);
+        setIsReverseGeocoding(false);
+        return;
+      }
+
+      // 2. Fallback to OSM Nominatim if native geocoding is unavailable
       const res = await fetch(
         `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
         {
@@ -110,88 +210,81 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
       const data = await res.json();
 
       if (data && data.address) {
-        const address = data.display_name;
+        const addrObj = data.address;
 
-        const name =
-          data.address?.building ||
-          data.address?.amenity ||
-          data.address?.shop ||
-          data.address?.office ||
-          data.address?.leisure ||
-          data.address?.commercial ||
-          data.address?.road ||
-          data.address?.suburb ||
-          data.address?.city ||
-          'Selected Location';
+        let pincode = addrObj.postcode || '';
+        if (!pincode && data.display_name) {
+          const pinMatch = data.display_name.match(/\b\d{6}\b/);
+          if (pinMatch) pincode = pinMatch[0];
+        }
+
+        const rawBuilding =
+          addrObj.building ||
+          addrObj.house_number ||
+          addrObj.amenity ||
+          addrObj.shop ||
+          addrObj.office ||
+          addrObj.commercial ||
+          addrObj.industrial ||
+          addrObj.leisure ||
+          '';
+
+        let buildingOrHouse = rawBuilding;
+        if (/^\d+$/.test(buildingOrHouse)) {
+          buildingOrHouse = `Plot ${buildingOrHouse}`;
+        }
+
+        const rawRoad = addrObj.road || '';
+        const rawSuburb = addrObj.neighbourhood || addrObj.suburb || '';
+
+        const parts: string[] = [];
+        const addUniquePart = (val?: string | null) => {
+          if (!val || typeof val !== 'string') return;
+          const trimmed = val.trim();
+          if (!trimmed) return;
+
+          const lowerTrimmed = trimmed.toLowerCase();
+          const isDup = parts.some((existing) => {
+            const lowerExisting = existing.toLowerCase();
+            return (
+              lowerExisting === lowerTrimmed ||
+              (lowerTrimmed.length > 3 && lowerExisting.includes(lowerTrimmed)) ||
+              (lowerExisting.length > 3 && lowerTrimmed.includes(lowerExisting))
+            );
+          });
+
+          if (!isDup) {
+            parts.push(trimmed);
+          }
+        };
+
+        if (buildingOrHouse) addUniquePart(buildingOrHouse);
+        if (rawRoad) addUniquePart(rawRoad);
+        if (rawSuburb) addUniquePart(rawSuburb);
+        addUniquePart(addrObj.city || addrObj.town || addrObj.village || addrObj.county);
+        addUniquePart(addrObj.state);
+        if (pincode) addUniquePart(pincode);
+
+        const titleName = buildingOrHouse
+          ? `${buildingOrHouse}${rawSuburb ? ', ' + rawSuburb : ''}`
+          : parts[0] || 'Selected Location';
+
+        const cleanAddress = parts.length > 0 ? parts.join(', ') : data.display_name;
 
         const locationData = {
-          name,
-          address,
-          clubAddress:
-            data.address?.road ||
-            data.address?.neighbourhood ||
-            data.address?.suburb ||
-            address,
-          city:
-            data.address?.city ||
-            data.address?.town ||
-            data.address?.village ||
-            '',
-          state: data.address?.state || '',
-          pincode: data.address?.postcode || '',
+          name: titleName,
+          address: cleanAddress,
+          clubAddress: parts.slice(0, Math.min(3, parts.length)).join(', ') || cleanAddress,
+          city: addrObj.city || addrObj.town || addrObj.village || addrObj.county || '',
+          state: addrObj.state || '',
+          pincode: pincode,
         };
 
         setLocationInfo(locationData);
-        setSearchQuery(address);
-      } else {
-        // Native fallback if OSM returned no address
-        const nativePlaces = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-        if (nativePlaces && nativePlaces.length > 0) {
-          const p = nativePlaces[0];
-          const name = p.name || p.street || p.district || p.subregion || 'Selected Location';
-          const fullAddr = [p.name, p.street, p.subregion, p.district, p.city, p.region, p.postalCode]
-            .filter(Boolean)
-            .join(', ');
-
-          const locationData = {
-            name,
-            address: fullAddr || name,
-            clubAddress: p.street || p.name || fullAddr || '',
-            city: p.city || p.region || '',
-            state: p.region || '',
-            pincode: p.postalCode || '',
-          };
-
-          setLocationInfo(locationData);
-          setSearchQuery(fullAddr || name);
-        }
+        setSearchQuery(cleanAddress);
       }
     } catch (err) {
-      console.log('OSM geocode error, trying native geocoder fallback:', err);
-      try {
-        const nativePlaces = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-        if (nativePlaces && nativePlaces.length > 0) {
-          const p = nativePlaces[0];
-          const name = p.name || p.street || p.district || p.subregion || 'Selected Location';
-          const fullAddr = [p.name, p.street, p.subregion, p.district, p.city, p.region, p.postalCode]
-            .filter(Boolean)
-            .join(', ');
-
-          const locationData = {
-            name,
-            address: fullAddr || name,
-            clubAddress: p.street || p.name || fullAddr || '',
-            city: p.city || p.region || '',
-            state: p.region || '',
-            pincode: p.postalCode || '',
-          };
-
-          setLocationInfo(locationData);
-          setSearchQuery(fullAddr || name);
-        }
-      } catch (geoErr) {
-        console.log('Native geocode error:', geoErr);
-      }
+      console.log('Reverse geocoding error:', err);
     } finally {
       setIsReverseGeocoding(false);
     }
@@ -385,6 +478,8 @@ const OnBoarding2_Part2 = ({ onConfirm }: OnBoarding2Props) => {
           style={{ flex: 1 }}
           initialRegion={region}
           onRegionChangeComplete={onRegionChangeComplete}
+          onMapTouchStart={onMapTouchStart}
+          onMapTouchEnd={onMapTouchEnd}
         />
 
         {/* Center Marker */}

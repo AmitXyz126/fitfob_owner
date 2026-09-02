@@ -66,6 +66,7 @@ export default function OnBoardingStep() {
   // --- 1. Centralized Parent State ---
   const [formData, setFormData] = useState<any>({});
   const [isDataSynced, setIsDataSynced] = useState(false);
+  const [isScrollEnabled, setIsScrollEnabled] = useState(true);
 
   const onboarding1Ref = useRef<any>(null);
   const onboarding2DetailsRef = useRef<any>(null);
@@ -175,18 +176,12 @@ export default function OnBoardingStep() {
 
     // 1. Approved status -> Home Page (tabs)
     if (isApprovedOwner || verificationStatus === 'approved' || status === 'approved') {
-      if (router.canGoBack()) {
-        router.dismissAll();
-      }
       router.replace('/(tabs)');
       return;
     }
 
     // 2. Rejected status -> Reject Request Screen
     if (verificationStatus === 'rejected' || status === 'rejected') {
-      if (router.canGoBack()) {
-        router.dismissAll();
-      }
       router.replace('/RejectRequestScreen');
       return;
     }
@@ -198,9 +193,6 @@ export default function OnBoardingStep() {
       verificationStatus === 'in_review' ||
       verificationStatus === 'completed'
     ) {
-      if (router.canGoBack()) {
-        router.dismissAll();
-      }
       router.replace('/ReviewStatusScreen');
       return;
     }
@@ -352,6 +344,7 @@ export default function OnBoardingStep() {
         style={{ flex: 1, backgroundColor: 'white' }}
         contentContainerStyle={{ flexGrow: 1 }}
         keyboardShouldPersistTaps="handled"
+        scrollEnabled={isScrollEnabled}
         showsVerticalScrollIndicator={false}>
         <View className="mt-5 flex-1">
           {step === 1 && (
@@ -371,6 +364,8 @@ export default function OnBoardingStep() {
                 onConfirm={() => {
                   setSubStep(2);
                 }}
+                onMapTouchStart={() => setIsScrollEnabled(false)}
+                onMapTouchEnd={() => setIsScrollEnabled(true)}
               />
             ) : (
               <OnBoarding2_Details

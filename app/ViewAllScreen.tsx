@@ -22,7 +22,9 @@ import Animated, {
   Extrapolation,
 } from 'react-native-reanimated';
 
-const ALL_CHECKINS = [
+// DUMMY ALL CHECKINS DATA (COMMENTED OUT FOR LIVE DATA / EMPTY STATE)
+/*
+const DUMMY_ALL_CHECKINS = [
   {
     id: '1',
     name: 'Tina Sharma',
@@ -78,6 +80,9 @@ const ALL_CHECKINS = [
     verified: true,
   },
 ];
+*/
+
+const ALL_CHECKINS: any[] = [];
 
 const ITEM_SIZE = 84;
 
@@ -246,13 +251,13 @@ const ViewAllScreen = () => {
                 key={cat}
                 onPress={() => setSelectedCategory(cat)}
                 activeOpacity={0.7}
-                className={`mr-2 rounded-full border px-4 py-2 ${
+                className={`mr-2 rounded-[13px] border px-4 py-2 ${
                   isSelected
                     ? 'border-[#F6163C] bg-[#F6163C]'
                     : 'border-slate-200 bg-white'
                 }`}>
                 <Text
-                  className={`font-semibold text-xs ${
+                  className={`font-semibold text-[14px] ${
                     isSelected ? 'text-white' : 'text-slate-600'
                   }`}>
                   {cat === 'All' ? 'All Passes' : cat}
@@ -272,22 +277,30 @@ const ViewAllScreen = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
         ListEmptyComponent={
-          <View className="items-center justify-center py-12">
-            <View className="mb-3 h-16 w-16 items-center justify-center rounded-full bg-rose-50">
-              <Ionicons name="search-outline" size={32} color="#F6163C" />
-            </View>
-            <Text className="font-bold text-base text-slate-800">No members found</Text>
-            <Text className="mt-1 text-center text-xs text-slate-400">
-              No check-ins match your search criteria.
+          <View className="items-center justify-center py-4">
+            <Image
+              source={require('../assets/images/view_all_empty.png')}
+              className="h-80 w-80"
+              resizeMode="contain"
+            />
+            <Text className="mt-1 text-center font-bold text-lg text-slate-900">
+              No Check-in History Found
             </Text>
-            <TouchableOpacity
-              onPress={() => {
-                setSearch('');
-                setSelectedCategory('All');
-              }}
-              className="mt-4 rounded-full bg-[#F6163C] px-5 py-2">
-              <Text className="font-semibold text-xs text-white">Reset Filters</Text>
-            </TouchableOpacity>
+            <Text className="mt-1 px-8 text-center text-[13px] leading-5 text-slate-500">
+              {search.length > 0 || selectedCategory !== 'All'
+                ? 'No check-ins match your search criteria.'
+                : 'All member check-in activities will be logged and listed right here.'}
+            </Text>
+            {(search.length > 0 || selectedCategory !== 'All') && (
+              <TouchableOpacity
+                onPress={() => {
+                  setSearch('');
+                  setSelectedCategory('All');
+                }}
+                className="mt-4 rounded-full bg-[#F6163C] px-5 py-2.5 shadow-sm">
+                <Text className="font-semibold text-xs text-white">Reset Filters</Text>
+              </TouchableOpacity>
+            )}
           </View>
         }
         renderItem={({ item, index }) => (
