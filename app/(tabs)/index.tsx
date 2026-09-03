@@ -1,11 +1,11 @@
 /* eslint-disable react/no-unescaped-entities */
 import { useState, useEffect } from 'react';
-import { View, Text, Image, TouchableOpacity, Platform, Modal, StyleSheet, Pressable } from 'react-native';
+import { View, Text, Image, TouchableOpacity, Platform, Modal, StyleSheet, Pressable, ScrollView, RefreshControl } from 'react-native';
 import { Container } from '@/components/Container';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useUserDetail } from '@/hooks/useUserDetail';
+import { useUserDetail, useClubOwnerMe } from '@/hooks/useUserDetail';
 import { useAuthStore } from '@/store/useAuthStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
@@ -16,6 +16,22 @@ import Animated, {
   interpolate,
   Extrapolation,
 } from 'react-native-reanimated';
+
+export const formatIndianCurrency = (amount: number | string): string => {
+  if (amount === undefined || amount === null || amount === '') return '₹0';
+  const cleanStr = String(amount).replace(/[^0-9.]/g, '');
+  const num = parseFloat(cleanStr);
+  if (isNaN(num)) return `₹${amount}`;
+  return `₹${num.toLocaleString('en-IN')}`;
+};
+
+export const formatIndianNumber = (numVal: number | string): string => {
+  if (numVal === undefined || numVal === null || numVal === '') return '0';
+  const cleanStr = String(numVal).replace(/[^0-9.]/g, '');
+  const num = parseFloat(cleanStr);
+  if (isNaN(num)) return String(numVal);
+  return num.toLocaleString('en-IN');
+};
 
 // DUMMY RECENT CHECKINS DATA (COMMENTED OUT FOR LIVE DATA / EMPTY STATE)
 /*
@@ -179,13 +195,29 @@ const getImageUriString = (val: any): string => {
 };
 
 const HomeScreen = () => {
-  const { profileStatus } = useUserDetail();
+  const { profileStatus, refetch } = useUserDetail();
+  const { data: myOwnerData, refetch: refetchOwner } = useClubOwnerMe();
   const { user } = useAuthStore();
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
   const [storedClubName, setStoredClubName] = useState<string>('');
   const [storedOwnerName, setStoredOwnerName] = useState<string>('');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        refetch(),
+        refetchOwner(),
+      ]);
+    } catch (e) {
+      console.log('Error refreshing home data:', e);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     const loadClubData = async () => {
@@ -226,6 +258,9 @@ const HomeScreen = () => {
 
         const pData = profileStatus?.data || profileStatus || {};
         const rawLogo =
+          myOwnerData?.logoUrl ||
+          myOwnerData?.logo ||
+          myOwnerData?.logo_url ||
           user?.clubOwnerDetail?.logoUrl ||
           user?.clubOwnerDetail?.logo ||
           user?.clubOwnerDetail?.logo_url ||
@@ -259,6 +294,7 @@ const HomeScreen = () => {
 
         // Persist fresh profileStatus into club_profile for app restarts/re-logins
         const cNameApi =
+          myOwnerData?.clubName ||
           user?.clubOwnerDetail?.clubName ||
           pData?.clubOwnerDetail?.clubName ||
           pData?.clubName ||
@@ -266,6 +302,7 @@ const HomeScreen = () => {
           pData?.pendingClubOwner?.clubName;
 
         const oNameApi =
+          myOwnerData?.ownerName ||
           user?.clubOwnerDetail?.ownerName ||
           pData?.clubOwnerDetail?.ownerName ||
           pData?.ownerName ||
@@ -287,7 +324,7 @@ const HomeScreen = () => {
     };
 
     loadClubData();
-  }, [profileStatus, user]);
+  }, [profileStatus, myOwnerData, user]);
 
   // Scroll Shared Value for Stacking Card Scroll Animation
   const scrollY = useSharedValue(0);
@@ -301,6 +338,8 @@ const HomeScreen = () => {
   const getDisplayName = () => {
     const pData = profileStatus?.data || profileStatus || {};
     const rawName =
+      myOwnerData?.ownerName ||
+      myOwnerData?.owner_name ||
       user?.clubOwnerDetail?.ownerName ||
       user?.clubOwnerDetail?.name ||
       pData?.clubOwnerDetail?.ownerName ||
@@ -342,6 +381,8 @@ const HomeScreen = () => {
   const ownerName = getDisplayName();
   const pData = profileStatus?.data || profileStatus || {};
   const clubName =
+    myOwnerData?.clubName ||
+    myOwnerData?.club_name ||
     user?.clubOwnerDetail?.clubName ||
     pData?.clubOwnerDetail?.clubName ||
     pData?.clubName ||
@@ -352,207 +393,226 @@ const HomeScreen = () => {
 
   return (
     <Container style={{ paddingBottom: 0 }}>
-      <View style={{ paddingTop: Platform.OS === 'ios' ? 10 : 20 }}>
-        {/* Header */}
-        <View className="mb-6 flex-row items-center justify-between">
-          <View className="flex-row items-center flex-1 mr-2">
-            <TouchableOpacity
-              onPress={() => router.push('/clubProfile')}
-              style={{
-                shadowColor: '#F6163C',
-                shadowOffset: { width: 0, height: 3 },
-                shadowOpacity: 0.3,
-                shadowRadius: 5,
-                elevation: 4,
-              }}
-              className="items-center justify-center rounded-full border-2 border-[#F6163C]/30 bg-red-50 p-0.5">
-              <Image
-                className="h-14 w-14 rounded-full"
-                source={
-                  profileImageUri && !imageError
-                    ? { uri: profileImageUri }
-                    : require('../../assets/images/fitfob_profile.png')
-                }
-                onError={() => setImageError(true)}
-                resizeMode={profileImageUri && !imageError ? 'cover' : 'contain'}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/clubProfile')} className="ml-3 flex-1 justify-center">
-              <Text className="text-[12px] font-medium text-slate-500" numberOfLines={1}>
-                Welcome to {clubName}
-              </Text>
-              <Text className="text-[18px] font-bold text-slate-900 leading-[24px]" numberOfLines={2}>
-                {greeting}, {ownerName}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <View className="flex-row gap-2">
-            <TouchableOpacity
-              onPress={() => router.push('/notification')}
-              style={{ elevation: 2 }}
-              className="rounded-full border border-white bg-white p-2 shadow-sm">
-              <Ionicons name="notifications" size={20} color="#F6163C" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => router.push('/chat')}
-              className="rounded-full border border-slate-100 bg-white p-2 shadow-sm">
-              <Ionicons name="paper-plane" size={20} color="#F6163C" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Monthly Earnings Card */}
-        <TouchableOpacity activeOpacity={0.9} onPress={() => router.push('/payoutHistory')}>
-          <LinearGradient
-            colors={['#F6163C', '#FF8FA3']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 2, y: 2 }}
-            style={{ borderRadius: 16, overflow: 'hidden' }}
-            className="relative mb-6 shadow-xl shadow-red-300">
-            {/* Background Pattern Image */}
-            <Image
-              source={require('../../assets/images/bgLayer.png')}
-              className="absolute right-0 top-0 h-full w-1/2"
-              resizeMode="cover"
-            />
-
-            <View className="relative z-10 rounded-lg px-4 py-5">
-              <View className="flex-row items-start justify-between">
-                <Text className="font-medium text-white/80">Monthly Earnings</Text>
-                <View className="flex-row items-center gap-1 rounded-full bg-[#0000001A] px-3 py-1.5 backdrop-blur-md">
-                  <Ionicons name="arrow-up" size={15} color="#FFF" />
-
-                  <Text className="font-bold text-[10px]  text-[#FFF]">+20% this month</Text>
-                </View>
-              </View>
-              <Text className="mt-2 font-bold text-4xl text-white">₹2,40,000</Text>
-            </View>
-          </LinearGradient>
-        </TouchableOpacity>
-
-        {/* Stats Row */}
-        <View className="mb-8 mt-4 flex-row justify-between">
-          {/* Today's Check-ins Card */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => router.push('/checkins')}
-            style={styles.statsCardRed}
-            className="mr-3 flex-1 rounded-[24px] overflow-hidden border border-red-100/80 bg-white">
-            <LinearGradient
-              colors={['#FFFFFF', '#FFF1F3', '#FFE4E8']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFillObject}
-            />
-
-            {/* Gym Watermark Background Icon */}
-            <View style={styles.watermarkContainerRed}>
-              <Ionicons name="barbell" size={90} color="#F6163C" style={{ opacity: 0.12, transform: [{ rotate: '-18deg' }] }} />
-            </View>
-
-            <View style={{ padding: 18 }} className="relative z-10">
-              <View className="flex-row items-center gap-1.5 mb-2">
-                <View className="h-6 w-6 items-center justify-center rounded-full bg-red-500/10">
-                  <Ionicons name="flame" size={14} color="#F6163C" />
-                </View>
-                <Text className="font-semibold text-[12px] text-slate-600">Today's Check-ins</Text>
-              </View>
-
-              <View className="mt-1 flex-row items-end justify-between">
-                <Text className="font-extrabold text-3xl text-slate-900">45</Text>
-                {/* Green Pill Indicator */}
-                <View className="mb-1 flex-row items-center rounded-full bg-emerald-500/10 px-2.5 py-1 border border-emerald-500/20">
-                  <Ionicons name="arrow-up" size={13} color="#10B981" />
-                  <Text className="ml-0.5 font-bold text-[11px] text-emerald-600">+5</Text>
-                </View>
-              </View>
-            </View>
-          </TouchableOpacity>
-
-          {/* Active Members Card */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => router.push('/')}
-            style={styles.statsCardPurple}
-            className="flex-1 rounded-[24px] overflow-hidden border border-purple-100/80 bg-white">
-            <LinearGradient
-              colors={['#FFFFFF', '#F7F5FF', '#EDE7FE']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFillObject}
-            />
-
-            {/* Gym Watermark Background Icon */}
-            <View style={styles.watermarkContainerPurple}>
-              <Ionicons name="fitness" size={90} color="#7C3AED" style={{ opacity: 0.12, transform: [{ rotate: '15deg' }] }} />
-            </View>
-
-            <View style={{ padding: 18 }} className="relative z-10">
-              <View className="flex-row items-center gap-1.5 mb-2">
-                <View className="h-6 w-6 items-center justify-center rounded-full bg-purple-500/10">
-                  <Ionicons name="people" size={14} color="#7C3AED" />
-                </View>
-                <Text className="font-semibold text-[12px] text-slate-600">Active Members</Text>
-              </View>
-
-              <View className="mt-1 flex-row items-end justify-between">
-                <Text className="font-extrabold text-3xl text-slate-900">320</Text>
-                {/* Green Pill Indicator */}
-                <View className="mb-1 flex-row items-center rounded-full bg-emerald-500/10 px-2.5 py-1 border border-emerald-500/20">
-                  <Ionicons name="arrow-up" size={13} color="#10B981" />
-                  <Text className="ml-0.5 font-bold text-[11px] text-emerald-600">+5</Text>
-                </View>
-              </View>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Title */}
-        <View className=" flex-row items-center justify-between">
-          <Text className="font-bold text-lg text-slate-900">Recent Check-ins</Text>
-          <TouchableOpacity onPress={() => router.push('/ViewAllScreen')}>
-            <Text className="rounded-full bg-[#F6163C] px-4 py-2.5 font-normal leading-4 text-white">
-              View All
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* --- SCROLLABLE LIST WITH STACKING CARD SCROLL ANIMATION / EMPTY STATE --- */}
-      {RECENT_CHECKINS.length === 0 ? (
-        <View className="items-center justify-center ">
-          <Image
-            source={require('../../assets/images/empty_checkins.png')}
-            className="h-72 w-72"
-            resizeMode="contain"
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#F6163C']}
+            tintColor="#F6163C"
           />
-          <Text className="mt-1 text-center font-bold text-lg text-slate-900">
-            No Recent Check-ins Yet
-          </Text>
-          <Text className="mt-1 px-6 text-center text-[12px] leading-5 text-slate-500">
-            When members check in to your gym, their live activity and details will appear right here.
-          </Text>
+        }
+        contentContainerStyle={{ paddingBottom: Platform.OS === 'ios' ? 100 : 30 }}>
+        <View style={{ paddingTop: Platform.OS === 'ios' ? 10 : 20 }}>
+          {/* Header */}
+          <View className="mb-6 flex-row items-center justify-between">
+            <View className="flex-row items-center flex-1 mr-2">
+              <TouchableOpacity
+                onPress={() => router.push('/clubProfile')}
+                style={{
+                  shadowColor: '#F6163C',
+                  shadowOffset: { width: 0, height: 3 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 5,
+                  elevation: 4,
+                }}
+                className="items-center justify-center rounded-full border-2 border-[#F6163C]/30 bg-red-50 p-0.5">
+                <Image
+                  className="h-14 w-14 rounded-full"
+                  source={
+                    profileImageUri && !imageError
+                      ? { uri: profileImageUri }
+                      : require('../../assets/images/fitfob_profile.png')
+                  }
+                  onError={() => setImageError(true)}
+                  resizeMode={profileImageUri && !imageError ? 'cover' : 'contain'}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push('/clubProfile')} className="ml-3 flex-1 justify-center">
+                <Text className="text-[12px] font-medium text-slate-500" numberOfLines={1}>
+                  Welcome to {clubName}
+                </Text>
+                <Text className="text-[18px] font-bold text-slate-900 leading-[24px]" numberOfLines={2}>
+                  {greeting}, {ownerName}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View className="flex-row gap-2">
+              <TouchableOpacity
+                onPress={() => router.push('/notification')}
+                style={{ elevation: 2 }}
+                className="rounded-full border border-white bg-white p-2 shadow-sm">
+                <Ionicons name="notifications" size={20} color="#F6163C" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => router.push('/chat')}
+                className="rounded-full border border-slate-100 bg-white p-2 shadow-sm">
+                <Ionicons name="paper-plane" size={20} color="#F6163C" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Monthly Earnings Card */}
+          <TouchableOpacity activeOpacity={0.9} onPress={() => router.push('/payoutHistory')}>
+            <LinearGradient
+              colors={['#F6163C', '#FF8FA3']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 2, y: 2 }}
+              style={{ borderRadius: 16, overflow: 'hidden' }}
+              className="relative mb-6 shadow-xl shadow-red-300">
+              {/* Background Pattern Image */}
+              <Image
+                source={require('../../assets/images/bgLayer.png')}
+                className="absolute right-0 top-0 h-full w-1/2"
+                resizeMode="cover"
+              />
+
+              <View className="relative z-10 rounded-lg px-4 py-5">
+                <View className="flex-row items-start justify-between">
+                  <Text className="font-medium text-white/80">Monthly Earnings</Text>
+                  <View className="flex-row items-center gap-1 rounded-full bg-[#0000001A] px-3 py-1.5 backdrop-blur-md">
+                    <Ionicons name="arrow-up" size={15} color="#FFF" />
+
+                    <Text className="font-bold text-[10px]  text-[#FFF]">+20% this month</Text>
+                  </View>
+                </View>
+                <Text className="mt-2 font-bold text-4xl text-white">
+                  {formatIndianCurrency(
+                    pData?.monthlyEarnings ||
+                    pData?.totalEarnings ||
+                    pData?.earnings ||
+                    22220
+                  )}
+                </Text>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Stats Row */}
+          <View className="mb-8 mt-4 flex-row justify-between">
+            {/* Today's Check-ins Card */}
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => router.push('/checkins')}
+              style={styles.statsCardRed}
+              className="mr-3 flex-1 rounded-[24px] overflow-hidden border border-red-100/80 bg-white">
+              <LinearGradient
+                colors={['#FFFFFF', '#FFF1F3', '#FFE4E8']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+
+              {/* Gym Watermark Background Icon */}
+              <View style={styles.watermarkContainerRed}>
+                <Ionicons name="barbell" size={90} color="#F6163C" style={{ opacity: 0.12, transform: [{ rotate: '-18deg' }] }} />
+              </View>
+
+              <View style={{ padding: 18 }} className="relative z-10">
+                <View className="flex-row items-center gap-1.5 mb-2">
+                  <View className="h-6 w-6 items-center justify-center rounded-full bg-red-500/10">
+                    <Ionicons name="flame" size={14} color="#F6163C" />
+                  </View>
+                  <Text className="font-semibold text-[12px] text-slate-600">Today's Check-ins</Text>
+                </View>
+
+                <View className="mt-1 flex-row items-end justify-between">
+                  <Text className="font-extrabold text-3xl text-slate-900">0</Text>
+                  {/* Green Pill Indicator */}
+                  <View className="mb-1 flex-row items-center rounded-full bg-emerald-500/10 px-2.5 py-1 border border-emerald-500/20">
+                    <Ionicons name="arrow-up" size={13} color="#10B981" />
+                    <Text className="ml-0.5 font-bold text-[11px] text-emerald-600">+5</Text>
+                  </View>
+                </View>
+              </View>
+            </TouchableOpacity>
+
+            {/* Active Members Card */}
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => router.push('/')}
+              style={styles.statsCardPurple}
+              className="flex-1 rounded-[24px] overflow-hidden border border-purple-100/80 bg-white">
+              <LinearGradient
+                colors={['#FFFFFF', '#F7F5FF', '#EDE7FE']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+
+              {/* Gym Watermark Background Icon */}
+              <View style={styles.watermarkContainerPurple}>
+                <Ionicons name="fitness" size={90} color="#7C3AED" style={{ opacity: 0.12, transform: [{ rotate: '15deg' }] }} />
+              </View>
+
+              <View style={{ padding: 18 }} className="relative z-10">
+                <View className="flex-row items-center gap-1.5 mb-2">
+                  <View className="h-6 w-6 items-center justify-center rounded-full bg-purple-500/10">
+                    <Ionicons name="people" size={14} color="#7C3AED" />
+                  </View>
+                  <Text className="font-semibold text-[12px] text-slate-600">Active Members</Text>
+                </View>
+
+                <View className="mt-1 flex-row items-end justify-between">
+                  <Text className="font-extrabold text-3xl text-slate-900">0</Text>
+                  {/* Green Pill Indicator */}
+                  <View className="mb-1 flex-row items-center rounded-full bg-emerald-500/10 px-2.5 py-1 border border-emerald-500/20">
+                    <Ionicons name="arrow-up" size={13} color="#10B981" />
+                    <Text className="ml-0.5 font-bold text-[11px] text-emerald-600">+5</Text>
+                  </View>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Title */}
+          <View className=" flex-row items-center justify-between">
+            <Text className="font-bold text-lg text-slate-900">Recent Check-ins</Text>
+            <TouchableOpacity onPress={() => router.push('/ViewAllScreen')}>
+              <Text className="rounded-full bg-[#F6163C] px-4 py-2.5 font-normal leading-4 text-white">
+                View All
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      ) : (
-        <Animated.FlatList
-          data={RECENT_CHECKINS}
-          keyExtractor={(item) => item.id}
-          onScroll={scrollHandler}
-          scrollEventThrottle={16}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingBottom: Platform.OS === 'ios' ? 100 : 20,
-          }}
-          renderItem={({ item, index }) => (
-            <CheckinItem
-              item={item}
-              index={index}
-              scrollY={scrollY}
-              onSelect={(selected: any) => setSelectedMember({ ...selected, verified: true })}
+
+        {/* --- SCROLLABLE LIST WITH STACKING CARD SCROLL ANIMATION / EMPTY STATE --- */}
+        {RECENT_CHECKINS.length === 0 ? (
+          <View className="items-center justify-center ">
+            <Image
+              source={require('../../assets/images/empty_checkins.png')}
+              className="h-72 w-72"
+              resizeMode="contain"
             />
-          )}
-        />
-      )}
+            <Text className="mt-1 text-center font-bold text-lg text-slate-900">
+              No Recent Check-ins Yet
+            </Text>
+            <Text className="mt-1 px-6 text-center text-[12px] leading-5 text-slate-500">
+              When members check in to your gym, their live activity and details will appear right here.
+            </Text>
+          </View>
+        ) : (
+          <Animated.FlatList
+            data={RECENT_CHECKINS}
+            keyExtractor={(item) => item.id}
+            onScroll={scrollHandler}
+            scrollEventThrottle={16}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingBottom: Platform.OS === 'ios' ? 100 : 20,
+            }}
+            renderItem={({ item, index }) => (
+              <CheckinItem
+                item={item}
+                index={index}
+                scrollY={scrollY}
+                onSelect={(selected: any) => setSelectedMember({ ...selected, verified: true })}
+              />
+            )}
+          />
+        )}
+      </ScrollView>
 
       {/* --- MEMBER DETAIL BOTTOM SHEET --- */}
       <Modal

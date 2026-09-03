@@ -276,7 +276,78 @@ export const userDetailsApi = {
   },
 
   updateClubOwner: async (id: number | string, payloadData: any) => {
-    const response = await api.put(`${ENDPOINTS.CLUB_OWNERS}/${id}`, {
+    // 1. Try PUT /api/club-owners/:id (for approved owners)
+    if (id && id !== 0 && id !== '0') {
+      try {
+        const response = await api.put(`${ENDPOINTS.CLUB_OWNERS}/${id}`, {
+          data: payloadData,
+        });
+        return response.data;
+      } catch (error: any) {
+        console.warn(`PUT ${ENDPOINTS.CLUB_OWNERS}/${id} failed (${error?.response?.status}), trying fallbacks...`);
+      }
+    }
+
+    // 2. Try PUT /api/club-owner/me
+    try {
+      const response = await api.put(ENDPOINTS.MY_CLUB_OWNER, {
+        data: payloadData,
+      });
+      return response.data;
+    } catch (e: any) {
+      console.warn('PUT MY_CLUB_OWNER fallback notice:', e?.response?.status || e?.message);
+    }
+
+    // 3. Fallback for pending owners - Step 1 details (clubName/ownerName)
+    if (payloadData.clubName || payloadData.ownerName) {
+      try {
+        const formData = new FormData();
+        if (payloadData.clubName) formData.append('clubName', payloadData.clubName);
+        if (payloadData.ownerName) formData.append('ownerName', payloadData.ownerName);
+        if (payloadData.phoneNumber || payloadData.phone) {
+          formData.append('phoneNumber', payloadData.phoneNumber || payloadData.phone);
+        }
+        if (payloadData.email) formData.append('email', payloadData.email);
+        if (payloadData.logo) formData.append('logo', payloadData.logo);
+
+        const response = await api.post(ENDPOINTS.STEP_1, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            Accept: 'application/json',
+          },
+          transformRequest: (data) => data,
+        });
+        return response.data;
+      } catch (e: any) {
+        console.warn('STEP_1 fallback notice:', e?.response?.status || e?.message);
+      }
+    }
+
+    // 4. Fallback for pending owners - Step 4 config (services, facilities, timings)
+    try {
+      const response = await api.post(ENDPOINTS.STEP_4, payloadData);
+      return response.data;
+    } catch (e: any) {
+      console.warn('STEP_4 fallback notice:', e?.response?.status || e?.message);
+    }
+
+    // 5. Fallback for pending owners - Step 3 address
+    if (payloadData.clubAddress || payloadData.latitude) {
+      try {
+        const response = await api.post(ENDPOINTS.STEP_3, {
+          clubAddress: payloadData.clubAddress,
+          city: payloadData.city,
+          state: payloadData.state,
+          pincode: payloadData.pincode,
+        });
+        return response.data;
+      } catch (e: any) {
+        console.warn('STEP_3 fallback notice:', e?.response?.status || e?.message);
+      }
+    }
+
+    // Final attempt: PUT /api/club-owners
+    const response = await api.put(ENDPOINTS.CLUB_OWNERS, {
       data: payloadData,
     });
     return response.data;

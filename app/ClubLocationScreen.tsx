@@ -18,7 +18,7 @@ import { LocationMapPicker, LocationMapPickerHandle } from '@/components/Locatio
 import * as Location from 'expo-location';
 import { Button } from '@/components/Button';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useUserDetail } from '@/hooks/useUserDetail';
+import { useUserDetail, useClubOwnerMe } from '@/hooks/useUserDetail';
 import { useAuthStore } from '@/store/useAuthStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
@@ -28,6 +28,7 @@ const ClubLocationScreen = () => {
   const router = useRouter();
   const { user } = useAuthStore();
   const { profileStatus, updateClubOwner, submitStep2 } = useUserDetail();
+  const { data: myOwnerData } = useClubOwnerMe();
 
   const mapRef = useRef<LocationMapPickerHandle>(null);
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
@@ -55,6 +56,7 @@ const ClubLocationScreen = () => {
   });
 
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isScrollEnabled, setIsScrollEnabled] = useState(true);
 
   // --- 1. Load Initial Saved Data ---
   useEffect(() => {
@@ -65,26 +67,97 @@ const ClubLocationScreen = () => {
         const savedData = await AsyncStorage.getItem('club_profile');
         if (savedData) savedClubProfile = JSON.parse(savedData);
 
-        const userKey =
-          profileStatus?.id ||
-          profileStatus?.pendingClubOwnerId ||
-          user?.id ||
-          user?.email ||
-          'guest';
-        const onboardingStorageKey = `@onboarding_step2_map_data_${userKey}`;
-        const onboardingData = await AsyncStorage.getItem(onboardingStorageKey);
+        let step2MapData: any = null;
+        let step3AddressData: any = null;
+        try {
+          const keys = await AsyncStorage.getAllKeys();
+          const step2Key = keys.find(
+            (k) => k.includes('onboarding_step2_map_data') || k.includes('onboarding_step2')
+          );
+          if (step2Key) {
+            const str2 = await AsyncStorage.getItem(step2Key);
+            if (str2) step2MapData = JSON.parse(str2);
+          }
+          const step3Key = keys.find(
+            (k) => k.includes('onboarding_step3_data') || k.includes('onboarding_step3')
+          );
+          if (step3Key) {
+            const str3 = await AsyncStorage.getItem(step3Key);
+            if (str3) step3AddressData = JSON.parse(str3);
+          }
+        } catch (e) {}
 
         const latVal =
+          myOwnerData?.latitude ||
           pData?.latitude ||
           pData?.pendingClubOwner?.latitude ||
+          user?.clubOwnerDetail?.latitude ||
           savedClubProfile?.latitude ||
-          (onboardingData ? JSON.parse(onboardingData)?.region?.latitude : null);
+          step2MapData?.region?.latitude ||
+          step2MapData?.latitude;
 
         const lngVal =
+          myOwnerData?.longitude ||
           pData?.longitude ||
           pData?.pendingClubOwner?.longitude ||
+          user?.clubOwnerDetail?.longitude ||
           savedClubProfile?.longitude ||
-          (onboardingData ? JSON.parse(onboardingData)?.region?.longitude : null);
+          step2MapData?.region?.longitude ||
+          step2MapData?.longitude;
+
+        const resolvedAddress =
+          myOwnerData?.clubAddress ||
+          myOwnerData?.address ||
+          pData?.clubAddress ||
+          pData?.address ||
+          pData?.pendingClubOwner?.clubAddress ||
+          user?.clubOwnerDetail?.clubAddress ||
+          user?.clubOwnerDetail?.address ||
+          savedClubProfile?.clubAddress ||
+          savedClubProfile?.address ||
+          step3AddressData?.clubAddress ||
+          step3AddressData?.address ||
+          '';
+
+        const resolvedCity =
+          myOwnerData?.city ||
+          pData?.city ||
+          pData?.pendingClubOwner?.city ||
+          user?.clubOwnerDetail?.city ||
+          savedClubProfile?.city ||
+          step3AddressData?.city ||
+          '';
+
+        const resolvedState =
+          myOwnerData?.state ||
+          pData?.state ||
+          pData?.pendingClubOwner?.state ||
+          user?.clubOwnerDetail?.state ||
+          savedClubProfile?.state ||
+          step3AddressData?.state ||
+          '';
+
+        const resolvedPincode =
+          myOwnerData?.pincode ||
+          pData?.pincode ||
+          pData?.pendingClubOwner?.pincode ||
+          user?.clubOwnerDetail?.pincode ||
+          savedClubProfile?.pincode ||
+          step3AddressData?.pincode ||
+          '';
+
+        if (resolvedAddress) {
+          setLocationInfo((prev) => ({
+            ...prev,
+            name: resolvedAddress.split(',')[0] || 'Club Location',
+            address: resolvedAddress,
+            clubAddress: resolvedAddress,
+            city: resolvedCity,
+            state: resolvedState,
+            pincode: resolvedPincode,
+          }));
+          setSearchQuery(resolvedAddress);
+        }
 
         if (latVal && lngVal) {
           const lat = parseFloat(String(latVal));
@@ -97,7 +170,9 @@ const ClubLocationScreen = () => {
               longitudeDelta: 0.005,
             };
             setRegion(initialRegion);
-            getAddressFromCoords(lat, lng);
+            if (!resolvedAddress) {
+              getAddressFromCoords(lat, lng);
+            }
             setIsInitialized(true);
             return;
           }
@@ -115,7 +190,7 @@ const ClubLocationScreen = () => {
     if (!isInitialized) {
       loadSavedLocation();
     }
-  }, [profileStatus, user, isInitialized]);
+  }, [profileStatus, myOwnerData, user, isInitialized]);
 
   // --- 2. Reverse Geocoding (Native First, OSM Fallback) ---
   const getAddressFromCoords = async (lat: number, lng: number) => {
@@ -433,28 +508,38 @@ const ClubLocationScreen = () => {
     setIsSaving(true);
     const pData = profileStatus?.data || profileStatus || {};
 
+    const ownerId =
+      myOwnerData?.id ||
+      myOwnerData?.clubOwnerId ||
+      profileStatus?.id ||
+      profileStatus?.clubOwnerId ||
+      user?.clubOwnerDetail?.id ||
+      user?.id;
+
     const payloadData: any = {
-      ownerName: pData?.ownerName || pData?.owner_name || '',
-      phoneNumber: pData?.phoneNumber || pData?.phone_number || '',
-      email: pData?.email || '',
-      clubName: pData?.clubName || pData?.club_name || '',
+      id: ownerId,
+      ownerName: myOwnerData?.ownerName || pData?.ownerName || pData?.owner_name || user?.username || '',
+      phoneNumber: myOwnerData?.phoneNumber || pData?.phoneNumber || pData?.phone_number || user?.phoneNumber || '',
+      email: myOwnerData?.email || pData?.email || user?.email || '',
+      clubName: myOwnerData?.clubName || pData?.clubName || pData?.club_name || '',
       latitude: String(region.latitude),
       longitude: String(region.longitude),
       clubAddress: locationInfo.address || searchQuery || 'Location Address',
-      city: locationInfo.city || pData?.city || '',
-      state: locationInfo.state || pData?.state || '',
-      pincode: locationInfo.pincode || pData?.pincode || '',
-      openingTime: pData?.openingTime || '06:00:00.000',
-      closingTime: pData?.closingTime || '22:00:00.000',
-      weekday: pData?.weekday || 'Monday to Friday',
-      weekend: pData?.weekend || 'Saturday & Sunday',
-      facilities: pData?.facilities || [],
-      services: pData?.services || [],
-      clubCategory: pData?.clubCategory || 'Premium',
+      city: locationInfo.city || myOwnerData?.city || pData?.city || '',
+      state: locationInfo.state || myOwnerData?.state || pData?.state || '',
+      pincode: locationInfo.pincode || myOwnerData?.pincode || pData?.pincode || '',
+      openingTime: myOwnerData?.openingTime || pData?.openingTime || '06:00:00.000',
+      closingTime: myOwnerData?.closingTime || pData?.closingTime || '22:00:00.000',
+      weekday: myOwnerData?.weekday || pData?.weekday || 'Monday to Friday',
+      weekend: myOwnerData?.weekend || pData?.weekend || 'Saturday & Sunday',
+      facilities: myOwnerData?.facilities || pData?.facilities || [],
+      services: myOwnerData?.services || pData?.services || [],
+      clubCategory: myOwnerData?.clubCategory || pData?.clubCategory || 'Premium',
     };
 
-    if (pData?.logo?.id || pData?.logo) {
-      payloadData.logo = typeof pData.logo === 'number' ? pData.logo : pData.logo.id;
+    if (myOwnerData?.logo || pData?.logo) {
+      const rawLogo = myOwnerData?.logo || pData?.logo;
+      payloadData.logo = typeof rawLogo === 'number' ? rawLogo : rawLogo?.id;
     }
 
     try {
@@ -561,6 +646,7 @@ const ClubLocationScreen = () => {
         </View>
 
         <ScrollView
+          scrollEnabled={isScrollEnabled}
           showsVerticalScrollIndicator={false}
           className="flex-1"
           keyboardShouldPersistTaps="handled">
@@ -607,12 +693,18 @@ const ClubLocationScreen = () => {
           </View>
 
           {/* Interactive Map View */}
-          <View className="relative z-10 h-[380px] w-full overflow-hidden rounded-[32px] border border-slate-200 bg-gray-100">
+          <View
+            onTouchStart={() => setIsScrollEnabled(false)}
+            onTouchEnd={() => setIsScrollEnabled(true)}
+            onTouchCancel={() => setIsScrollEnabled(true)}
+            className="relative z-10 h-[380px] w-full overflow-hidden rounded-[32px] border border-slate-200 bg-gray-100">
             <LocationMapPicker
               ref={mapRef}
               style={{ width: '100%', height: '100%' }}
               initialRegion={region}
               onRegionChangeComplete={onRegionChangeComplete}
+              onMapTouchStart={() => setIsScrollEnabled(false)}
+              onMapTouchEnd={() => setIsScrollEnabled(true)}
             />
 
             {/* Center Pin Marker */}

@@ -22,13 +22,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 export default function OnBoardingStep() {
   const router = useRouter();
-  const pendingMutations = useMutationState({
-    filters: { status: 'pending' },
-  });
-  const isLoading = pendingMutations.length > 0;
   const [step, setStep] = useState(1);
   const [subStep, setSubStep] = useState(1);
   const [hasCheckedDocuments, setHasCheckedDocuments] = useState(false);
+  const [isStepSaving, setIsStepSaving] = useState(false);
   const totalSteps = 5;
   const { user } = useAuthStore();
 
@@ -76,15 +73,26 @@ export default function OnBoardingStep() {
 
   const {
     submitStep1,
-    // submitStep2,
+    submitStep2,
     submitStep3,
     submitStep4,
     submitStep7,
+    uploadDoc,
     confirmDocs,
     profileStatus,
     isFetchingStatus,
     documents,
   } = useUserDetail();
+
+  const isLoading =
+    isStepSaving ||
+    submitStep1.isPending ||
+    submitStep2.isPending ||
+    submitStep3.isPending ||
+    submitStep4.isPending ||
+    submitStep7.isPending ||
+    uploadDoc.isPending ||
+    confirmDocs.isPending;
 
   // --- 2. Sync Global State with API Once ---
   useEffect(() => {
@@ -220,9 +228,7 @@ export default function OnBoardingStep() {
   if (isFetchingStatus && !profileStatus) {
     return (
       <Container>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' }}>
-          <ActivityIndicator size="large" color="#F6163C" />
-        </View>
+        <GymLoader visible={true} />
       </Container>
     );
   }
@@ -234,46 +240,42 @@ export default function OnBoardingStep() {
 
 
   const handleNext = async () => {
-
-    if (step === 1) {
-
-      const data = onboarding1Ref.current?.getFormData();
-      console.log(data, 'data');
-      if (data) updateFormData(data);
-      onboarding1Ref.current?.handleSave();
-      return;
-    } if (step === 2) {
-      if (subStep === 1) {
-        setSubStep(2);
-      } else {
-        const data = onboarding2DetailsRef.current?.getFormData();
+    setIsStepSaving(true);
+    try {
+      if (step === 1) {
+        const data = onboarding1Ref.current?.getFormData();
         if (data) updateFormData(data);
-        onboarding2DetailsRef.current?.handleSave();
+        await onboarding1Ref.current?.handleSave();
+      } else if (step === 2) {
+        if (subStep === 1) {
+          setSubStep(2);
+        } else {
+          const data = onboarding2DetailsRef.current?.getFormData();
+          if (data) updateFormData(data);
+          await onboarding2DetailsRef.current?.handleSave();
+        }
+      } else if (step === 3) {
+        const data = onboarding3Ref.current?.getFormData();
+        if (data) updateFormData(data);
+        await onboarding3Ref.current?.handleSave();
+      } else if (step === 4) {
+        if (subStep === 1) {
+          onboarding4Ref.current?.openModal();
+        } else {
+          confirmDocs.mutate(undefined, {
+            onSuccess: () => {
+              setStep(5);
+              setSubStep(1);
+            },
+          });
+        }
+      } else if (step === 5) {
+        await onboarding5Ref.current?.handleUpload();
       }
-      return;
-    }
-    if (step === 3) {
-      const data = onboarding3Ref.current?.getFormData();
-      if (data) updateFormData(data);
-      onboarding3Ref.current?.handleSave();
-      return;
-    }
-    if (step === 4) {
-      if (subStep === 1) {
-        onboarding4Ref.current?.openModal();
-      } else {
-        confirmDocs.mutate(undefined, {
-          onSuccess: () => {
-            setStep(5);
-            setSubStep(1);
-          },
-        });
-      }
-      return;
-    }
-    if (step === 5) {
-      onboarding5Ref.current?.handleUpload();
-      return;
+    } catch (e) {
+      console.log('Error in handleNext step:', e);
+    } finally {
+      setTimeout(() => setIsStepSaving(false), 500);
     }
   };
 

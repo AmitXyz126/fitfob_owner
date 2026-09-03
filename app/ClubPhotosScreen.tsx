@@ -8,11 +8,14 @@ import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import { userDetailsApi } from '@/api/userdetailsApi';
-import { useUserDetail } from '@/hooks/useUserDetail';
+import { useUserDetail, useClubOwnerMe } from '@/hooks/useUserDetail';
+import { useAuthStore } from '@/store/useAuthStore';
 
 const ClubPhotosScreen = () => {
   const router = useRouter();
-  const { profileStatus } = useUserDetail();
+  const { user } = useAuthStore();
+  const { profileStatus, updateClubOwner } = useUserDetail();
+  const { data: myOwnerData } = useClubOwnerMe();
 
   const [photos, setPhotos] = useState<{ id: string; uri: string; rawId?: number | null; isUploading?: boolean }[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -23,7 +26,15 @@ const ClubPhotosScreen = () => {
     if (typeof val === 'string') {
       str = val;
     } else if (typeof val === 'object') {
-      str = val.uri || val.url || val.path || val.src || val?.data?.attributes?.url || val?.data?.url || '';
+      str =
+        val.uri ||
+        val.url ||
+        val.path ||
+        val.src ||
+        val?.attributes?.url ||
+        val?.data?.attributes?.url ||
+        val?.data?.url ||
+        '';
     }
     if (!str) return '';
     if (str.startsWith('/')) {
@@ -40,43 +51,65 @@ const ClubPhotosScreen = () => {
     useCallback(() => {
       const loadPhotos = async () => {
         try {
-          const savedData = await AsyncStorage.getItem('club_photos');
-          if (savedData) {
-            const parsed = JSON.parse(savedData);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              setPhotos(parsed);
-              return;
-            }
-          }
-
           const pData = profileStatus?.data || profileStatus || {};
           const remotePhotos =
+            myOwnerData?.clubPhotos ||
+            myOwnerData?.photos ||
+            myOwnerData?.attributes?.clubPhotos ||
             pData?.clubPhotos ||
-            pData?.pendingClubOwner?.clubPhotos ||
             pData?.photos ||
+            pData?.pendingClubOwner?.clubPhotos ||
+            user?.clubOwnerDetail?.clubPhotos ||
+            user?.clubOwnerDetail?.photos ||
             [];
 
+          let parsedLocal: any[] = [];
+          const savedData = await AsyncStorage.getItem('club_photos');
+          if (savedData) {
+            try {
+              const p = JSON.parse(savedData);
+              if (Array.isArray(p)) parsedLocal = p;
+            } catch (e) { }
+          }
+
+          let combinedPhotos: any[] = [];
           if (Array.isArray(remotePhotos) && remotePhotos.length > 0) {
-            const mapped = remotePhotos
-              .map((item: any, idx: number) => ({
-                id: String(item?.id || idx),
-                uri: getImageUriString(item),
-                rawId: item?.id || null,
-                isUploading: false,
-              }))
+            combinedPhotos = remotePhotos;
+          } else if (parsedLocal.length > 0) {
+            combinedPhotos = parsedLocal;
+          }
+
+          if (combinedPhotos.length > 0) {
+            const mapped = combinedPhotos
+              .map((item: any, idx: number) => {
+                const uri = getImageUriString(item);
+                const id = String(item?.id || item?.rawId || idx);
+                const rawId = typeof item === 'object' && item?.id ? item.id : item?.rawId || null;
+                return {
+                  id,
+                  uri,
+                  rawId,
+                  isUploading: false,
+                };
+              })
               .filter((item: any) => Boolean(item.uri));
 
             if (mapped.length > 0) {
               setPhotos(mapped);
               await AsyncStorage.setItem('club_photos', JSON.stringify(mapped));
+              return;
             }
+          }
+
+          if (parsedLocal.length > 0) {
+            setPhotos(parsedLocal);
           }
         } catch (e) {
           console.log('Error loading club photos:', e);
         }
       };
       loadPhotos();
-    }, [profileStatus])
+    }, [profileStatus, myOwnerData, user])
   );
 
   const pickImage = async () => {
@@ -182,9 +215,22 @@ const ClubPhotosScreen = () => {
       await AsyncStorage.setItem('club_photos', JSON.stringify(cleanToStore));
 
       try {
-        await userDetailsApi.uploadClubPhotos(cleanToStore);
+        const ownerId =
+          myOwnerData?.id ||
+          myOwnerData?.clubOwnerId ||
+          profileStatus?.id ||
+          profileStatus?.clubOwnerId ||
+          user?.clubOwnerDetail?.id ||
+          user?.id;
+
+        const photoUrisOrIds = cleanToStore.map((p) => p.rawId || p.uri);
+        await updateClubOwner.mutateAsync({
+          id: ownerId,
+          clubPhotos: photoUrisOrIds,
+          photos: photoUrisOrIds,
+        });
       } catch (e) {
-        console.log('uploadClubPhotos API notice:', e);
+        console.log('updateClubOwner photos sync note:', e);
       }
 
       Toast.show({
@@ -242,7 +288,7 @@ const ClubPhotosScreen = () => {
 
               {/* Delete Button (only if not uploading) */}
               {!item.isUploading && (
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => removePhoto(item.id)}
                   activeOpacity={0.8}
                   className="absolute top-2 right-2 h-7 w-7 items-center justify-center rounded-full bg-[#F6163C] border border-white/40 shadow-md z-10"
@@ -255,7 +301,7 @@ const ClubPhotosScreen = () => {
 
           {/* Remaining Empty Slots */}
           {Array.from({ length: Math.max(0, 6 - photos.length) }).map((_, index) => (
-            <TouchableOpacity 
+            <TouchableOpacity
               key={`empty-${index}`}
               onPress={pickImage}
               disabled={isAnyUploading}
@@ -281,14 +327,13 @@ const ClubPhotosScreen = () => {
 
       {/* Save Button */}
       <View className="py-4">
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={handleSaveAll}
           disabled={photos.length === 0 || isAnyUploading || isSaving}
-          className={`w-full items-center justify-center rounded-2xl py-4 shadow-lg ${
-            photos.length === 0 || isAnyUploading || isSaving
+          className={`w-full items-center justify-center rounded-2xl py-4 shadow-lg ${photos.length === 0 || isAnyUploading || isSaving
               ? 'bg-gray-300'
               : 'bg-[#F6163C] shadow-red-200'
-          }`}
+            }`}
         >
           {isSaving ? (
             <ActivityIndicator color="white" size="small" />

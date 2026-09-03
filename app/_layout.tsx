@@ -26,8 +26,13 @@ export default function Layout() {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="index" options={{ gestureEnabled: false }} />
+          <Stack.Screen name="splash" options={{ gestureEnabled: false }} />
+          <Stack.Screen name="welcome" options={{ gestureEnabled: false }} />
+          <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
+          <Stack.Screen name="onBoardingScreen/OnBoardingStep" options={{ gestureEnabled: false }} />
+          <Stack.Screen name="ReviewStatusScreen" options={{ gestureEnabled: false }} />
+          <Stack.Screen name="RejectRequestScreen" options={{ gestureEnabled: false }} />
           <Stack.Screen name="clubProfile" />
           <Stack.Screen name="ClubPhotosScreen" />
           <Stack.Screen name="ManageBankScreen" />

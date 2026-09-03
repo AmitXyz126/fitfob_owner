@@ -40,7 +40,9 @@ import Animated, {
 
 const ITEM_SIZE = 80;
 
-const ALL_PAYOUT_HISTORY = [
+// DUMMY PAYOUT HISTORY DATA (COMMENTED OUT FOR LIVE DATA / EMPTY STATE)
+/*
+const DUMMY_PAYOUT_HISTORY = [
   { id: '1', date: 'Jan 26, 2026', rawDate: '2026-01-26', amountDisplay: '85,000', amountVal: 85000, status: 'Paid Out', year: '2026' },
   { id: '2', date: 'Dec 25, 2025', rawDate: '2025-12-25', amountDisplay: '70,000', amountVal: 70000, status: 'Paid Out', year: '2025' },
   { id: '3', date: 'Nov 25, 2025', rawDate: '2025-11-25', amountDisplay: '65,000', amountVal: 65000, status: 'Paid Out', year: '2025' },
@@ -50,6 +52,9 @@ const ALL_PAYOUT_HISTORY = [
   { id: '7', date: 'July 25, 2025', rawDate: '2025-07-25', amountDisplay: '45,000', amountVal: 45000, status: 'Paid Out', year: '2025' },
   { id: '8', date: 'June 20, 2025', rawDate: '2025-06-20', amountDisplay: '50,000', amountVal: 50000, status: 'Pending', year: '2025' },
 ];
+*/
+
+const ALL_PAYOUT_HISTORY: any[] = [];
 
 const PayoutHistoryItem = ({
   item,
@@ -115,6 +120,43 @@ const PayoutHistoryItem = ({
         </View>
       </View>
     </Animated.View>
+  );
+};
+
+const EmptyPayoutIllustration = () => {
+  const floatAnim = useSharedValue(0);
+
+  useEffect(() => {
+    floatAnim.value = withRepeat(
+      withSequence(
+        withTiming(-10, { duration: 2200, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0, { duration: 2200, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+  }, [floatAnim]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: floatAnim.value }],
+  }));
+
+  return (
+    <View className="items-center justify-center py-2 px-4">
+      <Animated.View style={animatedStyle} className="items-center justify-center">
+        <Image
+          source={require('../assets/images/payout_empty.png')}
+          style={{ width: 340, height: 290 }}
+          resizeMode="contain"
+        />
+      </Animated.View>
+      <Text className="mt-3 text-center font-bold text-lg text-slate-900">
+        No Payout History Yet
+      </Text>
+      <Text className="mt-1.5 px-6 text-center text-xs leading-5 text-slate-500">
+        Your earnings, scheduled bank settlements, and completed transactions will be listed here automatically.
+      </Text>
+    </View>
   );
 };
 
@@ -468,26 +510,7 @@ const PayoutHistory = () => {
         contentContainerStyle={{
           paddingBottom: Platform.OS === 'ios' ? 40 : 20,
         }}
-        ListEmptyComponent={
-          <View className="items-center justify-center py-12">
-            <FilterX size={48} color="#9CA3AF" />
-            <Text className="mt-3 font-semibold text-base text-gray-700">
-              No payout records found
-            </Text>
-            <Text className="mt-1 text-center text-xs text-gray-500">
-              Try changing or clearing your filter options.
-            </Text>
-            <TouchableOpacity
-              onPress={() => {
-                setSelectedYear('All');
-                setSelectedStatus('All');
-                setSelectedSort('Newest');
-              }}
-              className="mt-4 rounded-full bg-[#EF4444] px-5 py-2.5">
-              <Text className="font-semibold text-xs text-white">Reset Filters</Text>
-            </TouchableOpacity>
-          </View>
-        }
+        ListEmptyComponent={<EmptyPayoutIllustration />}
         renderItem={({ item, index }) => (
           <PayoutHistoryItem item={item} index={index} scrollY={scrollY} />
         )}

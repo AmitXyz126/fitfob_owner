@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { useAuthStore } from '@/store/useAuthStore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const useClubOwnerMe = (enabled: boolean = true) => {
   const { user } = useAuthStore();
@@ -173,18 +174,55 @@ export const useUserDetail = () => {
   });
 
   const updateClubOwner = useMutation({
-    mutationFn: (data: any) => {
-      const id =
+    mutationFn: async (data: any) => {
+      const currentUser = useAuthStore.getState().user;
+      const cachedOwnerMe: any = queryClient.getQueryData(['my-club-owner-me', userKey]);
+
+      let id =
+        data?.id ||
+        currentUser?.clubOwnerDetail?.id ||
+        currentUser?.clubOwnerDetail?.clubOwnerId ||
+        cachedOwnerMe?.id ||
+        cachedOwnerMe?.clubOwnerId ||
+        cachedOwnerMe?.data?.id ||
+        profileStatus?.clubOwnerDetail?.id ||
         profileStatus?.id ||
         profileStatus?.clubOwnerId ||
-        profileStatus?.pendingClubOwnerId ||
         profileStatus?.data?.id ||
         profileStatus?.data?.attributes?.id;
-      if (!id) throw new Error('Owner ID not found!');
-      return userDetailsApi.updateClubOwner(id, data);
+
+      if (!id) {
+        id =
+          currentUser?.clubOwnerId ||
+          currentUser?.pendingClubOwnerId ||
+          profileStatus?.pendingClubOwnerId ||
+          profileStatus?.pendingClubOwner?.id;
+      }
+
+      if (!id) {
+        try {
+          const cachedStr = await AsyncStorage.getItem('club_owner_me');
+          if (cachedStr) {
+            const parsed = JSON.parse(cachedStr);
+            id = parsed?.id || parsed?.clubOwnerId || parsed?.data?.id;
+          }
+          if (!id) {
+            const profStr = await AsyncStorage.getItem('club_profile');
+            if (profStr) {
+              const parsedProf = JSON.parse(profStr);
+              id = parsedProf?.id || parsedProf?.clubOwnerId;
+            }
+          }
+        } catch (e) {
+          console.log('Error reading cached owner ID from AsyncStorage:', e);
+        }
+      }
+
+      return userDetailsApi.updateClubOwner(id || 0, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
+      queryClient.invalidateQueries({ queryKey: ['my-club-owner-me'] });
       Toast.show({ type: 'success', text1: 'Club Details Updated! ✅' });
     },
     onError: (error: any) => {

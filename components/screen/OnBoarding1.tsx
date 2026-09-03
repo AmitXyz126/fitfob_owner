@@ -35,45 +35,90 @@ const OnBoarding1 = forwardRef(({ initialData, onNext }: any, ref) => {
 
 console.log (ref ,"ref")
 console.log(initialData,"initialdata")
- 
+  const getImageUriString = (val: any): string => {
+    if (!val) return '';
+    let str = '';
+    if (typeof val === 'string') {
+      str = val;
+    } else if (typeof val === 'object') {
+      str =
+        val.uri ||
+        val.url ||
+        val.path ||
+        val.src ||
+        val.logoUrl ||
+        val?.attributes?.url ||
+        val?.data?.attributes?.url ||
+        val?.data?.url ||
+        '';
+    }
+    if (!str) return '';
+    if (str.startsWith('/')) {
+      const baseUrl = process.env.EXPO_PUBLIC_API_URL || '';
+      if (baseUrl) {
+        const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+        return `${cleanBase}${str}`;
+      }
+    }
+    return str;
+  };
+
   // 1. Initialize logic
   useEffect(() => {
     const initData = async () => {
-      if (initialData && (initialData.clubName || initialData.ownerName)) {
-        setClubName(initialData.clubName || '');
-        setOwnerName(initialData.ownerName || '');
-        setPhone(initialData.phoneNumber || '');
-        setEmail(initialData.email || '');
+      let savedLocal: any = null;
+      try {
+        const savedStr = await AsyncStorage.getItem(STORAGE_KEY);
+        if (savedStr) savedLocal = JSON.parse(savedStr);
+      } catch (e) {}
 
-        const logoVal = initialData.logoId || initialData.logo;
-        if (logoVal && typeof logoVal === 'object') {
-          setLogoId(logoVal);
-          if (logoVal.uri) {
-            setImage(logoVal.uri);
-          } else {
-            setImage(initialData.image || initialData.logoUrl || null);
-          }
-        } else {
-          setImage(initialData.image || initialData.logoUrl || logoVal || null);
-        }
-        setIsInitialized(true);
-      } else if (!isInitialized) {
-        const savedData = await AsyncStorage.getItem(STORAGE_KEY);
-        if (savedData) {
-          const parsed = JSON.parse(savedData);
-          setClubName(parsed.clubName || '');
-          setOwnerName(parsed.ownerName || '');
-          setPhone(parsed.phoneNumber || '');
-          setEmail(parsed.email || '');
-          setImage(parsed.image || null);
-          setLogoId(parsed.logoId || null);
-        }
-        setIsInitialized(true);
+      const sourceData = initialData || profileStatus || {};
+
+      const resolvedClubName = sourceData.clubName || savedLocal?.clubName || '';
+      const resolvedOwnerName = sourceData.ownerName || savedLocal?.ownerName || '';
+      const resolvedPhone = sourceData.phoneNumber || sourceData.phone || savedLocal?.phone || '';
+      const resolvedEmail = sourceData.email || savedLocal?.email || '';
+
+      if (resolvedClubName) setClubName(resolvedClubName);
+      if (resolvedOwnerName) setOwnerName(resolvedOwnerName);
+      if (resolvedPhone) setPhone(resolvedPhone);
+      if (resolvedEmail) setEmail(resolvedEmail);
+
+      // Resolve Logo: Prioritize local file URI if set, then remote API URI, then saved local
+      const localFileUri = savedLocal?.image;
+      const localLogoObj = savedLocal?.logoId || savedLocal?.logo;
+
+      const rawLogo =
+        sourceData.logoId ||
+        sourceData.logo ||
+        sourceData.logoUrl ||
+        sourceData.image ||
+        null;
+
+      const remoteUri = getImageUriString(rawLogo);
+
+      const finalImageUri =
+        localFileUri && (localFileUri.startsWith('file://') || localFileUri.startsWith('content://'))
+          ? localFileUri
+          : remoteUri || localFileUri || null;
+
+      if (finalImageUri) {
+        setImage(finalImageUri);
       }
+
+      if (localLogoObj && typeof localLogoObj === 'object') {
+        setLogoId(localLogoObj);
+      } else if (rawLogo && typeof rawLogo === 'object') {
+        setLogoId(rawLogo);
+      } else if (finalImageUri) {
+        setLogoId(finalImageUri);
+      }
+
+      setIsInitialized(true);
     };
 
     initData();
-  }, [userId, initialData, isInitialized, STORAGE_KEY]);
+  }, [userId, profileStatus, STORAGE_KEY]);
 
   // 2. Continuous draft backup
   useEffect(() => {

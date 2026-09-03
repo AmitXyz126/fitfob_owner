@@ -295,8 +295,20 @@ const ClubProfileScreen = () => {
     address: 'Fetching address...',
   });
 
+  const [storedOwnerName, setStoredOwnerName] = useState<string>('');
+
   const getDisplayName = () => {
-    const rawName = profileStatus?.ownerName || user?.username || 'User';
+    const rawName =
+      myOwnerData?.ownerName ||
+      myOwnerData?.owner_name ||
+      profileStatus?.ownerName ||
+      profileStatus?.owner_name ||
+      profileStatus?.data?.ownerName ||
+      user?.clubOwnerDetail?.ownerName ||
+      storedOwnerName ||
+      user?.username ||
+      'User';
+
     const namePart = rawName.includes('@') ? rawName.split('@')[0] : rawName;
     if (/^\+?[0-9]+$/.test(namePart)) {
       return 'User';
@@ -379,6 +391,7 @@ const ClubProfileScreen = () => {
           if (parsedData.logo) logoFromStorage = parsedData.logo;
           if (parsedData.address) addressFromStorage = parsedData.address;
           if (parsedData.clubName) clubNameFromStorage = parsedData.clubName;
+          if (parsedData.ownerName) setStoredOwnerName(parsedData.ownerName);
           if (parsedData.services) servicesFromStorage = parseArrayData(parsedData.services);
           if (parsedData.amenities) amenitiesFromStorage = parseArrayData(parsedData.amenities);
           if (parsedData.clubCategory) categoryFromStorage = parsedData.clubCategory;
@@ -653,8 +666,8 @@ const ClubProfileScreen = () => {
               clubCategory
                 ? `${clubCategory} • ${servicesList.length} Services`
                 : servicesList.length > 0
-                ? `${servicesList.length} Services`
-                : undefined
+                  ? `${servicesList.length} Services`
+                  : undefined
             }
             onPress={() => router.push('/clubServices')}
           />

@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 
+
 type TabType = 'Daily' | 'Weekly' | 'Monthly';
 
 // DUMMY TRANSACTIONS DATA (COMMENTED OUT FOR LIVE DATA / EMPTY STATE)
@@ -244,20 +245,19 @@ const Wallet = () => {
               style={
                 activeTab === tab
                   ? {
-                      shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 1 },
-                      shadowOpacity: 0.1,
-                      shadowRadius: 2,
-                      elevation: 1,
-                      backgroundColor: 'white',
-                    }
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 2,
+                    elevation: 1,
+                    backgroundColor: 'white',
+                  }
                   : {}
               }
               className={`flex-1 items-center rounded-lg py-2.5`}>
               <Text
-                className={`font-bold ${
-                  activeTab === tab ? 'text-slate-900' : 'text-slate-400'
-                }`}>
+                className={`font-bold ${activeTab === tab ? 'text-slate-900' : 'text-slate-400'
+                  }`}>
                 {tab}
               </Text>
             </TouchableOpacity>
@@ -285,11 +285,11 @@ const Wallet = () => {
             resizeMode="cover"
           />
           <View className="relative z-10 px-4 py-5">
-            <Text className="font-medium text-white" style={{ opacity: 0.8 }}>
+            <Text className="font-semibold text-white" style={{ opacity: 0.8 }}>
               {stats[activeTab].label}
             </Text>
             <View className="mt-2 flex-row items-center justify-between">
-              <Text className="font-bold font-sans text-4xl leading-9 text-white">
+              <Text className="font-semibold font-sans text-4xl leading-9 text-white">
                 {stats[activeTab].amount}
               </Text>
               <View
@@ -302,10 +302,11 @@ const Wallet = () => {
             </View>
           </View>
         </LinearGradient>
+     
 
         <View className="mb-2 mt-6">
           <Text className="font-bold text-lg text-slate-800 mb-3">{activeTab} Transactions</Text>
-          
+
           <View className="flex-row items-center gap-3">
             {/* Search Input on main screen */}
             <View className="flex-1 flex-row items-center rounded-2xl border border-slate-200 bg-[#F8FAFC] px-4 h-12">

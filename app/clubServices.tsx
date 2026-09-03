@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Container } from '@/components/Container';
 import Toast from 'react-native-toast-message';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useUserDetail } from '@/hooks/useUserDetail';
+import { useUserDetail, useClubOwnerMe } from '@/hooks/useUserDetail';
 import { useAuthStore } from '@/store/useAuthStore';
 
 interface MasterService {
@@ -19,6 +19,28 @@ interface MasterService {
 interface ServiceItem extends MasterService {
   isEnabled: boolean;
 }
+
+const parseArrayData = (val: any): string[] => {
+  if (!val) return [];
+  if (Array.isArray(val)) {
+    return val.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.map((item) => String(item).trim()).filter(Boolean);
+        }
+      } catch (e) {
+        // fallback
+      }
+    }
+    return trimmed.split(',').map((item) => item.trim()).filter(Boolean);
+  }
+  return [];
+};
 
 // EXACT 18 Fitness Services matching Onboarding Step 3
 const MASTER_SERVICES: MasterService[] = [
@@ -154,6 +176,7 @@ export default function ClubServicesScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
   const { profileStatus, updateClubOwner, refetch } = useUserDetail();
+  const { data: myOwnerData } = useClubOwnerMe();
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -161,49 +184,52 @@ export default function ClubServicesScreen() {
     const initializeServices = async () => {
       let userSelected: string[] = [];
 
-      // 1. Extract selected services from profileStatus / getMe backend data
-      const pData = profileStatus?.data || profileStatus || {};
-      const rawServices =
-        pData?.services ||
-        pData?.fitnessTypes ||
-        pData?.pendingClubOwner?.services ||
-        pData?.pendingClubOwner?.fitnessTypes;
-
-      if (rawServices) {
-        if (typeof rawServices === 'string') {
-          try {
-            userSelected = JSON.parse(rawServices);
-          } catch {
-            userSelected = [rawServices];
-          }
-        } else if (Array.isArray(rawServices)) {
-          userSelected = rawServices;
-        }
-      }
-
-      // 2. Local Storage Fallback if backend data is not populated yet
+      // 1. Storage fallback
+      let servicesFromStorage: string[] = [];
       try {
         const savedProfile = await AsyncStorage.getItem('club_profile');
         if (savedProfile) {
-          const parsed = JSON.parse(savedProfile);
-          if (parsed.services && Array.isArray(parsed.services) && userSelected.length === 0) {
-            userSelected = parsed.services;
+          const parsedProf = JSON.parse(savedProfile);
+          if (parsedProf.services) {
+            servicesFromStorage = parseArrayData(parsedProf.services);
+          } else if (parsedProf.fitnessTypes) {
+            servicesFromStorage = parseArrayData(parsedProf.fitnessTypes);
           }
         }
 
-        const userKey = profileStatus?.id || profileStatus?.pendingClubOwnerId || user?.id || user?.email || 'guest';
-        const step3StorageKey = `@onboarding_step3_data_${userKey}`;
-        const savedStep3 = await AsyncStorage.getItem(step3StorageKey);
-        if (savedStep3 && userSelected.length === 0) {
-          const parsedStep3 = JSON.parse(savedStep3);
-          if (parsedStep3.fitnessTypes && Array.isArray(parsedStep3.fitnessTypes)) {
-            userSelected = parsedStep3.fitnessTypes;
-          } else if (parsedStep3.services && Array.isArray(parsedStep3.services)) {
-            userSelected = parsedStep3.services;
+        const keys = await AsyncStorage.getAllKeys();
+        const step3Keys = keys.filter((k) => k.includes('onboarding_step3_data'));
+        if (step3Keys.length > 0) {
+          const lastStep3Key = step3Keys[step3Keys.length - 1];
+          const step3Json = await AsyncStorage.getItem(lastStep3Key);
+          if (step3Json) {
+            const parsedStep3 = JSON.parse(step3Json);
+            const step3Services = parseArrayData(parsedStep3.fitnessTypes || parsedStep3.services);
+            if (step3Services.length > 0 && servicesFromStorage.length === 0) {
+              servicesFromStorage = step3Services;
+            }
           }
         }
       } catch (e) {
         console.log('Error reading local services draft:', e);
+      }
+
+      // 2. Extract selected services from all backend & user state sources
+      const pData = profileStatus?.data || profileStatus || {};
+      const rawServices =
+        myOwnerData?.services ||
+        myOwnerData?.fitnessTypes ||
+        pData?.services ||
+        pData?.fitnessTypes ||
+        pData?.pendingClubOwner?.services ||
+        pData?.pendingClubOwner?.fitnessTypes ||
+        user?.clubOwnerDetail?.services ||
+        user?.clubOwnerDetail?.fitnessTypes ||
+        servicesFromStorage;
+
+      userSelected = parseArrayData(rawServices);
+      if (userSelected.length === 0 && servicesFromStorage.length > 0) {
+        userSelected = servicesFromStorage;
       }
 
       // 3. Map MASTER_SERVICES with boolean flags
@@ -229,7 +255,7 @@ export default function ClubServicesScreen() {
     };
 
     initializeServices();
-  }, [profileStatus, user]);
+  }, [profileStatus, myOwnerData, user]);
 
   const handleToggle = (id: string) => {
     setServices((prev) =>
@@ -272,8 +298,17 @@ export default function ClubServicesScreen() {
         })
       );
 
+      const ownerId =
+        myOwnerData?.id ||
+        myOwnerData?.clubOwnerId ||
+        profileStatus?.id ||
+        profileStatus?.clubOwnerId ||
+        user?.clubOwnerDetail?.id ||
+        user?.id;
+
       // Save to backend via updateClubOwner mutation
       await updateClubOwner.mutateAsync({
+        id: ownerId,
         services: enabledTitles,
         fitnessTypes: enabledTitles,
       });

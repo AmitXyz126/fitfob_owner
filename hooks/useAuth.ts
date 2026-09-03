@@ -18,11 +18,20 @@ import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
 
 export const navigateAfterAuth = async (user: any, router: any) => {
+  const resetAndNavigate = (targetPath: string) => {
+    if (router.canGoBack()) {
+      try {
+        router.dismissAll();
+      } catch (e) {}
+    }
+    router.replace(targetPath as any);
+  };
+
   // 1. Direct check on login response user object: if clubOwnerDetail is non-null
   if (user?.clubOwnerDetail !== null && user?.clubOwnerDetail !== undefined) {
     console.log('✅ clubOwnerDetail present in login response, fetching /api/club-owner/me & routing to /(tabs)');
     await userDetailsApi.getMyClubOwner();
-    router.replace('/(tabs)');
+    resetAndNavigate('/(tabs)');
     return;
   }
 
@@ -44,13 +53,13 @@ export const navigateAfterAuth = async (user: any, router: any) => {
     if (isApproved) {
       console.log('✅ User approved via getMe, fetching /api/club-owner/me & routing to /(tabs)');
       await userDetailsApi.getMyClubOwner();
-      router.replace('/(tabs)');
+      resetAndNavigate('/(tabs)');
       return;
     }
 
     if (verificationStatus === 'rejected' || status === 'rejected') {
       console.log('❌ User verification rejected, routing to /RejectRequestScreen');
-      router.replace('/RejectRequestScreen');
+      resetAndNavigate('/RejectRequestScreen');
       return;
     }
 
@@ -61,7 +70,7 @@ export const navigateAfterAuth = async (user: any, router: any) => {
       verificationStatus === 'completed'
     ) {
       console.log('⏳ User application in review, routing to /ReviewStatusScreen');
-      router.replace('/ReviewStatusScreen');
+      resetAndNavigate('/ReviewStatusScreen');
       return;
     }
   } catch (error) {
@@ -70,7 +79,7 @@ export const navigateAfterAuth = async (user: any, router: any) => {
 
   // 3. Fallback: details null & onboarding incomplete -> OnBoardingStep
   console.log('ℹ️ Incomplete onboarding, routing to /onBoardingScreen/OnBoardingStep');
-  router.replace('/onBoardingScreen/OnBoardingStep');
+  resetAndNavigate('/onBoardingScreen/OnBoardingStep');
 };
 
 export const useSignupRequest = () => {

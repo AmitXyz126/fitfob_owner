@@ -23,7 +23,7 @@ import { Container } from '@/components/Container';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useUserDetail } from '@/hooks/useUserDetail';
+import { useUserDetail, useClubOwnerMe } from '@/hooks/useUserDetail';
 import { userDetailsApi } from '@/api/userdetailsApi';
 import GymLoader from '@/components/GymLoader';
 import Toast from 'react-native-toast-message';
@@ -33,6 +33,7 @@ const EditClubDetails = () => {
 
   const { user } = useAuthStore();
   const { profileStatus, updateClubOwner } = useUserDetail();
+  const { data: myOwnerData } = useClubOwnerMe();
 
   // --- FORM STATES ---
   const [isSaving, setIsSaving] = useState(false);
@@ -136,6 +137,7 @@ const EditClubDetails = () => {
       const pData = profileStatus?.data || profileStatus || {};
 
       const cName =
+        myOwnerData?.clubName ||
         pData?.clubName ||
         pData?.club_name ||
         pData?.pendingClubOwner?.clubName ||
@@ -163,6 +165,7 @@ const EditClubDetails = () => {
       };
 
       const rawOwnerName =
+        myOwnerData?.ownerName ||
         pData?.ownerName ||
         pData?.owner_name ||
         pData?.pendingClubOwner?.ownerName ||
@@ -176,6 +179,7 @@ const EditClubDetails = () => {
       const oName = cleanOwnerName(rawOwnerName) || (user?.username ? cleanOwnerName(user.username) : '');
 
       const pPhone =
+        myOwnerData?.phoneNumber ||
         pData?.phoneNumber ||
         pData?.phone_number ||
         pData?.phone ||
@@ -188,6 +192,7 @@ const EditClubDetails = () => {
         '';
 
       const pEmail =
+        myOwnerData?.email ||
         pData?.email ||
         savedClubProfile?.email ||
         savedStep1?.email ||
@@ -195,6 +200,8 @@ const EditClubDetails = () => {
         '';
 
       const rawLogo =
+        myOwnerData?.logoUrl ||
+        myOwnerData?.logo ||
         pData?.logoUrl ||
         pData?.logo ||
         pData?.logo_url ||
@@ -212,9 +219,19 @@ const EditClubDetails = () => {
       const logo = extractUri(rawLogo);
 
       const wDay =
-        pData?.weekday || savedClubProfile?.weekday || savedStep3?.weekdayRange || savedStep3?.weekday || 'Monday to Friday';
+        myOwnerData?.weekday ||
+        pData?.weekday ||
+        savedClubProfile?.weekday ||
+        savedStep3?.weekdayRange ||
+        savedStep3?.weekday ||
+        'Monday to Friday';
       const wEnd =
-        pData?.weekend || savedClubProfile?.weekend || savedStep3?.weekendRange || savedStep3?.weekend || 'Saturday & Sunday';
+        myOwnerData?.weekend ||
+        pData?.weekend ||
+        savedClubProfile?.weekend ||
+        savedStep3?.weekendRange ||
+        savedStep3?.weekend ||
+        'Saturday & Sunday';
 
       if (cName) setClubName(cName);
       if (oName) setOwnerName(oName);
@@ -225,22 +242,32 @@ const EditClubDetails = () => {
       if (wEnd) setWeekendRange(wEnd);
 
       const openT =
-        pData?.openingTime || pData?.opening_time || savedClubProfile?.openingTime || savedStep3?.openingTime || savedStep3?.startTime;
+        myOwnerData?.openingTime ||
+        pData?.openingTime ||
+        pData?.opening_time ||
+        savedClubProfile?.openingTime ||
+        savedStep3?.openingTime ||
+        savedStep3?.startTime;
       const parsedOpen = parseTimeToTimestamp(openT);
       if (parsedOpen) setStartTime(parsedOpen);
 
       const closeT =
-        pData?.closingTime || pData?.closing_time || savedClubProfile?.closingTime || savedStep3?.closingTime || savedStep3?.endTime;
+        myOwnerData?.closingTime ||
+        pData?.closingTime ||
+        pData?.closing_time ||
+        savedClubProfile?.closingTime ||
+        savedStep3?.closingTime ||
+        savedStep3?.endTime;
       const parsedClose = parseTimeToTimestamp(closeT);
       if (parsedClose) setEndTime(parsedClose);
 
-      if (pData?.status === 'completed' || pData?.isApprovedOwner) {
+      if (myOwnerData?.id || pData?.status === 'completed' || pData?.isApprovedOwner) {
         setIsVerified(true);
       }
     };
 
     populateForm();
-  }, [profileStatus, user]);
+  }, [profileStatus, myOwnerData, user]);
 
   const [showPicker, setShowPicker] = useState<'start' | 'end' | null>(null);
   const [showDayModal, setShowDayModal] = useState<'weekday' | 'weekend' | null>(null);
@@ -259,69 +286,70 @@ const EditClubDetails = () => {
     return { time: `${strHours}:${strMinutes}`, ampm };
   };
 
-  const formatTimeToApiStr = (timeValue: any) => {
-    const date = new Date(timeValue);
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
-    return `${hours}:${minutes}:${seconds}.000`;
+  const formatTimeToApiStr = (ts: number): string => {
+    const d = new Date(ts);
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}:00.000`;
   };
 
-  const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-    });
-
-    if (!result.canceled && result.assets?.[0]?.uri) {
-      const selectedUri = result.assets[0].uri;
-      setClubImage(selectedUri);
-
-      // 🚀 Hit /api/upload IMMEDIATELY upon selection!
-      setIsUploadingLogo(true);
-      try {
-        console.log('Uploading logo immediately to /api/upload...');
-        const uploadRes = await userDetailsApi.uploadFile({
-          uri: selectedUri,
-          name: `logo_${Date.now()}.jpg`,
-          type: 'image/jpeg',
-        });
-        console.log('Immediate upload result from /api/upload:', uploadRes);
-
-        let id: number | null = null;
-        if (Array.isArray(uploadRes) && uploadRes.length > 0) {
-          id = uploadRes[0]?.id || uploadRes[0]?.documentId || null;
-        } else if (uploadRes?.data && Array.isArray(uploadRes.data) && uploadRes.data.length > 0) {
-          id = uploadRes.data[0]?.id || uploadRes.data[0]?.documentId || null;
-        } else if (uploadRes && typeof uploadRes === 'object') {
-          id = uploadRes?.id || uploadRes?.documentId || uploadRes?.data?.id || null;
-        }
-
-        if (id) {
-          setUploadedLogoId(id);
-          Toast.show({
-            type: 'success',
-            text1: 'Logo Uploaded! 📸',
-            text2: 'Image saved to server successfully.',
-          });
-        }
-      } catch (e: any) {
-        console.error('Error uploading logo image:', e?.response?.data || e?.message);
-        Toast.show({
-          type: 'error',
-          text1: 'Upload Failed',
-          text2: 'Failed to upload logo image. Please try again.',
-        });
-      } finally {
-        setIsUploadingLogo(false);
+  const handlePickImage = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission Denied', 'Permission to access gallery is required!');
+        return;
       }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        const localUri = result.assets[0].uri;
+        setClubImage(localUri);
+        setIsUploadingLogo(true);
+
+        try {
+          const uploadRes = await userDetailsApi.uploadFile({
+            uri: localUri,
+            name: `club_logo_${Date.now()}.jpg`,
+            type: 'image/jpeg',
+          });
+
+          const firstItem = Array.isArray(uploadRes)
+            ? uploadRes[0]
+            : uploadRes?.data && Array.isArray(uploadRes.data)
+            ? uploadRes.data[0]
+            : uploadRes;
+
+          if (firstItem && (firstItem.id || firstItem.documentId)) {
+            setUploadedLogoId(firstItem.id || firstItem.documentId);
+            if (firstItem.url) {
+              setClubImage(extractUri(firstItem.url));
+            }
+          }
+        } catch (uploadError: any) {
+          console.log('Error uploading logo image:', uploadError);
+          Alert.alert(
+            'Upload Warning',
+            'Image selected locally, but server upload failed. The new logo might not save on the server.'
+          );
+        } finally {
+          setIsUploadingLogo(false);
+        }
+      }
+    } catch (error) {
+      console.log('Image pick error:', error);
+      setIsUploadingLogo(false);
     }
   };
+  const pickImage = handlePickImage;
 
   const handleSaveChanges = async () => {
-    // ⚠️ Popup if logo is currently uploading
     if (isUploadingLogo) {
       return Alert.alert(
         'Uploading Logo ⏳',
@@ -335,10 +363,108 @@ const EditClubDetails = () => {
     setIsSaving(true);
     const pData = profileStatus?.data || profileStatus || {};
 
+    let savedClubProfile: any = null;
+    let savedStep3: any = null;
+    let savedStep2Map: any = null;
+    try {
+      const json1 = await AsyncStorage.getItem('club_profile');
+      if (json1) savedClubProfile = JSON.parse(json1);
+
+      const keys = await AsyncStorage.getAllKeys();
+      const mapKey = keys.find((k) => k.includes('onboarding_step2_map_data'));
+      if (mapKey) {
+        const mapJson = await AsyncStorage.getItem(mapKey);
+        if (mapJson) savedStep2Map = JSON.parse(mapJson);
+      }
+
+      const step3Key = keys.find((k) => k.includes('onboarding_step3_data') || k.includes('onboarding_step4'));
+      if (step3Key) {
+        const json3 = await AsyncStorage.getItem(step3Key);
+        if (json3) savedStep3 = JSON.parse(json3);
+      }
+    } catch (e) {}
+
     const existingLogoId =
-      typeof pData?.logo === 'number'
-        ? pData.logo
-        : pData?.logo?.id || pData?.logo_id || null;
+      uploadedLogoId ||
+      (typeof myOwnerData?.logo === 'number' ? myOwnerData.logo : myOwnerData?.logo?.id) ||
+      (typeof pData?.logo === 'number' ? pData.logo : pData?.logo?.id || pData?.logo_id) ||
+      null;
+
+    const resolvedFacilities =
+      myOwnerData?.facilities ||
+      pData?.facilities ||
+      user?.clubOwnerDetail?.facilities ||
+      savedClubProfile?.facilities ||
+      savedClubProfile?.amenities ||
+      savedStep3?.facilities ||
+      savedStep3?.amenities;
+
+    const resolvedServices =
+      myOwnerData?.services ||
+      pData?.services ||
+      user?.clubOwnerDetail?.services ||
+      savedClubProfile?.services ||
+      savedClubProfile?.fitnessTypes ||
+      savedStep3?.services ||
+      savedStep3?.fitnessTypes;
+
+    const resolvedLat =
+      myOwnerData?.latitude ||
+      pData?.latitude ||
+      pData?.pendingClubOwner?.latitude ||
+      user?.clubOwnerDetail?.latitude ||
+      savedClubProfile?.latitude ||
+      savedStep2Map?.region?.latitude ||
+      savedStep2Map?.latitude;
+
+    const resolvedLng =
+      myOwnerData?.longitude ||
+      pData?.longitude ||
+      pData?.pendingClubOwner?.longitude ||
+      user?.clubOwnerDetail?.longitude ||
+      savedClubProfile?.longitude ||
+      savedStep2Map?.region?.longitude ||
+      savedStep2Map?.longitude;
+
+    const resolvedAddress =
+      myOwnerData?.clubAddress ||
+      myOwnerData?.address ||
+      pData?.clubAddress ||
+      pData?.address ||
+      pData?.pendingClubOwner?.clubAddress ||
+      user?.clubOwnerDetail?.clubAddress ||
+      user?.clubOwnerDetail?.address ||
+      savedClubProfile?.clubAddress ||
+      savedClubProfile?.address ||
+      savedStep3?.clubAddress ||
+      savedStep3?.address;
+
+    const resolvedCity =
+      myOwnerData?.city ||
+      pData?.city ||
+      user?.clubOwnerDetail?.city ||
+      savedClubProfile?.city ||
+      savedStep3?.city;
+
+    const resolvedState =
+      myOwnerData?.state ||
+      pData?.state ||
+      user?.clubOwnerDetail?.state ||
+      savedClubProfile?.state ||
+      savedStep3?.state;
+
+    const resolvedPincode =
+      myOwnerData?.pincode ||
+      pData?.pincode ||
+      user?.clubOwnerDetail?.pincode ||
+      savedClubProfile?.pincode ||
+      savedStep3?.pincode;
+
+    const resolvedCategory =
+      myOwnerData?.clubCategory ||
+      pData?.clubCategory ||
+      user?.clubOwnerDetail?.clubCategory ||
+      savedClubProfile?.clubCategory;
 
     const payloadData: any = {
       ownerName: ownerName.trim(),
@@ -349,23 +475,23 @@ const EditClubDetails = () => {
       closingTime: formatTimeToApiStr(endTime),
       weekday: weekdayRange,
       weekend: weekendRange,
-      facilities: pData?.facilities || ['Parking', 'WiFi', 'Locker Room'],
-      services: pData?.services || ['Gym', 'Personal Training'],
-      latitude: pData?.latitude ? String(pData.latitude) : '29.3909',
-      longitude: pData?.longitude ? String(pData.longitude) : '76.9635',
-      clubAddress: pData?.clubAddress || 'Model Town',
-      pincode: pData?.pincode ? String(pData.pincode) : '132103',
-      city: pData?.city || 'Panipat',
-      state: pData?.state || 'Haryana',
-      clubCategory: pData?.clubCategory || 'Premium',
     };
 
-    const finalLogoId = uploadedLogoId || existingLogoId;
-    if (finalLogoId) {
-      payloadData.logo = finalLogoId;
+    if (resolvedFacilities) payloadData.facilities = resolvedFacilities;
+    if (resolvedServices) payloadData.services = resolvedServices;
+    if (resolvedLat) payloadData.latitude = String(resolvedLat);
+    if (resolvedLng) payloadData.longitude = String(resolvedLng);
+    if (resolvedAddress) payloadData.clubAddress = resolvedAddress;
+    if (resolvedCity) payloadData.city = resolvedCity;
+    if (resolvedState) payloadData.state = resolvedState;
+    if (resolvedPincode) payloadData.pincode = String(resolvedPincode);
+    if (resolvedCategory) payloadData.clubCategory = resolvedCategory;
+
+    if (existingLogoId) {
+      payloadData.logo = existingLogoId;
     }
 
-    console.log('Sending update payload with logo ID:', payloadData);
+    console.log('Sending update payload from EditClubDetails:', payloadData);
 
     updateClubOwner.mutate(payloadData, {
       onSuccess: async (resData: any) => {
@@ -383,11 +509,31 @@ const EditClubDetails = () => {
             ownerName: payloadData.ownerName,
             phoneNumber: payloadData.phoneNumber,
             email: payloadData.email,
+            openingTime: payloadData.openingTime,
+            closingTime: payloadData.closingTime,
+            weekday: payloadData.weekday,
+            weekend: payloadData.weekend,
             ...(newLogoUri ? { image: newLogoUri, logo: newLogoUri } : {}),
           };
           await AsyncStorage.setItem('club_profile', JSON.stringify(updated));
+
+          const currentUser = useAuthStore.getState().user;
+          if (currentUser) {
+            const updatedUser = {
+              ...currentUser,
+              username: payloadData.ownerName || currentUser.username,
+              clubOwnerDetail: {
+                ...(currentUser.clubOwnerDetail || {}),
+                ownerName: payloadData.ownerName,
+                clubName: payloadData.clubName,
+                phoneNumber: payloadData.phoneNumber,
+                email: payloadData.email,
+              },
+            };
+            await useAuthStore.getState().setUser(updatedUser, true);
+          }
         } catch (e) {
-          console.log('Error updating local storage:', e);
+          console.log('Error updating local storage/auth store:', e);
         }
         router.back();
       },
@@ -415,7 +561,7 @@ const EditClubDetails = () => {
         <ScrollView showsVerticalScrollIndicator={false} className="flex-1" contentContainerStyle={{ paddingBottom: 40 }}>
           {/* PROFILE IMAGE */}
           <View className="my-6 items-center">
-            <TouchableOpacity onPress={pickImage} disabled={isUploadingLogo} className="relative">
+            <TouchableOpacity onPress={handlePickImage} disabled={isUploadingLogo} className="relative">
               <View className="h-32 w-32 items-center justify-center overflow-hidden rounded-full border-4 border-slate-50 bg-[#F1F5F9]">
                 <Image
                   source={

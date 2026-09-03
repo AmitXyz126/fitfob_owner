@@ -1,8 +1,16 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, TouchableOpacity, FlatList, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Container } from '@/components/Container';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 
 interface NotificationItem {
   id: string;
@@ -12,7 +20,9 @@ interface NotificationItem {
   isUnread?: boolean;
 }
 
-const mockNotifications: NotificationItem[] = [
+// DUMMY NOTIFICATIONS DATA (COMMENTED OUT FOR LIVE DATA / EMPTY STATE)
+/*
+const DUMMY_NOTIFICATIONS: NotificationItem[] = [
   {
     id: '1',
     title: 'Booked for Tomorrow Morning',
@@ -57,6 +67,40 @@ const mockNotifications: NotificationItem[] = [
     date: '15 Oct 2024 · 9:30 AM',
   },
 ];
+*/
+
+const mockNotifications: NotificationItem[] = [];
+
+const EmptyNotificationState = () => {
+  const floatAnim = useSharedValue(0);
+
+  useEffect(() => {
+    floatAnim.value = withRepeat(
+      withSequence(
+        withTiming(-10, { duration: 2200, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0, { duration: 2200, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+  }, [floatAnim]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: floatAnim.value }],
+  }));
+
+  return (
+    <View className="items-center justify-center py-6 px-4 flex-1">
+      <Animated.View style={animatedStyle} className="items-center justify-center w-full">
+        <Image
+          source={require('../assets/images/notification_empty.png')}
+          style={{ width: 420, height: 350 }}
+          resizeMode="contain"
+        />
+      </Animated.View>
+    </View>
+  );
+};
 
 export default function NotificationScreen() {
   const router = useRouter();
@@ -118,7 +162,8 @@ export default function NotificationScreen() {
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 20 }}
+        contentContainerStyle={{ paddingBottom: 20, flexGrow: 1 }}
+        ListEmptyComponent={<EmptyNotificationState />}
       />
     </Container>
   );

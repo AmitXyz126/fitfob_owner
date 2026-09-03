@@ -5,7 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Container } from '@/components/Container';
 import Toast from 'react-native-toast-message';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useUserDetail } from '@/hooks/useUserDetail';
+import { useUserDetail, useClubOwnerMe } from '@/hooks/useUserDetail';
+import { useAuthStore } from '@/store/useAuthStore';
 
 interface MasterAmenity {
   id: string;
@@ -18,6 +19,28 @@ interface MasterAmenity {
 interface AmenityItem extends MasterAmenity {
   isEnabled: boolean;
 }
+
+const parseArrayData = (val: any): string[] => {
+  if (!val) return [];
+  if (Array.isArray(val)) {
+    return val.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.map((item) => String(item).trim()).filter(Boolean);
+        }
+      } catch (e) {
+        // fallback
+      }
+    }
+    return trimmed.split(',').map((item) => item.trim()).filter(Boolean);
+  }
+  return [];
+};
 
 // EXACT 17 Amenities & Titles matching Onboarding Step 3
 const MASTER_AMENITIES: MasterAmenity[] = [
@@ -144,7 +167,9 @@ const MASTER_AMENITIES: MasterAmenity[] = [
 
 export default function ClubAmenitiesScreen() {
   const router = useRouter();
-  const { profileStatus, updateClubOwner } = useUserDetail();
+  const { user } = useAuthStore();
+  const { profileStatus, updateClubOwner, refetch } = useUserDetail();
+  const { data: myOwnerData } = useClubOwnerMe();
   const [amenities, setAmenities] = useState<AmenityItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -152,38 +177,39 @@ export default function ClubAmenitiesScreen() {
     const initializeAmenities = async () => {
       let userSelected: string[] = [];
 
-      // 1. Extract selected amenities from profileStatus / getMe backend data
-      const rawFacilities =
-        profileStatus?.facilities ||
-        profileStatus?.amenities ||
-        profileStatus?.data?.attributes?.facilities ||
-        profileStatus?.data?.attributes?.amenities ||
-        profileStatus?.pendingClubOwner?.facilities;
-
-      if (rawFacilities) {
-        if (typeof rawFacilities === 'string') {
-          try {
-            userSelected = JSON.parse(rawFacilities);
-          } catch {
-            userSelected = [rawFacilities];
-          }
-        } else if (Array.isArray(rawFacilities)) {
-          userSelected = rawFacilities;
-        }
-      }
-
-      // 2. Check local draft fallback if backend data is empty
+      // 1. Storage fallback
+      let amenitiesFromStorage: string[] = [];
       try {
         const savedDraft = await AsyncStorage.getItem('club_amenities');
         if (savedDraft) {
           const parsed = JSON.parse(savedDraft);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            const draftEnabledTitles = parsed
-              .filter((item: any) => item.isEnabled)
-              .map((item: any) => item.title || item.id);
+            amenitiesFromStorage = parsed
+              .filter((item: any) => item.isEnabled || typeof item === 'string')
+              .map((item: any) => (typeof item === 'string' ? item : item.title || item.id));
+          }
+        }
 
-            if (userSelected.length === 0) {
-              userSelected = draftEnabledTitles;
+        const savedProfile = await AsyncStorage.getItem('club_profile');
+        if (savedProfile) {
+          const parsedProf = JSON.parse(savedProfile);
+          if (parsedProf.amenities) {
+            amenitiesFromStorage = parseArrayData(parsedProf.amenities);
+          } else if (parsedProf.facilities) {
+            amenitiesFromStorage = parseArrayData(parsedProf.facilities);
+          }
+        }
+
+        const keys = await AsyncStorage.getAllKeys();
+        const step3Keys = keys.filter((k) => k.includes('onboarding_step3_data'));
+        if (step3Keys.length > 0) {
+          const lastStep3Key = step3Keys[step3Keys.length - 1];
+          const step3Json = await AsyncStorage.getItem(lastStep3Key);
+          if (step3Json) {
+            const parsedStep3 = JSON.parse(step3Json);
+            const step3Amenities = parseArrayData(parsedStep3.amenities || parsedStep3.facilities);
+            if (step3Amenities.length > 0 && amenitiesFromStorage.length === 0) {
+              amenitiesFromStorage = step3Amenities;
             }
           }
         }
@@ -191,7 +217,25 @@ export default function ClubAmenitiesScreen() {
         console.log('Error reading local amenities draft:', e);
       }
 
-      // 3. Map EXACT 8 MASTER_AMENITIES with boolean flags
+      // 2. Extract selected amenities from all backend & user state sources
+      const pData = profileStatus?.data || profileStatus || {};
+      const rawFacilities =
+        myOwnerData?.facilities ||
+        myOwnerData?.amenities ||
+        pData?.facilities ||
+        pData?.amenities ||
+        pData?.pendingClubOwner?.facilities ||
+        pData?.pendingClubOwner?.amenities ||
+        user?.clubOwnerDetail?.facilities ||
+        user?.clubOwnerDetail?.amenities ||
+        amenitiesFromStorage;
+
+      userSelected = parseArrayData(rawFacilities);
+      if (userSelected.length === 0 && amenitiesFromStorage.length > 0) {
+        userSelected = amenitiesFromStorage;
+      }
+
+      // 3. Map MASTER_AMENITIES with boolean flags
       const mappedList: AmenityItem[] = MASTER_AMENITIES.map((item) => {
         const isMatched = userSelected.some((userItem: string) => {
           const cleanUserItem = String(userItem).toLowerCase().trim();
@@ -214,7 +258,7 @@ export default function ClubAmenitiesScreen() {
     };
 
     initializeAmenities();
-  }, [profileStatus]);
+  }, [profileStatus, myOwnerData, user]);
 
   const handleToggle = (id: string) => {
     setAmenities((prev) =>
@@ -231,11 +275,31 @@ export default function ClubAmenitiesScreen() {
       // Save locally
       await AsyncStorage.setItem('club_amenities', JSON.stringify(amenities));
 
+      const saved = await AsyncStorage.getItem('club_profile');
+      const parsed = saved ? JSON.parse(saved) : {};
+      const updated = {
+        ...parsed,
+        amenities: enabledTitles,
+        facilities: enabledTitles,
+      };
+      await AsyncStorage.setItem('club_profile', JSON.stringify(updated));
+
+      const ownerId =
+        myOwnerData?.id ||
+        myOwnerData?.clubOwnerId ||
+        profileStatus?.id ||
+        profileStatus?.clubOwnerId ||
+        user?.clubOwnerDetail?.id ||
+        user?.id;
+
       // Save to backend via updateClubOwner mutation
       await updateClubOwner.mutateAsync({
+        id: ownerId,
         facilities: enabledTitles,
         amenities: enabledTitles,
       });
+
+      refetch();
 
       Toast.show({
         type: 'success',

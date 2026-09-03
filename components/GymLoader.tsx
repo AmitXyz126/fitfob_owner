@@ -89,7 +89,7 @@ export default function GymLoader({ visible }: GymLoaderProps) {
   });
 
   return (
-    <Modal transparent visible={visible} animationType="fade">
+    <Modal transparent visible={visible} statusBarTranslucent animationType="fade">
       <View style={styles.overlay}>
         <View style={styles.card}>
           
@@ -144,12 +144,8 @@ export default function GymLoader({ visible }: GymLoaderProps) {
 
 const styles = StyleSheet.create({
   overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width,
-    height,
-    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
   },
