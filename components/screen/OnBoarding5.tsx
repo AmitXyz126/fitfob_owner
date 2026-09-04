@@ -45,8 +45,8 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
   }, [initialData]);
 
   useImperativeHandle(ref, () => ({
-    handleUpload: () => {
-      handleUploadLogic();
+    handleUpload: async () => {
+      return await handleUploadLogic();
     },
   }));
 
@@ -77,36 +77,43 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
     setImages(newImages);
   };
 
-const handleUploadLogic = () => {
-  // Check if at least one photo (new or old) exists
-  const hasAnyPhoto = images.some((img) => !!img);
+  const handleUploadLogic = async () => {
+    // Check if at least one photo (new or old) exists
+    const hasAnyPhoto = images.some((img) => !!img);
 
-  if (!hasAnyPhoto) {
-    Alert.alert('Wait', 'Please select at least one photo!');
-    return;
-  }
+    if (!hasAnyPhoto) {
+      Alert.alert('Wait', 'Please select at least one photo!');
+      return false;
+    }
 
-  const selectedPhotos = images
-    .map((uri, index) => {
-      if (!uri) return null;
+    const selectedPhotos = images
+      .map((uri, index) => {
+        if (!uri) return null;
 
-       if (uri.startsWith('http')) return null;
+        if (uri.startsWith('http')) return null;
 
-      return {
-        uri,
-        name: `club_photo_${index}_${Date.now()}.jpg`,
-        type: 'image/jpeg',
-      };
-    })
-    .filter((item): item is { uri: string; name: string; type: string } => item !== null);
+        return {
+          uri,
+          name: `club_photo_${index}_${Date.now()}.jpg`,
+          type: 'image/jpeg',
+        };
+      })
+      .filter((item): item is { uri: string; name: string; type: string } => item !== null);
 
-  if (selectedPhotos.length > 0) {
-    submitStep7.mutate(selectedPhotos);
-  } else {
-    // No new photos but old photos exist
-    router.replace('/ReviewStatusScreen');
-  }
-};
+    if (selectedPhotos.length > 0) {
+      try {
+        await submitStep7.mutateAsync(selectedPhotos);
+        return true;
+      } catch (error) {
+        console.error('Error uploading photos:', error);
+        return false;
+      }
+    } else {
+      // No new photos but old photos exist
+      router.replace('/ReviewStatusScreen');
+      return true;
+    }
+  };
 
   return (
     <View className="flex-1 bg-white ">

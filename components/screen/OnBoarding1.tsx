@@ -15,7 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUserDetail } from '@/hooks/useUserDetail';
 import { useAuthStore } from '@/store/useAuthStore';
  
-const OnBoarding1 = forwardRef(({ initialData, onNext }: any, ref) => {
+const OnBoarding1 = forwardRef(({ initialData, onNext, onValidationChange }: any, ref) => {
   const { profileStatus, submitStep1 } = useUserDetail();
   const { user } = useAuthStore();
   const userId = profileStatus?.id || profileStatus?.pendingClubOwnerId;
@@ -63,6 +63,22 @@ console.log(initialData,"initialdata")
     return str;
   };
 
+  const authPhone = profileStatus?.phoneNumber || profileStatus?.phone || user?.phoneNumber || user?.phone || '';
+  const authEmail = profileStatus?.email || user?.email || '';
+
+  const isPhoneLocked = !!authPhone;
+  const isEmailLocked = !!authEmail;
+
+  // Sync auth credentials to state if locked
+  useEffect(() => {
+    if (isPhoneLocked && phone !== authPhone) {
+      setPhone(authPhone);
+    }
+    if (isEmailLocked && email !== authEmail) {
+      setEmail(authEmail);
+    }
+  }, [authPhone, authEmail, isPhoneLocked, isEmailLocked, phone, email]);
+
   // 1. Initialize logic
   useEffect(() => {
     const initData = async () => {
@@ -76,8 +92,8 @@ console.log(initialData,"initialdata")
 
       const resolvedClubName = sourceData.clubName || savedLocal?.clubName || '';
       const resolvedOwnerName = sourceData.ownerName || savedLocal?.ownerName || '';
-      const resolvedPhone = sourceData.phoneNumber || sourceData.phone || savedLocal?.phone || '';
-      const resolvedEmail = sourceData.email || savedLocal?.email || '';
+      const resolvedPhone = authPhone || sourceData.phoneNumber || sourceData.phone || savedLocal?.phone || '';
+      const resolvedEmail = authEmail || sourceData.email || savedLocal?.email || '';
 
       if (resolvedClubName) setClubName(resolvedClubName);
       if (resolvedOwnerName) setOwnerName(resolvedOwnerName);
@@ -131,6 +147,29 @@ console.log(initialData,"initialdata")
     }
   }, [clubName, ownerName, phone, email, image, LogoId, isInitialized, STORAGE_KEY]);
 
+  // 3. Validation Logic
+  const isLogoValid = !!(image || LogoId) && !isImageLoading;
+  const isClubNameValid = clubName.trim().length > 0;
+  const isOwnerNameValid = ownerName.trim().length > 0;
+
+  const finalEmail = email.trim() || authEmail;
+  const finalPhone = phone.trim() || authPhone;
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const digitsCount = finalPhone.replace(/[^0-9]/g, '').length;
+
+  const hasValidPhone = digitsCount >= 10;
+  const hasValidEmail = finalEmail.length > 0 && emailRegex.test(finalEmail);
+  const isContactValid = hasValidPhone || hasValidEmail;
+
+  const isStep1Valid = isLogoValid && isClubNameValid && isOwnerNameValid && isContactValid;
+
+  useEffect(() => {
+    if (onValidationChange) {
+      onValidationChange(isStep1Valid);
+    }
+  }, [isStep1Valid, onValidationChange]);
+
   const pickImage = async () => {
     if (isSubmitting) return;
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -175,7 +214,7 @@ console.log(initialData,"initialdata")
   // --- VALIDATION & API SUBMIT LOGIC ---
 
   useImperativeHandle(ref, () => ({
-    handleSave: () => {
+    handleSave: async () => {
       const logoToUse =
         LogoId ||
         (image
@@ -190,8 +229,8 @@ console.log(initialData,"initialdata")
       if (!clubName.trim()) return Alert.alert('Required', 'Club Name is required');
       if (!ownerName.trim()) return Alert.alert('Required', 'Owner Name is required');
 
-      const finalEmail = email.trim() || user?.email || '';
-      const finalPhone = phone.trim() || user?.phoneNumber || '';
+      const finalEmail = email.trim() || authEmail;
+      const finalPhone = phone.trim() || authPhone;
 
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       const digitsCount = finalPhone.replace(/[^0-9]/g, '').length;
@@ -214,11 +253,12 @@ console.log(initialData,"initialdata")
         logo: logoToUse,
       };
 
-      submitStep1.mutate(payload, {
-        onSuccess: () => {
-          if (onNext) onNext();
-        },
-      });
+      try {
+        await submitStep1.mutateAsync(payload);
+        if (onNext) onNext();
+      } catch (error: any) {
+        console.error('Error submitting step 1:', error);
+      }
     },
     getFormData: () => ({
       clubName,
@@ -299,10 +339,10 @@ console.log(initialData,"initialdata")
 
         <View>
           <Text className="mb-2 ml-1 mt-4 font-medium text-[13px] text-slate-500">
-            Phone Number{user?.email && '(optional)'}
+            Phone Number{isPhoneLocked ? ' (from account)' : isEmailLocked ? ' (optional)' : ''}
           </Text>
           <View
-            className={`h-14 w-full flex-row items-center rounded-xl border px-3 ${isSubmitting ? 'border-slate-100 bg-slate-50' : 'border-slate-200 bg-white'}`}>
+            className={`h-14 w-full flex-row items-center rounded-xl border px-3 ${isSubmitting || isPhoneLocked ? 'border-slate-200 bg-slate-100' : 'border-slate-200 bg-white'}`}>
             <View className="mr-3 h-6 flex-row items-center border-r border-slate-200 pr-3">
               <Image
                 source={{ uri: 'https://flagcdn.com/w40/in.png' }}
@@ -312,32 +352,44 @@ console.log(initialData,"initialdata")
               <Ionicons name="chevron-down" size={14} color="#64748B" />
             </View>
             <TextInput
-              value={phone || user?.phoneNumber || ''}
+              value={phone}
               onChangeText={setPhone}
-              editable={!isSubmitting}
+              editable={!isSubmitting && !isPhoneLocked}
               keyboardType="numeric"
               maxLength={10}
               placeholder="Enter mobile number"
               placeholderTextColor="#94A3B8"
-              className={`flex-1 font-medium text-[15px] ${isSubmitting ? 'text-slate-400' : 'text-slate-900'}`}
+              className={`flex-1 font-medium text-[15px] ${isSubmitting || isPhoneLocked ? 'text-slate-500' : 'text-slate-900'}`}
             />
+            {isPhoneLocked && (
+              <View className="ml-2">
+                <MaterialIcons name="lock" size={18} color="#94A3B8" />
+              </View>
+            )}
           </View>
         </View>
 
         <View className="mb-6 mt-4">
           <Text className="mb-2 ml-1 font-medium text-[13px] text-slate-500">
-            Email Address{user?.phoneNumber && '(optional)'}
+            Email Address{isEmailLocked ? ' (from account)' : isPhoneLocked ? ' (optional)' : ''}
           </Text>
-          <TextInput
-            value={email || user?.email || ''}
-            selectTextOnFocus={false}
-            onChangeText={setEmail}
-            editable={!isSubmitting}
-            keyboardType="email-address"
-            placeholder="Enter email address"
-            placeholderTextColor="#94A3B8"
-            className={`h-14 w-full rounded-xl border px-4 font-medium text-[15px] ${isSubmitting ? 'border-slate-100 bg-slate-50 text-slate-400' : 'border-slate-200 bg-white text-slate-900'}`}
-          />
+          <View className="relative justify-center">
+            <TextInput
+              value={email}
+              selectTextOnFocus={false}
+              onChangeText={setEmail}
+              editable={!isSubmitting && !isEmailLocked}
+              keyboardType="email-address"
+              placeholder="Enter email address"
+              placeholderTextColor="#94A3B8"
+              className={`h-14 w-full rounded-xl border px-4 font-medium text-[15px] ${isSubmitting || isEmailLocked ? 'border-slate-200 bg-slate-100 text-slate-500 pr-10' : 'border-slate-200 bg-white text-slate-900'}`}
+            />
+            {isEmailLocked && (
+              <View className="absolute right-3">
+                <MaterialIcons name="lock" size={18} color="#94A3B8" />
+              </View>
+            )}
+          </View>
         </View>
       </View>
     </>

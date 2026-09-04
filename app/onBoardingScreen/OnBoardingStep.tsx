@@ -26,6 +26,7 @@ export default function OnBoardingStep() {
   const [subStep, setSubStep] = useState(1);
   const [hasCheckedDocuments, setHasCheckedDocuments] = useState(false);
   const [isStepSaving, setIsStepSaving] = useState(false);
+  const [isStep1Valid, setIsStep1Valid] = useState(false);
   const totalSteps = 5;
   const { user } = useAuthStore();
 
@@ -240,9 +241,9 @@ export default function OnBoardingStep() {
 
 
   const handleNext = async () => {
-    setIsStepSaving(true);
     try {
       if (step === 1) {
+        setIsStepSaving(true);
         const data = onboarding1Ref.current?.getFormData();
         if (data) updateFormData(data);
         await onboarding1Ref.current?.handleSave();
@@ -250,11 +251,13 @@ export default function OnBoardingStep() {
         if (subStep === 1) {
           setSubStep(2);
         } else {
+          setIsStepSaving(true);
           const data = onboarding2DetailsRef.current?.getFormData();
           if (data) updateFormData(data);
           await onboarding2DetailsRef.current?.handleSave();
         }
       } else if (step === 3) {
+        setIsStepSaving(true);
         const data = onboarding3Ref.current?.getFormData();
         if (data) updateFormData(data);
         await onboarding3Ref.current?.handleSave();
@@ -262,12 +265,10 @@ export default function OnBoardingStep() {
         if (subStep === 1) {
           onboarding4Ref.current?.openModal();
         } else {
-          confirmDocs.mutate(undefined, {
-            onSuccess: () => {
-              setStep(5);
-              setSubStep(1);
-            },
-          });
+          setIsStepSaving(true);
+          await confirmDocs.mutateAsync(undefined);
+          setStep(5);
+          setSubStep(1);
         }
       } else if (step === 5) {
         await onboarding5Ref.current?.handleUpload();
@@ -275,7 +276,7 @@ export default function OnBoardingStep() {
     } catch (e) {
       console.log('Error in handleNext step:', e);
     } finally {
-      setTimeout(() => setIsStepSaving(false), 500);
+      setIsStepSaving(false);
     }
   };
 
@@ -353,6 +354,7 @@ export default function OnBoardingStep() {
             <OnBoarding1
               ref={onboarding1Ref}
               initialData={formData}
+              onValidationChange={setIsStep1Valid}
               onNext={() => {
                 setStep(2);
                 setSubStep(1);
@@ -425,7 +427,7 @@ export default function OnBoardingStep() {
               title={getButtonTitle()}
               onPress={handleNext}
               loading={isLoading}
-              disabled={isLoading}
+              disabled={isLoading || (step === 1 && !isStep1Valid)}
             />
             <View className="mt-5 flex-row items-center my-2">
               <LinearGradient

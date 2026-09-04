@@ -49,17 +49,27 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
 
       if (saved) {
         const parsed = JSON.parse(saved);
-        setClubCategory(parsed.clubCategory || 'Luxury');
-        setFitnessTypes(parsed.fitnessTypes || ['Gym']);
-        setAmenities(parsed.amenities || ['Parking', 'Wi-Fi']);
-        setStartTime(parsed.startTime || new Date().setHours(5, 0));
-        setEndTime(parsed.endTime || new Date().setHours(22, 0));
-        setWeekdayRange(parsed.weekdayRange || 'Monday to Friday');
-        setWeekendRange(parsed.weekendRange || 'Saturday & Sunday');
-      } else if (data && data.clubCategory) {
-        setClubCategory(data.clubCategory);
-        setFitnessTypes(data.services || []);
-        setAmenities(data.facilities || []);
+        if (parsed.clubCategory) setClubCategory(parsed.clubCategory);
+        if (parsed.fitnessTypes) setFitnessTypes(parsed.fitnessTypes);
+        if (parsed.amenities) setAmenities(parsed.amenities);
+        if (parsed.startTime) setStartTime(parsed.startTime);
+        if (parsed.endTime) setEndTime(parsed.endTime);
+        if (parsed.weekdayRange) setWeekdayRange(parsed.weekdayRange);
+        if (parsed.weekendRange) setWeekendRange(parsed.weekendRange);
+      } else if (data) {
+        const extractNames = (arr: any) => {
+          if (!arr || !Array.isArray(arr)) return [];
+          return arr.map((item: any) => (typeof item === 'string' ? item : item.name || item.title || item.label || ''));
+        };
+
+        const resolvedCategory = data.clubCategory || data.category || 'Luxury';
+        const resolvedServices = extractNames(data.services || data.clubServices || data.fitnessTypes || []);
+        const resolvedFacilities = extractNames(data.facilities || data.clubFacilities || data.amenities || []);
+
+        setClubCategory(resolvedCategory);
+        if (resolvedServices.length > 0) setFitnessTypes(resolvedServices);
+        if (resolvedFacilities.length > 0) setAmenities(resolvedFacilities);
+
         if (data.openingTime) {
           const [h, m] = data.openingTime.split(':');
           setStartTime(new Date().setHours(parseInt(h), parseInt(m)));
@@ -68,8 +78,8 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
           const [h, m] = data.closingTime.split(':');
           setEndTime(new Date().setHours(parseInt(h), parseInt(m)));
         }
-        setWeekdayRange(data.weekday || 'Monday to Friday');
-        setWeekendRange(data.weekend || 'Saturday & Sunday');
+        if (data.weekday) setWeekdayRange(data.weekday);
+        if (data.weekend) setWeekendRange(data.weekend);
       }
       setIsInitialized(true);
     };
@@ -145,7 +155,7 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
       weekdayRange,
       weekendRange,
     }),
-    handleSave: () => {
+    handleSave: async () => {
       // ⚠️ Validation Check for Fitness Club Type (At least 1 required e.g. Gym)
       if (!fitnessTypes || fitnessTypes.length === 0) {
         return Alert.alert(
@@ -172,16 +182,12 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
         weekend: weekendRange,
       };
 
-      // Mutate with onSuccess handler
-      submitStep4.mutate(payload as any, {
-        onSuccess: async () => {
-          await AsyncStorage.removeItem(STORAGE_KEY);
-          props.onNext && props.onNext();
-        },
-        onError: (err) => {
-          console.error('Step 3 Save Error:', err);
-        },
-      });
+      try {
+        await submitStep4.mutateAsync(payload as any);
+        if (props.onNext) props.onNext();
+      } catch (error: any) {
+        console.error('Error submitting step 3:', error);
+      }
     },
   }));
 

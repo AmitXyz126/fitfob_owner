@@ -4,10 +4,15 @@
     "slug": "fitFob_owner",
     "version": "1.0.0",
     "jsEngine": "hermes",
-    "scheme": ["fitfob_owner", "fb2349725998870415"],
-    "facebookAppId": "2349725998870415",
-    "facebookDisplayName": "fitfob_owner",
-    "platforms": ["ios", "android", "web"],
+    "scheme": [
+      "fitfob-owner",
+      "fb2349725998870415"
+    ],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
     "web": {
       "bundler": "metro",
       "output": "static",
@@ -27,13 +32,14 @@
       [
         "react-native-fbsdk-next",
         {
-          "appID": "1017733454437395",
+          "appID": "2349725998870415",
           "clientToken": "51394908565334eb54ab6530f699c04d",
-          "displayName": "FitFob",
-          "scheme": "fb1017733454437395",
+          "displayName": "fitfob_owner",
+          "scheme": "fb2349725998870415",
           "iosUserTrackingPermission": "This identifier will be used to deliver personalized ads to you."
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -46,11 +52,12 @@
       "image": "./assets/splash.png",
       "resizeMode": "contain"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.xyzstudio.fitfob",
-      "googleServicesFile": "./GoogleService-Info.plist",
       "config": {
         "googleMapsApiKey": "AIzaSyB7liTs6ffq-vFE9VZH5rjbQ_ttSSFSb4o"
       },
@@ -77,7 +84,6 @@
       "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-  
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.xyzstudio.fitfob",

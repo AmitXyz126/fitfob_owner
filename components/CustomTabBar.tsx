@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import  { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -15,8 +15,9 @@ import Svg, { Path } from 'react-native-svg';
 
 export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  // Position tab bar near bottom
-  const bottomInset = Platform.OS === 'ios' ? Math.max(insets.bottom - 10, 6) : 6;
+  // Position tab bar near bottom (lifted higher on Android)
+  const bottomInset =
+    Platform.OS === 'ios' ? Math.max(insets.bottom - 10, 6) : Math.max(insets.bottom + 12, 18);
 
   // Filter visible tabs
   const visibleRoutes = state.routes.filter((route) => {
@@ -99,10 +100,10 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
         if (width > 0) setBarWidth(width);
       }}
       style={[styles.container, { bottom: bottomInset }]}>
-      {/* SVG Curved Background */}
+      {/* SVG Curved Background with crisp border stroke */}
       <View style={StyleSheet.absoluteFill}>
         <Svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-          <Path d={d} fill="#FFFFFF" />
+          <Path d={d} fill="#FFFFFF" stroke="#E2E8F0" strokeWidth={1.2} />
         </Svg>
       </View>
 
@@ -232,9 +233,9 @@ const styles = StyleSheet.create({
     height: 72,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.18,
     shadowRadius: 16,
-    elevation: 12,
+    elevation: 16,
   },
   tabRow: {
     flex: 1,

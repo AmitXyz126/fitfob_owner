@@ -251,15 +251,13 @@ const ViewAllScreen = () => {
                 key={cat}
                 onPress={() => setSelectedCategory(cat)}
                 activeOpacity={0.7}
-                className={`mr-2 rounded-[13px] border px-4 py-2 ${
-                  isSelected
+                className={`mr-2 rounded-[13px] border px-4 py-2 ${isSelected
                     ? 'border-[#F6163C] bg-[#F6163C]'
                     : 'border-slate-200 bg-white'
-                }`}>
-                <Text
-                  className={`font-semibold text-[14px] ${
-                    isSelected ? 'text-white' : 'text-slate-600'
                   }`}>
+                <Text
+                  className={`font-semibold text-[14px] ${isSelected ? 'text-white' : 'text-slate-600'
+                    }`}>
                   {cat === 'All' ? 'All Passes' : cat}
                 </Text>
               </TouchableOpacity>

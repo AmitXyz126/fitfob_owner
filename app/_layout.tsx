@@ -5,6 +5,7 @@ import '../global.css';
 import { useFonts } from 'expo-font';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 
 const queryClient = new QueryClient();
 export default function Layout() {
@@ -24,6 +25,7 @@ export default function Layout() {
 
   return (
     <SafeAreaProvider>
+      <StatusBar style="dark" animated />
       <QueryClientProvider client={queryClient}>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" options={{ gestureEnabled: false }} />

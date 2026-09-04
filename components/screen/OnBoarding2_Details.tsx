@@ -151,7 +151,7 @@ const OnBoarding2_Details = forwardRef((props: OnBoarding2DetailsProps, ref) => 
 
   useImperativeHandle(ref, () => ({
     getFormData: () => formData,
-    handleSave: () => {
+    handleSave: async () => {
       if (!formData.clubAddress.trim() || !formData.pincode.trim() || !formData.city.trim()) {
         Alert.alert('Required', 'Please fill all address details');
         return;
@@ -169,15 +169,13 @@ const OnBoarding2_Details = forwardRef((props: OnBoarding2DetailsProps, ref) => 
         pincode: formData.pincode.trim().toString(),
       };
 
-      submitStep3.mutate(payload, {
-        onSuccess: async () => {
-          await AsyncStorage.removeItem(STORAGE_KEY);
-          if (onNext) onNext();
-        },
-        onError: (error: any) => {
-          Alert.alert('API Failed', error?.response?.data?.message || 'Something went wrong');
-        },
-      });
+      try {
+        await submitStep3.mutateAsync(payload);
+        await AsyncStorage.removeItem(STORAGE_KEY);
+        if (onNext) onNext();
+      } catch (error: any) {
+        Alert.alert('API Failed', error?.response?.data?.message || 'Something went wrong');
+      }
     },
   }));
 

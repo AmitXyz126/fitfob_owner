@@ -510,7 +510,7 @@ const HomeScreen = () => {
               </View>
 
               <View style={{ padding: 18 }} className="relative z-10">
-                <View className="flex-row items-center gap-1.5 mb-2">
+                <View className="flex-row items-center gap-1.5 mb-2  ">
                   <View className="h-6 w-6 items-center justify-center rounded-full bg-red-500/10">
                     <Ionicons name="flame" size={14} color="#F6163C" />
                   </View>
