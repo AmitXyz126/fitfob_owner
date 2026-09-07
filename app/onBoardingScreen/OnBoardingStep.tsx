@@ -10,18 +10,16 @@ import OnBoarding4 from '@/components/screen/OnBoarding4';
 import OnBoarding4_List from '@/components/screen/OnBoarding4_List';
 import OnBoarding5 from '@/components/screen/OnBoarding5';
 import { KeyboardAwareScrollView } from '@pietile-native-kit/keyboard-aware-scrollview';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 import { useState, useRef, useEffect } from 'react';
 import { TouchableOpacity, View, Text, ActivityIndicator, BackHandler } from 'react-native';
 import { useUserDetail } from '@/hooks/useUserDetail';
 import { useAuthStore } from '@/store/useAuthStore';
 import GymLoader from '@/components/GymLoader';
-import { useMutationState } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function OnBoardingStep() {
-  const router = useRouter();
   const [step, setStep] = useState(1);
   const [subStep, setSubStep] = useState(1);
   const [hasCheckedDocuments, setHasCheckedDocuments] = useState(false);
@@ -172,10 +170,12 @@ export default function OnBoardingStep() {
     return () => subscription.remove();
   }, [step, subStep, profileStatus]);
 
-  //  useEffect
+  // useEffect for status check (ONLY run if data sync has NOT happened yet!)
   useEffect(() => {
     if (!user) return;
     if (!profileStatus) return;
+    if (isDataSynced) return;
+
     const { status, isApprovedOwner } = profileStatus;
 
     const verificationStatus =
@@ -207,24 +207,13 @@ export default function OnBoardingStep() {
     }
 
     // 4. Incomplete Onboarding (draft / pending) -> Onboarding
-    if (!isDataSynced) {
-      const backendMapped = mapApiStepToFrontend(profileStatus?.currentStep || 1);
-      setStep(backendMapped.step);
-      setSubStep(backendMapped.subStep);
-    }
-  }, [user, profileStatus]);
+    const backendMapped = mapApiStepToFrontend(profileStatus?.currentStep || 1);
+    setStep(backendMapped.step);
+    setSubStep(backendMapped.subStep);
+    setIsDataSynced(true);
+  }, [user, profileStatus, isDataSynced]);
 
-  useEffect(() => {
-    if (step === 4 && documents && !hasCheckedDocuments) {
-      const docList = documents?.documents || documents?.data || documents || [];
-      if (docList.length > 0) {
-        setSubStep(2);
-      }
-      setHasCheckedDocuments(true);
-    } else if (step !== 4 && hasCheckedDocuments) {
-      setHasCheckedDocuments(false);
-    }
-  }, [step, documents, hasCheckedDocuments]);
+
 
   if (isFetchingStatus && !profileStatus) {
     return (

@@ -1,12 +1,13 @@
 /* eslint-disable no-unused-expressions */
 import { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Platform, Modal, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Platform, Modal, Alert, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import CustomTimePickerModal from '@/components/CustomTimePickerModal';
 import LineGradient from '../lineGradient/LineGradient';
 import { useUserDetail } from '@/hooks/useUserDetail';
 import { useAuthStore } from '@/store/useAuthStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Props interface for TypeScript safety
 interface OnBoarding3Props {
@@ -14,30 +15,88 @@ interface OnBoarding3Props {
   onNext?: () => void;
 }
 
+const DAYS_CONFIG = [
+  { key: 'monday', name: 'Monday', short: 'Mon' },
+  { key: 'tuesday', name: 'Tuesday', short: 'Tue' },
+  { key: 'wednesday', name: 'Wednesday', short: 'Wed' },
+  { key: 'thursday', name: 'Thursday', short: 'Thu' },
+  { key: 'friday', name: 'Friday', short: 'Fri' },
+  { key: 'saturday', name: 'Saturday', short: 'Sat' },
+  { key: 'sunday', name: 'Sunday', short: 'Sun' },
+];
+
+const ensureDate = (val: any, defaultHour: number = 6): Date => {
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    return val;
+  }
+  if (typeof val === 'number') {
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) return d;
+  }
+  if (typeof val === 'string') {
+    if (val.includes(':') && val.length <= 5) {
+      const [h, m] = val.split(':');
+      const d = new Date();
+      d.setHours(parseInt(h, 10) || 0, parseInt(m, 10) || 0, 0, 0);
+      return d;
+    }
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) return d;
+  }
+  const fallback = new Date();
+  fallback.setHours(defaultHour, 0, 0, 0);
+  return fallback;
+};
+
+const createInitialDaySchedules = () => {
+  const defaults: Record<string, { isOpen: boolean; openTime: Date; closeTime: Date }> = {};
+  DAYS_CONFIG.forEach(({ key }) => {
+    defaults[key] = {
+      isOpen: true,
+      openTime: ensureDate(undefined, 6),
+      closeTime: ensureDate(undefined, 22),
+    };
+  });
+  return defaults;
+};
+
 const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
+  const insets = useSafeAreaInsets();
   const { initialData } = props;
   const { submitStep4, profileStatus: userData } = useUserDetail();
   const { user } = useAuthStore();
   const userId = userData?.id || userData?.pendingClubOwnerId;
   const STORAGE_KEY = `@onboarding_step3_data_${userId || user?.id || user?.email || 'guest'}`;
 
-  // --- NEW STATE FOR CLUB CATEGORY ---
+  // --- CLUB CATEGORY ---
   const [clubCategory, setClubCategory] = useState('Luxury');
   const [showCategoryModal, setShowCategoryModal] = useState(false);
-  const categoryOptions = ['Luxury', 'Premium', 'Basic'];
+  const categoryOptions = ['Luxury', 'Premium'];
 
   const [fitnessTypes, setFitnessTypes] = useState(['Gym']);
   const [amenities, setAmenities] = useState(['Parking', 'Wi-Fi']);
 
-  const [startTime, setStartTime] = useState(new Date().setHours(5, 0));
-  const [endTime, setEndTime] = useState(new Date().setHours(22, 0));
-  const [showPicker, setShowPicker] = useState<'start' | 'end' | null>(null);
+  // --- EVERYDAY MODE STATE ---
+  const [isEverydayMode, setIsEverydayMode] = useState(true);
+  const [everydayOpenTime, setEverydayOpenTime] = useState<Date>(() => ensureDate(undefined, 6));
+  const [everydayCloseTime, setEverydayCloseTime] = useState<Date>(() => ensureDate(undefined, 22));
 
-  const [weekdayRange, setWeekdayRange] = useState('Monday to Friday');
-  const [weekendRange, setWeekendRange] = useState('Saturday & Sunday');
-  const [showDayModal, setShowDayModal] = useState<'weekday' | 'weekend' | null>(null);
+  // --- PER DAY SCHEDULE STATE ---
+  const [daySchedules, setDaySchedules] = useState<
+    Record<string, { isOpen: boolean; openTime: Date; closeTime: Date }>
+  >(createInitialDaySchedules);
+
+  // Active time picker: { dayKey: 'everyday' | 'monday' | 'tuesday'..., type: 'openTime' | 'closeTime' }
+  const [activePicker, setActivePicker] = useState<{
+    dayKey: string;
+    type: 'openTime' | 'closeTime';
+  } | null>(null);
 
   const [isInitialized, setIsInitialized] = useState(false);
+
+  const parseTimeStringToDate = (timeStr?: string, defaultHour: number = 6) => {
+    return ensureDate(timeStr, defaultHour);
+  };
 
   // 1. Initial Load from Local Storage (Priority 1) or initialData (Fallback)
   useEffect(() => {
@@ -48,14 +107,34 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
       const data = initialData || userData;
 
       if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed.clubCategory) setClubCategory(parsed.clubCategory);
-        if (parsed.fitnessTypes) setFitnessTypes(parsed.fitnessTypes);
-        if (parsed.amenities) setAmenities(parsed.amenities);
-        if (parsed.startTime) setStartTime(parsed.startTime);
-        if (parsed.endTime) setEndTime(parsed.endTime);
-        if (parsed.weekdayRange) setWeekdayRange(parsed.weekdayRange);
-        if (parsed.weekendRange) setWeekendRange(parsed.weekendRange);
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed.clubCategory) setClubCategory(parsed.clubCategory);
+          if (parsed.fitnessTypes) setFitnessTypes(parsed.fitnessTypes);
+          if (parsed.amenities) setAmenities(parsed.amenities);
+          if (parsed.isEverydayMode !== undefined) setIsEverydayMode(parsed.isEverydayMode);
+          if (parsed.everydayOpenTime) setEverydayOpenTime(ensureDate(parsed.everydayOpenTime, 6));
+          if (parsed.everydayCloseTime) setEverydayCloseTime(ensureDate(parsed.everydayCloseTime, 22));
+
+          if (parsed.daySchedules) {
+            const restored: Record<string, { isOpen: boolean; openTime: Date; closeTime: Date }> = {};
+            DAYS_CONFIG.forEach(({ key }) => {
+              const item = parsed.daySchedules[key];
+              if (item) {
+                restored[key] = {
+                  isOpen: item.isOpen ?? true,
+                  openTime: ensureDate(item.openTime, 6),
+                  closeTime: ensureDate(item.closeTime, 22),
+                };
+              } else {
+                restored[key] = createInitialDaySchedules()[key];
+              }
+            });
+            setDaySchedules(restored);
+          }
+        } catch (e) {
+          console.error('Error parsing saved onboarding step 3 state:', e);
+        }
       } else if (data) {
         const extractNames = (arr: any) => {
           if (!arr || !Array.isArray(arr)) return [];
@@ -70,16 +149,68 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
         if (resolvedServices.length > 0) setFitnessTypes(resolvedServices);
         if (resolvedFacilities.length > 0) setAmenities(resolvedFacilities);
 
-        if (data.openingTime) {
-          const [h, m] = data.openingTime.split(':');
-          setStartTime(new Date().setHours(parseInt(h), parseInt(m)));
+        const scheduling = data.weekdayScheduling || data.scheduling;
+        if (scheduling && typeof scheduling === 'object') {
+          if (scheduling.everyday) {
+            setIsEverydayMode(true);
+            const openD = parseTimeStringToDate(scheduling.everyday.openingTime, 6);
+            const closeD = parseTimeStringToDate(scheduling.everyday.closingTime, 22);
+            setEverydayOpenTime(openD);
+            setEverydayCloseTime(closeD);
+
+            const restored: Record<string, { isOpen: boolean; openTime: Date; closeTime: Date }> = {};
+            DAYS_CONFIG.forEach(({ key }) => {
+              restored[key] = { isOpen: true, openTime: openD, closeTime: closeD };
+            });
+            setDaySchedules(restored);
+          } else {
+            // Check if all 7 days exist with the same opening & closing time
+            const presentDays = DAYS_CONFIG.filter(({ key }) => scheduling[key]);
+            const all7DaysPresent = presentDays.length === 7;
+            const firstDay = presentDays[0] ? scheduling[presentDays[0].key] : null;
+            const isAllSameTiming =
+              all7DaysPresent &&
+              firstDay &&
+              presentDays.every(
+                ({ key }) =>
+                  scheduling[key]?.openingTime === firstDay.openingTime &&
+                  scheduling[key]?.closingTime === firstDay.closingTime
+              );
+
+            if (isAllSameTiming && firstDay) {
+              setIsEverydayMode(true);
+              const openD = parseTimeStringToDate(firstDay.openingTime, 6);
+              const closeD = parseTimeStringToDate(firstDay.closingTime, 22);
+              setEverydayOpenTime(openD);
+              setEverydayCloseTime(closeD);
+            } else {
+              setIsEverydayMode(false);
+              if (firstDay) {
+                setEverydayOpenTime(parseTimeStringToDate(firstDay.openingTime, 6));
+                setEverydayCloseTime(parseTimeStringToDate(firstDay.closingTime, 22));
+              }
+            }
+
+            const restored: Record<string, { isOpen: boolean; openTime: Date; closeTime: Date }> = {};
+            DAYS_CONFIG.forEach(({ key }) => {
+              const dayData = scheduling[key];
+              if (dayData) {
+                restored[key] = {
+                  isOpen: true,
+                  openTime: parseTimeStringToDate(dayData.openingTime, 6),
+                  closeTime: parseTimeStringToDate(dayData.closingTime, 22),
+                };
+              } else {
+                restored[key] = {
+                  isOpen: false,
+                  openTime: parseTimeStringToDate(undefined, 6),
+                  closeTime: parseTimeStringToDate(undefined, 22),
+                };
+              }
+            });
+            setDaySchedules(restored);
+          }
         }
-        if (data.closingTime) {
-          const [h, m] = data.closingTime.split(':');
-          setEndTime(new Date().setHours(parseInt(h), parseInt(m)));
-        }
-        if (data.weekday) setWeekdayRange(data.weekday);
-        if (data.weekend) setWeekendRange(data.weekend);
       }
       setIsInitialized(true);
     };
@@ -93,10 +224,10 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
         clubCategory,
         fitnessTypes,
         amenities,
-        startTime,
-        endTime,
-        weekdayRange,
-        weekendRange,
+        isEverydayMode,
+        everydayOpenTime,
+        everydayCloseTime,
+        daySchedules,
       };
       AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
     }
@@ -104,39 +235,25 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
     clubCategory,
     fitnessTypes,
     amenities,
-    startTime,
-    endTime,
-    weekdayRange,
-    weekendRange,
+    isEverydayMode,
+    everydayOpenTime,
+    everydayCloseTime,
+    daySchedules,
     isInitialized,
     STORAGE_KEY,
   ]);
 
-  const weekdayOptions = [
-    'Monday to Friday',
-    'Monday to Saturday',
-    'Monday to Thursday',
-    'Everyday (Mon - Sun)',
-  ];
-
-  const weekendOptions = [
-    'Saturday & Sunday',
-    'Sunday Only',
-    'Saturday Only',
-    'Closed on Weekends',
-  ];
-
-  const formatTimeForApi = (timeValue: any) => {
-    const date = new Date(timeValue);
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${hours}:${minutes}:00.000`;
+  const formatTime24h = (timeInput: any, defaultHour: number = 6) => {
+    const dateObj = ensureDate(timeInput, defaultHour);
+    const hours = String(dateObj.getHours()).padStart(2, '0');
+    const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
   };
 
-  const formatTimeParts = (timeValue: any) => {
-    const date = new Date(timeValue);
-    let hours = date.getHours();
-    const minutes = date.getMinutes();
+  const formatTimeParts = (timeInput: any, defaultHour: number = 6) => {
+    const dateObj = ensureDate(timeInput, defaultHour);
+    let hours = dateObj.getHours();
+    const minutes = dateObj.getMinutes();
     const ampm = hours >= 12 ? 'PM' : 'AM';
     hours = hours % 12 || 12;
     const strHours = hours < 10 ? `0${hours}` : hours;
@@ -144,65 +261,150 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
     return { time: `${strHours}:${strMinutes}`, ampm };
   };
 
-  // --- FIXED: EXPOSE SAVE METHOD WITH SUCCESS CALLBACK AND VALIDATIONS ---
+  const toggleEverydayMode = (enabled: boolean) => {
+    setActivePicker(null);
+    setIsEverydayMode(enabled);
+    if (enabled) {
+      // Sync all days to Everyday times
+      setDaySchedules((prev) => {
+        const updated: Record<string, { isOpen: boolean; openTime: Date; closeTime: Date }> = {};
+        DAYS_CONFIG.forEach(({ key }) => {
+          updated[key] = {
+            isOpen: true,
+            openTime: ensureDate(everydayOpenTime, 6),
+            closeTime: ensureDate(everydayCloseTime, 22),
+          };
+        });
+        return updated;
+      });
+    }
+  };
+
+  const toggleDayOpen = (dayKey: string) => {
+    if (isEverydayMode) return;
+    setDaySchedules((prev) => {
+      const current = prev[dayKey] || {
+        isOpen: true,
+        openTime: ensureDate(undefined, 6),
+        closeTime: ensureDate(undefined, 22),
+      };
+      return {
+        ...prev,
+        [dayKey]: {
+          ...current,
+          isOpen: !current.isOpen,
+        },
+      };
+    });
+  };
+
+  const onCustomTimeChange = (dayKey: string, type: 'openTime' | 'closeTime', selectedDate: Date) => {
+    const validDate = ensureDate(selectedDate);
+    if (dayKey === 'everyday') {
+      if (type === 'openTime') {
+        setEverydayOpenTime(validDate);
+      } else {
+        setEverydayCloseTime(validDate);
+      }
+      // Sync to all days
+      setDaySchedules((prev) => {
+        const updated: Record<string, { isOpen: boolean; openTime: Date; closeTime: Date }> = {};
+        DAYS_CONFIG.forEach(({ key }) => {
+          updated[key] = {
+            isOpen: true,
+            openTime: type === 'openTime' ? validDate : ensureDate(prev[key]?.openTime, 6),
+            closeTime: type === 'closeTime' ? validDate : ensureDate(prev[key]?.closeTime, 22),
+          };
+        });
+        return updated;
+      });
+    } else {
+      setDaySchedules((prev) => ({
+        ...prev,
+        [dayKey]: {
+          ...prev[dayKey],
+          [type]: validDate,
+        },
+      }));
+    }
+  };
+
   useImperativeHandle(ref, () => ({
     getFormData: () => ({
       clubCategory,
       fitnessTypes,
       amenities,
-      startTime,
-      endTime,
-      weekdayRange,
-      weekendRange,
+      isEverydayMode,
+      everydayOpenTime,
+      everydayCloseTime,
+      daySchedules,
     }),
     handleSave: async () => {
-      // ⚠️ Validation Check for Fitness Club Type (At least 1 required e.g. Gym)
       if (!fitnessTypes || fitnessTypes.length === 0) {
-        return Alert.alert(
-          'Required',
-          'Please select at least one fitness service (e.g. Gym or Yoga).'
-        );
+        return Alert.alert('Required', 'Please select at least one fitness service (e.g. Gym or Yoga).');
       }
 
-      // ⚠️ Validation Check for Amenities (At least 1 required)
       if (!amenities || amenities.length === 0) {
-        return Alert.alert(
-          'Required',
-          'Please select at least one amenity (e.g. Parking or Wi-Fi).'
-        );
+        return Alert.alert('Required', 'Please select at least one amenity (e.g. Parking or Wi-Fi).');
+      }
+
+      let weekdayScheduling: Record<string, { openingTime: string; closingTime: string }> = {};
+      let defaultOpeningTime = '06:00';
+      let defaultClosingTime = '22:00';
+
+      if (isEverydayMode) {
+        const openStr = formatTime24h(everydayOpenTime, 6);
+        const closeStr = formatTime24h(everydayCloseTime, 22);
+        defaultOpeningTime = openStr;
+        defaultClosingTime = closeStr;
+        weekdayScheduling = {
+          everyday: {
+            openingTime: openStr,
+            closingTime: closeStr,
+          },
+        };
+      } else {
+        const openDays = DAYS_CONFIG.filter(({ key }) => daySchedules[key]?.isOpen);
+        if (openDays.length === 0) {
+          return Alert.alert('Required', 'Please enable at least one operating day for your club.');
+        }
+
+        DAYS_CONFIG.forEach(({ key }) => {
+          if (daySchedules[key]?.isOpen) {
+            weekdayScheduling[key] = {
+              openingTime: formatTime24h(daySchedules[key].openTime, 6),
+              closingTime: formatTime24h(daySchedules[key].closeTime, 22),
+            };
+          }
+        });
+
+        const firstOpenDay = openDays[0]?.key;
+        if (firstOpenDay && daySchedules[firstOpenDay]) {
+          defaultOpeningTime = formatTime24h(daySchedules[firstOpenDay].openTime, 6);
+          defaultClosingTime = formatTime24h(daySchedules[firstOpenDay].closeTime, 22);
+        }
       }
 
       const payload = {
-        clubCategory: clubCategory,
         services: fitnessTypes,
         facilities: amenities,
-        openingTime: formatTimeForApi(startTime),
-        closingTime: formatTimeForApi(endTime),
-        weekday: weekdayRange,
-        weekend: weekendRange,
+        weekdayScheduling,
+        clubCategory,
+        openingTime: defaultOpeningTime,
+        closingTime: defaultClosingTime,
       };
 
       try {
-        await submitStep4.mutateAsync(payload as any);
+        await submitStep4.mutateAsync(payload);
         if (props.onNext) props.onNext();
-      } catch (error: any) {
-        console.error('Error submitting step 3:', error);
+      } catch (err: any) {
+        console.error('Error submitting step 4:', err);
+        Alert.alert('Error', err?.response?.data?.message || err?.message || 'Failed to save club details.');
       }
     },
   }));
 
-  const onTimeChange = (event: any, selectedDate?: Date) => {
-    const currentPicker = showPicker;
-    if (Platform.OS === 'android') {
-      setShowPicker(null);
-    }
-    if (selectedDate && currentPicker) {
-      if (currentPicker === 'start') setStartTime(selectedDate.getTime());
-      if (currentPicker === 'end') setEndTime(selectedDate.getTime());
-    }
-  };
-
-  const toggleSelection = (item: string, state: any, setState: any) => {
+  const toggleSelection = (item: string, state: string[], setState: any) => {
     if (state.includes(item)) {
       setState(state.filter((i: string) => i !== item));
     } else {
@@ -212,16 +414,21 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
 
   const CheckboxItem = ({ label, isSelected, onPress }: any) => (
     <View>
-      <TouchableOpacity
-        onPress={onPress}
-        activeOpacity={0.7}
-        className="flex-row items-center py-4">
+      <TouchableOpacity onPress={onPress} activeOpacity={0.7} className="flex-row items-center py-4">
         <View
-          className={`h-5 w-5 rounded border ${isSelected ? 'border-[#F6163C] bg-[#F6163C]' : 'border-slate-300 bg-white'} mr-3 items-center justify-center`}>
+          className="mr-3 h-5 w-5 items-center justify-center rounded border"
+          style={{
+            borderColor: isSelected ? '#F6163C' : '#CBD5E1',
+            backgroundColor: isSelected ? '#F6163C' : '#FFFFFF',
+          }}>
           {isSelected && <Ionicons name="checkmark" size={14} color="white" />}
         </View>
         <Text
-          className={`text-[15px] ${isSelected ? 'font-medium text-slate-900' : 'text-slate-500'}`}>
+          className="text-[15px]"
+          style={{
+            fontWeight: isSelected ? '600' : '400',
+            color: isSelected ? '#0F172A' : '#64748B',
+          }}>
           {label}
         </Text>
       </TouchableOpacity>
@@ -229,34 +436,31 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
     </View>
   );
 
+  const everydayOpenParts = formatTimeParts(everydayOpenTime);
+  const everydayCloseParts = formatTimeParts(everydayCloseTime);
+  const isEverydayOpenPickerActive = activePicker?.dayKey === 'everyday' && activePicker?.type === 'openTime';
+  const isEverydayClosePickerActive = activePicker?.dayKey === 'everyday' && activePicker?.type === 'closeTime';
+
   return (
     <View className="flex-1 bg-white">
-      <ScrollView
-        contentContainerStyle={{ flexGrow: 1 }}
-        className="px-1 pt-4"
-        showsVerticalScrollIndicator={false}>
-        <Text className="mb-6 font-bold text-[24px] leading-8 text-[#1C1C1C]">
-          Configure your club
-        </Text>
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="px-1 pt-4" showsVerticalScrollIndicator={false}>
+        <Text className="mb-6 font-bold text-[24px] leading-8 text-[#1C1C1C]">Configure your club</Text>
 
-        {/* --- ADDED CLUB CATEGORY DROPDOWN --- */}
+        {/* --- CLUB CATEGORY DROPDOWN --- */}
         <View className="mb-6">
-          <Text className="mb-2 ml-1 font-sans text-sm font-normal text-[#697281]">
-            Club Category
-          </Text>
+          <Text className="mb-2 ml-1 font-sans text-sm font-normal text-[#697281]">Club Category</Text>
           <TouchableOpacity
             onPress={() => setShowCategoryModal(true)}
             activeOpacity={0.7}
-            className="h-14 flex-row items-center justify-between rounded-2xl border border-slate-100 bg-white px-5">
+            className="h-14 flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white px-5">
             <Text className="font-medium text-slate-900">{clubCategory}</Text>
             <Ionicons name="chevron-down" size={20} color="#94A3B8" />
           </TouchableOpacity>
         </View>
 
+        {/* --- TYPE OF FITNESS CLUB --- */}
         <View className="mb-6">
-          <Text className="mb-2 ml-1 font-sans text-sm font-normal text-[#697281]">
-            Type of Fitness club
-          </Text>
+          <Text className="mb-2 ml-1 font-sans text-sm font-normal text-[#697281]">Type of Fitness club</Text>
           {[
             'Gym',
             'Yoga',
@@ -286,6 +490,7 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
           ))}
         </View>
 
+        {/* --- AMENITIES --- */}
         <View className="mb-6">
           <Text className="mb-2 ml-1 font-sans text-sm font-normal text-[#697281]">Amenities</Text>
           {[
@@ -316,136 +521,324 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
           ))}
         </View>
 
-        <View className="mb-10">
-          <Text className="mb-2 ml-1 font-sans text-sm font-normal text-[#697281]">Timings</Text>
+        {/* --- OPERATING DAYS & HOURS SECTION --- */}
+        <View
+          className="mb-10 rounded-3xl border p-4"
+          style={{
+            borderColor: '#F1F5F9',
+            backgroundColor: '#F8FAFC',
+          }}>
+          <Text className="font-bold text-[18px] text-slate-900">Gym Timing</Text>
+          <Text className="mb-4 font-sans text-xs text-[#697281]">Set your club timing schedule</Text>
 
-          <View className="mb-6 h-16 w-full flex-row items-center justify-between rounded-2xl">
-            <TouchableOpacity
-              onPress={() => setShowPicker(showPicker === 'start' ? null : 'start')}
-              className={`h-12 flex-1 flex-row items-center justify-between rounded-xl px-4 ${showPicker === 'start' ? 'border border-red-100 bg-red-50' : 'bg-slate-50'}`}>
-              <Text className="font-bold text-[16px] text-slate-900">
-                {formatTimeParts(startTime).time}
-              </Text>
-              <Text className="font-bold text-[11px] uppercase text-slate-400">
-                {formatTimeParts(startTime).ampm}
-              </Text>
-            </TouchableOpacity>
+          {/* EVERYDAY MASTER CARD */}
+          <View
+            className="mb-4 rounded-2xl border p-3.5"
+            style={{
+              borderColor: isEverydayMode ? '#FECDD3' : '#E2E8F0',
+              backgroundColor: isEverydayMode ? '#FFF1F2' : '#FFFFFF',
+            }}>
+            <View className="flex-row items-center justify-between">
+              <View className="flex-1 flex-row items-center space-x-2.5 pr-2 shrink">
+                <Switch
+                  value={isEverydayMode}
+                  onValueChange={toggleEverydayMode}
+                  trackColor={{ false: '#CBD5E1', true: '#F6163C' }}
+                  thumbColor="#FFFFFF"
+                  ios_backgroundColor="#CBD5E1"
+                />
+                <TouchableOpacity
+                  onPress={() => toggleEverydayMode(!isEverydayMode)}
+                  activeOpacity={0.7}
+                  className="flex-1 shrink ml-2">
+                  <Text numberOfLines={1} className="font-bold text-[15px] text-slate-900">
+                    Everyday (Same timing for all days)
+                  </Text>
+                  <Text numberOfLines={1} className="text-[11px] text-slate-500 mt-0.5">
+                    {isEverydayMode ? 'Set timing once for all 7 days' : 'Turn ON to set single timing for all days'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
 
-            <Text className="mx-4 font-bold text-xs italic text-slate-300">To</Text>
+            {/* Time Pickers for Everyday Mode */}
+            {isEverydayMode && (
+              <View
+                className="mt-3 pt-3 flex-row items-center justify-between border-t"
+                style={{ borderColor: '#FFE4E6' }}>
+                <Text className="font-bold text-[12px] text-slate-700">Everyday Timing:</Text>
+                <View className="flex-row items-center space-x-1.5">
+                  {/* Open Time Pill */}
+                  <TouchableOpacity
+                    onPress={() =>
+                      setActivePicker(isEverydayOpenPickerActive ? null : { dayKey: 'everyday', type: 'openTime' })
+                    }
+                    activeOpacity={0.7}
+                    className="flex-row items-center rounded-xl border px-2.5 py-1.5"
+                    style={{
+                      borderColor: isEverydayOpenPickerActive ? '#F6163C' : '#FECDD3',
+                      backgroundColor: '#FFFFFF',
+                    }}>
+                    <Ionicons
+                      name="time-outline"
+                      size={13}
+                      color="#F6163C"
+                      style={{ marginRight: 4 }}
+                    />
+                    <Text className="font-bold text-[13px] text-slate-900">{everydayOpenParts.time}</Text>
+                    <Text className="ml-1 text-[9px] font-bold text-[#F6163C]">{everydayOpenParts.ampm}</Text>
+                  </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => setShowPicker(showPicker === 'end' ? null : 'end')}
-              className={`h-12 flex-1 flex-row items-center justify-between rounded-xl px-4 ${showPicker === 'end' ? 'border border-red-100 bg-red-50' : 'bg-slate-50'}`}>
-              <Text className="font-bold text-[16px] text-slate-900">
-                {formatTimeParts(endTime).time}
-              </Text>
-              <Text className="font-bold text-[11px] uppercase text-slate-400">
-                {formatTimeParts(endTime).ampm}
-              </Text>
-            </TouchableOpacity>
+                  <Text className="font-bold text-[12px] text-slate-400 mx-1">-</Text>
+
+                  {/* Close Time Pill */}
+                  <TouchableOpacity
+                    onPress={() =>
+                      setActivePicker(isEverydayClosePickerActive ? null : { dayKey: 'everyday', type: 'closeTime' })
+                    }
+                    activeOpacity={0.7}
+                    className="flex-row items-center rounded-xl border px-2.5 py-1.5"
+                    style={{
+                      borderColor: isEverydayClosePickerActive ? '#F6163C' : '#FECDD3',
+                      backgroundColor: '#FFFFFF',
+                    }}>
+                    <Ionicons
+                      name="time-outline"
+                      size={13}
+                      color="#F6163C"
+                      style={{ marginRight: 4 }}
+                    />
+                    <Text className="font-bold text-[13px] text-slate-900">{everydayCloseParts.time}</Text>
+                    <Text className="ml-1 text-[9px] font-bold text-[#F6163C]">{everydayCloseParts.ampm}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
           </View>
 
-          {showPicker && (
-            <View className="shadow-inner mb-6 rounded-2xl border border-slate-100 bg-slate-50 p-2">
-              <View className="flex-row items-center justify-between px-4 py-1">
-                <Text className="font-bold text-[10px] uppercase text-slate-400">
-                  Set {showPicker} Time
-                </Text>
-                {Platform.OS === 'ios' && (
-                  <TouchableOpacity onPress={() => setShowPicker(null)}>
-                    <Text className="font-bold text-[#F6163C]">Done</Text>
-                  </TouchableOpacity>
-                )}
+          {/* Table Header Labels */}
+          <View
+            className="mb-2 flex-row items-center justify-between border-b pb-2 px-1"
+            style={{ borderColor: '#E2E8F0' }}>
+            <Text className="w-[34%] font-bold text-[11px] uppercase tracking-wider text-slate-400">Day</Text>
+            <Text className="w-[60%] text-right font-bold text-[11px] uppercase tracking-wider text-slate-400">
+              {isEverydayMode ? 'Operating Schedule' : 'Open - Close Timings'}
+            </Text>
+          </View>
+
+          {/* Per Day Schedule Rows */}
+          {DAYS_CONFIG.map(({ key, name }) => {
+            const dayData = daySchedules[key] || {
+              isOpen: true,
+              openTime: ensureDate(undefined, 6),
+              closeTime: ensureDate(undefined, 22),
+            };
+            const openParts = formatTimeParts(isEverydayMode ? everydayOpenTime : dayData.openTime, 6);
+            const closeParts = formatTimeParts(isEverydayMode ? everydayCloseTime : dayData.closeTime, 22);
+
+            const isOpeningPickerActive = activePicker?.dayKey === key && activePicker?.type === 'openTime';
+            const isClosingPickerActive = activePicker?.dayKey === key && activePicker?.type === 'closeTime';
+            const isDayPickerActive = activePicker?.dayKey === key;
+
+            return (
+              <View key={key} className="mb-2.5">
+                <View
+                  className="flex-row items-center justify-between rounded-2xl border p-2.5"
+                  style={{
+                    borderColor: isEverydayMode ? '#E2E8F0' : dayData.isOpen ? '#CBD5E1' : '#F1F5F9',
+                    backgroundColor: isEverydayMode || dayData.isOpen ? '#FFFFFF' : '#F8FAFC',
+                  }}>
+                  {/* Day Column + Toggle */}
+                  <View className="w-[38%] shrink-0 flex-row items-center">
+                    <Switch
+                      value={isEverydayMode ? true : dayData.isOpen}
+                      disabled={isEverydayMode}
+                      onValueChange={() => toggleDayOpen(key)}
+                      trackColor={{ false: '#CBD5E1', true: '#F6163C' }}
+                      thumbColor="#FFFFFF"
+                      ios_backgroundColor="#CBD5E1"
+                      style={{ opacity: isEverydayMode ? 0.6 : 1 }}
+                    />
+                    <TouchableOpacity
+                      onPress={() => toggleDayOpen(key)}
+                      disabled={isEverydayMode}
+                      activeOpacity={isEverydayMode ? 1 : 0.7}
+                      className="flex-1 shrink ml-2">
+                      <Text
+                        numberOfLines={1}
+                        className="font-bold text-[13px]"
+                        style={{
+                          color: isEverydayMode || dayData.isOpen ? '#0F172A' : '#94A3B8',
+                        }}>
+                        {name}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Open & Close Timings */}
+                  {isEverydayMode ? (
+                    // In Everyday Mode: Timings are synced automatically
+                    <View className="flex-1 flex-row items-center justify-end">
+                      <View
+                        className="rounded-xl border px-2.5 py-1.5 flex-row items-center"
+                        style={{ borderColor: '#F1F5F9', backgroundColor: '#F8FAFC' }}>
+                        <Ionicons name="time-outline" size={12} color="#64748B" style={{ marginRight: 4 }} />
+                        <Text className="font-bold text-[12px] text-slate-800">
+                          {openParts.time} {openParts.ampm} - {closeParts.time} {closeParts.ampm}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : dayData.isOpen ? (
+                    // Custom Days Mode: Per-Day Pickers
+                    <View className="flex-1 flex-row items-center justify-end space-x-1">
+                      {/* Open Time Pill */}
+                      <TouchableOpacity
+                        onPress={() =>
+                          setActivePicker(isOpeningPickerActive ? null : { dayKey: key, type: 'openTime' })
+                        }
+                        activeOpacity={0.7}
+                        className="flex-row items-center rounded-xl border px-2 py-1.5"
+                        style={{
+                          borderColor: isOpeningPickerActive ? '#F6163C' : '#CBD5E1',
+                          backgroundColor: isOpeningPickerActive ? '#FFF1F2' : '#F8FAFC',
+                        }}>
+                        <Ionicons
+                          name="time-outline"
+                          size={12}
+                          color={isOpeningPickerActive ? '#F6163C' : '#64748B'}
+                          style={{ marginRight: 3 }}
+                        />
+                        <Text className="font-bold text-[12px] text-slate-900">{openParts.time}</Text>
+                        <Text className="ml-1 text-[9px] font-bold text-slate-500">{openParts.ampm}</Text>
+                      </TouchableOpacity>
+
+                      <Text className="font-bold text-[11px] text-slate-300 mx-0.5">-</Text>
+
+                      {/* Close Time Pill */}
+                      <TouchableOpacity
+                        onPress={() =>
+                          setActivePicker(isClosingPickerActive ? null : { dayKey: key, type: 'closeTime' })
+                        }
+                        activeOpacity={0.7}
+                        className="flex-row items-center rounded-xl border px-2 py-1.5"
+                        style={{
+                          borderColor: isClosingPickerActive ? '#F6163C' : '#CBD5E1',
+                          backgroundColor: isClosingPickerActive ? '#FFF1F2' : '#F8FAFC',
+                        }}>
+                        <Ionicons
+                          name="time-outline"
+                          size={12}
+                          color={isClosingPickerActive ? '#F6163C' : '#64748B'}
+                          style={{ marginRight: 3 }}
+                        />
+                        <Text className="font-bold text-[12px] text-slate-900">{closeParts.time}</Text>
+                        <Text className="ml-1 text-[9px] font-bold text-slate-500">{closeParts.ampm}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View className="flex-1 items-end pr-1">
+                      <View className="rounded-full bg-slate-200 px-2.5 py-0.5">
+                        <Text className="font-semibold text-[11px] text-slate-500">Closed</Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+
               </View>
-              <DateTimePicker
-                value={new Date(showPicker === 'start' ? startTime : endTime)}
-                mode="time"
-                is24Hour={false}
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                onChange={onTimeChange}
-                style={{ height: 120, borderRadius: 50 }}
-                textColor="#F6163C"
-                accentColor="#F6163C"
-              />
-            </View>
-          )}
-
-          <Text className="mb-2 ml-1 font-medium text-[13px] text-slate-400">Weekday Schedule</Text>
-          <TouchableOpacity
-            onPress={() => setShowDayModal('weekday')}
-            className="mb-4 h-14 flex-row items-center justify-between rounded-2xl border border-slate-100 bg-white px-5">
-            <Text className="font-medium text-slate-900">{weekdayRange}</Text>
-            <Ionicons name="chevron-down" size={20} color="#94A3B8" />
-          </TouchableOpacity>
-
-          <Text className="mb-2 ml-1 font-medium text-[13px] text-slate-400">Weekend Schedule</Text>
-          <TouchableOpacity
-            onPress={() => setShowDayModal('weekend')}
-            className="h-14 flex-row items-center justify-between rounded-2xl border border-slate-100 bg-white px-5">
-            <Text className="font-medium text-slate-900">{weekendRange}</Text>
-            <Ionicons name="chevron-down" size={20} color="#94A3B8" />
-          </TouchableOpacity>
+            );
+          })}
         </View>
       </ScrollView>
 
-      {/* --- REUSABLE MODAL FOR CATEGORY AND SCHEDULES --- */}
-      <Modal visible={showCategoryModal || !!showDayModal} transparent animationType="fade">
-        <TouchableOpacity
-          className="flex-1 justify-end bg-black/40"
-          activeOpacity={1}
-          onPress={() => {
-            setShowCategoryModal(false);
-            setShowDayModal(null);
+      {/* --- CLUB CATEGORY MODAL --- */}
+      <Modal
+        visible={showCategoryModal}
+        transparent
+        animationType="fade"
+        statusBarTranslucent={true}
+        onRequestClose={() => setShowCategoryModal(false)}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.45)',
+            justifyContent: 'flex-end',
           }}>
-          <View className="rounded-t-[32px] bg-white p-6 pb-12 shadow-2xl">
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={() => setShowCategoryModal(false)}
+          />
+          <View
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderTopLeftRadius: 32,
+              borderTopRightRadius: 32,
+              borderBottomLeftRadius: 0,
+              borderBottomRightRadius: 0,
+              paddingHorizontal: 24,
+              paddingTop: 20,
+              paddingBottom: Math.max(insets.bottom, 16) + 16,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: -4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 10,
+              elevation: 10,
+            }}>
             <View className="mb-6 h-1.5 w-12 self-center rounded-full bg-slate-200" />
-            <Text className="mb-6 text-center font-bold text-xl text-slate-900">
-              {showCategoryModal
-                ? 'Select Category'
-                : `Select ${showDayModal === 'weekday' ? 'Weekday' : 'Weekend'}`}
-            </Text>
+            <Text className="mb-6 text-center font-bold text-xl text-slate-900">Select Category</Text>
 
-            {(showCategoryModal
-              ? categoryOptions
-              : showDayModal === 'weekday'
-                ? weekdayOptions
-                : weekendOptions
-            ).map((option) => (
+            {categoryOptions.map((option) => (
               <TouchableOpacity
                 key={option}
                 onPress={() => {
-                  if (showCategoryModal) {
-                    setClubCategory(option);
-                    setShowCategoryModal(false);
-                  } else {
-                    showDayModal === 'weekday' ? setWeekdayRange(option) : setWeekendRange(option);
-                    setShowDayModal(null);
-                  }
+                  setClubCategory(option);
+                  setShowCategoryModal(false);
                 }}
-                className="flex-row items-center justify-between border-b border-slate-50 py-5">
+                className="flex-row items-center justify-between border-b border-slate-50 py-4">
                 <Text
-                  className={`text-[16px] ${(showCategoryModal
-                    ? clubCategory
-                    : showDayModal === 'weekday'
-                      ? weekdayRange
-                      : weekendRange) === option
-                    ? 'font-bold text-[#F6163C]'
-                    : 'text-slate-700'
-                    }`}>
+                  className="text-[16px]"
+                  style={{
+                    fontWeight: clubCategory === option ? '700' : '400',
+                    color: clubCategory === option ? '#F6163C' : '#334155',
+                  }}>
                   {option}
                 </Text>
-                {(showCategoryModal
-                  ? clubCategory
-                  : showDayModal === 'weekday'
-                    ? weekdayRange
-                    : weekendRange) === option && (
-                    <Ionicons name="checkmark-circle" size={24} color="#F6163C" />
-                  )}
+                {clubCategory === option && <Ionicons name="checkmark-circle" size={24} color="#F6163C" />}
               </TouchableOpacity>
             ))}
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
+
+      {/* --- FITFOB BRANDED RED TIME PICKER MODAL --- */}
+      <CustomTimePickerModal
+        visible={activePicker !== null}
+        initialDate={
+          activePicker
+            ? activePicker.dayKey === 'everyday'
+              ? activePicker.type === 'openTime'
+                ? everydayOpenTime
+                : everydayCloseTime
+              : daySchedules[activePicker.dayKey]?.[activePicker.type] || new Date()
+            : new Date()
+        }
+        title={
+          activePicker
+            ? activePicker.dayKey === 'everyday'
+              ? `Everyday • ${activePicker.type === 'openTime' ? 'Opening' : 'Closing'} Time`
+              : `${DAYS_CONFIG.find((d) => d.key === activePicker.dayKey)?.name || ''} • ${
+                  activePicker.type === 'openTime' ? 'Opening' : 'Closing'
+                } Time`
+            : 'Select Time'
+        }
+        onConfirm={(selectedDate: Date) => {
+          if (activePicker) {
+            onCustomTimeChange(activePicker.dayKey, activePicker.type, selectedDate);
+          }
+          setActivePicker(null);
+        }}
+        onCancel={() => setActivePicker(null)}
+      />
     </View>
   );
 });

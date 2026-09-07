@@ -501,7 +501,7 @@ const HomeScreen = () => {
                 colors={['#FFFFFF', '#FFF1F3', '#FFE4E8']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFillObject}
+                style={StyleSheet.absoluteFill}
               />
 
               {/* Gym Watermark Background Icon */}
@@ -538,7 +538,7 @@ const HomeScreen = () => {
                 colors={['#FFFFFF', '#F7F5FF', '#EDE7FE']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFillObject}
+                style={StyleSheet.absoluteFill}
               />
 
               {/* Gym Watermark Background Icon */}

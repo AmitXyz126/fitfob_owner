@@ -59,7 +59,7 @@ export default function Login() {
           text2: 'Welcome back! 👋',
         });
 
-       
+
       },
 
       onError: (error: any) => {
@@ -107,82 +107,82 @@ export default function Login() {
     });
   };
 
-   // Handle Google Login
-    const handleGoogleLogin = async () => {
-      console.log('Google Login: Button pressed.');
-      try {
-        console.log('Google Login: Triggering native Google Sign-In flow...');
-        const idToken = await googleAuthService.signIn();
-        console.log('Google Login: Obtained ID Token successfully. Sending to backend...');
-        googleLogin(
-          { idToken },
-          {
-            onSuccess: () => {
-              console.log('Google Login: Backend verification succeeded.');
-              Toast.show({
-                type: 'success',
-                text1: 'Google Login Success',
-                text2: 'Welcome back! 👋',
-              });
-            },
-            onError: (err: any) => {
-              console.error('Google Login: Backend verification failed:', err);
-              Toast.show({
-                type: 'error',
-                text1: 'Google Login Failed',
-                text2: err?.message || 'Google Login failed',
-              });
-            },
-          }
-        );
-      } catch (err: any) {
-        console.error('Google Login: Service error caught:', err);
-        if (err.message && err.message !== "User cancelled the Google Sign-In flow.") {
-          Toast.show({
-            type: 'error',
-            text1: 'Google Login Failed',
-            text2: err?.message || 'Google Login failed',
-          });
-        }
-      }
-    };
-  
-    // Handle Facebook Login
-    const handleFacebookLogin = async () => {
-      console.log('Facebook Login: Button pressed.');
-      try {
-        console.log('Facebook Login: Triggering native Facebook login...');
-        const credentials = await facebookAuthService.signIn();
-        console.log('Facebook Login: Obtained Facebook credentials. Sending to backend...');
-        facebookLogin(credentials, {
+  // Handle Google Login
+  const handleGoogleLogin = async () => {
+    console.log('Google Login: Button pressed.');
+    try {
+      console.log('Google Login: Triggering native Google Sign-In flow...');
+      const idToken = await googleAuthService.signIn();
+      console.log('Google Login: Obtained ID Token successfully. Sending to backend...');
+      googleLogin(
+        { idToken },
+        {
           onSuccess: () => {
-            console.log('Facebook Login: Backend verification succeeded.');
+            console.log('Google Login: Backend verification succeeded.');
             Toast.show({
               type: 'success',
-              text1: 'Facebook Login Success',
+              text1: 'Google Login Success',
               text2: 'Welcome back! 👋',
             });
           },
           onError: (err: any) => {
-            console.error('Facebook Login: Backend verification failed:', err);
+            console.error('Google Login: Backend verification failed:', err);
             Toast.show({
               type: 'error',
-              text1: 'Facebook Login Failed',
-              text2: err?.message || 'Facebook Login failed',
+              text1: 'Google Login Failed',
+              text2: err?.message || 'Google Login failed',
             });
           },
+        }
+      );
+    } catch (err: any) {
+      console.error('Google Login: Service error caught:', err);
+      if (err.message && err.message !== "User cancelled the Google Sign-In flow.") {
+        Toast.show({
+          type: 'error',
+          text1: 'Google Login Failed',
+          text2: err?.message || 'Google Login failed',
         });
-      } catch (err: any) {
-        console.error('Facebook Login: Service error caught:', err);
-        if (err.message && !err.message.includes('cancelled')) {
+      }
+    }
+  };
+
+  // Handle Facebook Login
+  const handleFacebookLogin = async () => {
+    console.log('Facebook Login: Button pressed.');
+    try {
+      console.log('Facebook Login: Triggering native Facebook login...');
+      const credentials = await facebookAuthService.signIn();
+      console.log('Facebook Login: Obtained Facebook credentials. Sending to backend...');
+      facebookLogin(credentials, {
+        onSuccess: () => {
+          console.log('Facebook Login: Backend verification succeeded.');
+          Toast.show({
+            type: 'success',
+            text1: 'Facebook Login Success',
+            text2: 'Welcome back! 👋',
+          });
+        },
+        onError: (err: any) => {
+          console.error('Facebook Login: Backend verification failed:', err);
           Toast.show({
             type: 'error',
             text1: 'Facebook Login Failed',
             text2: err?.message || 'Facebook Login failed',
           });
-        }
+        },
+      });
+    } catch (err: any) {
+      console.error('Facebook Login: Service error caught:', err);
+      if (err.message && !err.message.includes('cancelled')) {
+        Toast.show({
+          type: 'error',
+          text1: 'Facebook Login Failed',
+          text2: err?.message || 'Facebook Login failed',
+        });
       }
-    };
+    }
+  };
 
   return (
     <Container>
@@ -307,18 +307,18 @@ export default function Login() {
         </View>
 
         {/* Social Buttons */}
-         <View className="mb-6 mt-2 flex-col gap-3">
-                  <GoogleButton
-                    onPress={handleGoogleLogin}
-                    isLoading={googleIsPending}
-                    disabled={isLoading}
-                  />
-                  <FacebookButton
-                    onPress={handleFacebookLogin}
-                    isLoading={facebookIsPending}
-                    disabled={isLoading}
-                  />
-                </View>
+        <View className="mb-6 mt-2 flex-col gap-3">
+          <GoogleButton
+            onPress={handleGoogleLogin}
+            isLoading={googleIsPending}
+            disabled={isLoading}
+          />
+          <FacebookButton
+            onPress={handleFacebookLogin}
+            isLoading={facebookIsPending}
+            disabled={isLoading}
+          />
+        </View>
 
         {/* Footer */}
         <View className="flex-row justify-center pb-6">

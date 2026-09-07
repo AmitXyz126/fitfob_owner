@@ -208,7 +208,7 @@ const GymBackgroundAnimation = memo(() => {
   }, [items]);
 
   return (
-    <View style={[StyleSheet.absoluteFillObject, { zIndex: -1 }]} pointerEvents="none">
+    <View style={[StyleSheet.absoluteFill, { zIndex: -1 }]} pointerEvents="none">
       {items.map((item) => {
         const spin = item.rotAnim.interpolate({
           inputRange: [0, 360],

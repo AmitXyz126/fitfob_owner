@@ -1,4 +1,4 @@
-import  { useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,12 +8,20 @@ import {
   PanResponder,
   Dimensions,
 } from 'react-native';
-import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Scan, Wallet } from 'lucide-react-native';
 import Svg, { Path } from 'react-native-svg';
 
-export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+export interface CustomTabBarProps {
+  state: {
+    routes: Array<{ key: string; name: string; params?: Record<string, any> }>;
+    index: number;
+  };
+  descriptors: Record<string, { options: any }>;
+  navigation: any;
+}
+
+export function CustomTabBar({ state, descriptors, navigation }: CustomTabBarProps) {
   const insets = useSafeAreaInsets();
   // Position tab bar near bottom (lifted higher on Android)
   const bottomInset =

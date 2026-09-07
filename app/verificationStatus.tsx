@@ -150,7 +150,7 @@ export default function VerificationStatusScreen() {
   return (
     <Container>
       {/* Confetti Overlay */}
-      <View style={StyleSheet.absoluteFillObject} pointerEvents="none" className="z-50 items-center justify-center">
+      <View style={StyleSheet.absoluteFill} pointerEvents="none" className="z-50 items-center justify-center">
         {particles.map((p) => {
           const spin = p.rotation.interpolate({
             inputRange: [0, 360],

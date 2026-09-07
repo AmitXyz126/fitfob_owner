@@ -1,4 +1,4 @@
-import  { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
+import { useState, useRef, useImperativeHandle, forwardRef } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,10 @@ import {
   TextInput,
   Platform,
   Alert,
-  Animated,
-  StyleSheet,
   ActivityIndicator,
   Image,
   ScrollView,
+  StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
@@ -19,7 +18,6 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useUserDetail } from '@/hooks/useUserDetail';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter } from 'expo-router';
-import { useIsFocused } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export interface OnBoarding4Handle {
@@ -34,78 +32,61 @@ interface Props {
 
 const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
   const router = useRouter();
-  const isFocused = useIsFocused();
-  const { onUploadSuccess, onUploadDone, onBack } = props;
+  const { onUploadSuccess, onUploadDone } = props;
   const { uploadDoc, refetch } = useUserDetail();
 
   const [activeTab, setActiveTab] = useState<'camera' | 'file'>('camera');
   const [docName, setDocName] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<any[]>([]);
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
-  const [permission, requestPermission] = useCameraPermissions();
 
+  // Camera State
+  const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [scannedData, setScannedData] = useState<any>(null);
 
-  const scanLineAnim = useRef(new Animated.Value(0)).current;
-
   useImperativeHandle(ref, () => ({
-    openModal: () => {
-      // Stub for legacy compat if called from parent
-    },
+    openModal: () => { },
   }));
 
-  const startScanAnimation = () => {
-    scanLineAnim.setValue(0);
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(scanLineAnim, { toValue: 1, duration: 1500, useNativeDriver: true }),
-        Animated.timing(scanLineAnim, { toValue: 0, duration: 1500, useNativeDriver: true }),
-      ])
-    ).start();
-  };
-
-  useEffect(() => {
-    if (isFocused && activeTab === 'camera') {
-      requestPermission();
-      startScanAnimation();
-    }
-  }, [isFocused, activeTab]);
-
+  // Capture Photo with Camera
   const takePicture = async () => {
     if (!cameraRef.current || isCapturing) return;
     try {
       setIsCapturing(true);
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
       if (photo) {
         const fileObj = {
           id: `${Date.now()}_${Math.random()}`,
           uri: photo.uri,
           name: `camera_${Date.now()}.jpg`,
           type: 'image/jpeg',
-          docName: docName.trim() || `Scanned Document ${selectedFiles.length + 1}`,
+          docName: docName.trim() || `Document ${selectedFiles.length + 1}`,
         };
         setSelectedFiles((prev) => [...prev, fileObj]);
         setScannedData(fileObj);
         setDocName('');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to capture photo');
+      Alert.alert('Error', 'Failed to capture photo. Please try again.');
     } finally {
       setIsCapturing(false);
     }
   };
 
   const resetCameraCapture = () => {
+    if (scannedData) {
+      setSelectedFiles((prev) => prev.filter((item) => item.id !== scannedData.id));
+    }
     setScannedData(null);
-    startScanAnimation();
   };
 
+  // Gallery Picker
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'Gallery access is needed to upload photos.');
+      Alert.alert('Permission Denied', 'Gallery access is needed to select photos.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -125,14 +106,15 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
             ? docName.trim()
             : `${docName.trim()} ${idx + 1}`
           : asset.fileName
-          ? asset.fileName.split('.')[0]
-          : `Govt Document ${selectedFiles.length + idx + 1}`,
+            ? asset.fileName.split('.')[0]
+            : `Document ${selectedFiles.length + idx + 1}`,
       }));
       setSelectedFiles((prev) => [...prev, ...newFiles]);
       setDocName('');
     }
   };
 
+  // File / PDF Picker
   const pickDocument = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -152,8 +134,8 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
               ? docName.trim()
               : `${docName.trim()} ${idx + 1}`
             : file.name
-            ? file.name.split('.')[0]
-            : `Govt Document ${selectedFiles.length + idx + 1}`,
+              ? file.name.split('.')[0]
+              : `Document ${selectedFiles.length + idx + 1}`,
         }));
         setSelectedFiles((prev) => [...prev, ...newFiles]);
         setDocName('');
@@ -164,7 +146,7 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
   };
 
   const handleSelectSource = () => {
-    Alert.alert('Choose File source', 'Select a file format from your phone:', [
+    Alert.alert('Select File Source', 'Choose how you would like to select your files:', [
       { text: 'Photo Gallery', onPress: pickImage },
       { text: 'Files / PDF', onPress: pickDocument },
       { text: 'Cancel', style: 'cancel' },
@@ -181,6 +163,7 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
     );
   };
 
+  // Upload Logic
   const handleFinalUpload = async () => {
     if (selectedFiles.length === 0) {
       return Alert.alert('Required', 'Please scan or select at least one document file.');
@@ -235,16 +218,16 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
       {/* Title Header */}
       <View className="mb-6 flex-row items-center justify-between">
         <Text className="font-bold text-[24px] text-[#1C1C1C]">Upload Govt Document</Text>
-        {selectedFiles.length > 0 && (
+        {/* {selectedFiles.length > 0 && (
           <View className="rounded-full bg-red-50 px-3 py-1 border border-red-100">
             <Text className="font-bold text-xs text-[#F6163C]">
               {selectedFiles.length} {selectedFiles.length === 1 ? 'File' : 'Files'} Selected
             </Text>
           </View>
-        )}
+        )} */}
       </View>
 
-      {/* Tabs */}
+      {/* Mode Selector Tabs */}
       <View className="mb-6 flex-row rounded-2xl bg-slate-100 p-1">
         <TouchableOpacity
           onPress={() => setActiveTab('camera')}
@@ -276,14 +259,14 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
         </TouchableOpacity>
       </View>
 
-      {/* Default Document Name Input (used for new selections) */}
+      {/* Document Name Input */}
       {selectedFiles.length === 0 && (
         <View className="mb-6">
           <Text className="mb-2 ml-1 text-sm font-semibold text-slate-500">Document Name</Text>
           <TextInput
             value={docName}
             onChangeText={setDocName}
-            placeholder="e.g. Aadhar Card, License, PAN"
+            placeholder="e.g. Aadhar Card, License, PAN, GST"
             placeholderTextColor="#94A3B8"
             className="h-14 w-full rounded-2xl border border-slate-100 bg-[#F8FAFC] px-5 font-semibold text-slate-900"
             editable={!isUploading}
@@ -291,13 +274,13 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
         </View>
       )}
 
-      {/* Content Body Based on Tab */}
+      {/* Tab Content */}
       <View className="mb-6">
         {activeTab === 'camera' ? (
           // Camera Tab
           <View className="relative h-80 w-full overflow-hidden rounded-[30px] border border-slate-100 bg-slate-900">
             {scannedData ? (
-              // Scanned Preview
+              // Captured Preview
               <View className="flex-1">
                 <Image source={{ uri: scannedData.uri }} className="flex-1" resizeMode="cover" />
                 <View className="absolute inset-0 items-center justify-center" style={styles.overlayBg}>
@@ -306,33 +289,24 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
                   </View>
                   <TouchableOpacity
                     onPress={resetCameraCapture}
-                    className="rounded-full px-6 py-2 border border-white/30"
+                    className="flex-row items-center rounded-full px-6 py-2.5 border border-white/30"
                     style={styles.retakeBtnBg}>
-                    <Text className="font-bold text-sm text-white">Scan Another Photo</Text>
+                    <Ionicons name="refresh-outline" size={18} color="white" className="mr-1.5" />
+                    <Text className="font-bold text-sm text-white ml-1.5">Retake Photo</Text>
                   </TouchableOpacity>
                 </View>
               </View>
-            ) : isFocused && permission?.granted ? (
-              // Live Shutter Scan View
-              <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back">
-                <View className="flex-1 items-center justify-center" style={styles.shutterOverlayBg}>
-                  <Animated.View
-                    style={[
-                      styles.scanLine,
-                      {
-                        transform: [
-                          {
-                            translateY: scanLineAnim.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: [-100, 100],
-                            }),
-                          },
-                        ],
-                      },
-                    ]}
-                  />
-
-                  {/* Corner Targets */}
+            ) : !permission ? (
+              // Permission Loading
+              <View className="flex-1 items-center justify-center bg-slate-950">
+                <ActivityIndicator size="large" color="#F6163C" />
+              </View>
+            ) : permission.granted ? (
+              // Live Camera View with Absolute Overlay
+              <View className="flex-1">
+                <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
+                <View className="absolute inset-0 items-center justify-center" style={styles.shutterOverlayBg}>
+                  {/* Target Frame */}
                   <View className="h-48 w-72 items-center justify-center rounded-2xl border" style={styles.targetBorderColor}>
                     <View className="absolute left-0 top-0 h-6 w-6 rounded-tl-lg border-l-4 border-t-4 border-[#F6163C]" />
                     <View className="absolute right-0 top-0 h-6 w-6 rounded-tr-lg border-r-4 border-t-4 border-[#F6163C]" />
@@ -340,7 +314,7 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
                     <View className="absolute bottom-0 right-0 h-6 w-6 rounded-br-lg border-b-4 border-r-4 border-[#F6163C]" />
                   </View>
 
-                  {/* Capture Button */}
+                  {/* Shutter Button */}
                   <TouchableOpacity
                     onPress={takePicture}
                     disabled={isCapturing}
@@ -354,9 +328,9 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
                     )}
                   </TouchableOpacity>
                 </View>
-              </CameraView>
+              </View>
             ) : (
-              // Requiring Permissions fallback
+              // Request Permission View
               <View className="flex-1 items-center justify-center p-6 bg-slate-950">
                 <Ionicons name="camera" size={48} color="#94A3B8" />
                 <Text className="mt-4 text-center text-sm font-semibold text-slate-300">
@@ -371,7 +345,7 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
             )}
           </View>
         ) : (
-          // File / PDF Tab
+          // File / Gallery Tab
           <View>
             <TouchableOpacity
               onPress={handleSelectSource}
@@ -385,7 +359,7 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
                 {selectedFiles.length > 0 ? 'Select More PDF or Image Files' : 'Choose PDF or Image Files'}
               </Text>
               <Text className="mt-1 text-center text-xs text-slate-400">
-                Select one or multiple files from gallery or storage
+                Select files from photo gallery or device storage
               </Text>
             </TouchableOpacity>
           </View>
@@ -435,7 +409,6 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
                   </TouchableOpacity>
                 </View>
 
-                {/* Editable Document Name for this file */}
                 <View className="mt-3">
                   <Text className="text-[11px] font-semibold text-slate-400 mb-1">
                     Document Name #{idx + 1}
@@ -455,15 +428,14 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
         </View>
       )}
 
-      {/* Main Upload Button at the bottom */}
+      {/* Submit Button */}
       <View className="mt-auto pb-8">
         <TouchableOpacity
           onPress={handleFinalUpload}
           disabled={isUploading}
           activeOpacity={0.8}
-          className={`h-14 w-full flex-row items-center justify-center rounded-2xl ${
-            isUploading ? 'bg-slate-400' : 'bg-[#F6163C]'
-          }`}
+          className={`h-14 w-full flex-row items-center justify-center rounded-2xl ${isUploading ? 'bg-slate-400' : 'bg-[#F6163C]'
+            }`}
           style={styles.uploadBtnShadow}>
           {isUploading ? (
             <View className="flex-row items-center">
@@ -563,45 +535,31 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
-  scanLine: {
-    position: 'absolute',
-    zIndex: 10,
-    height: 3,
-    width: '80%',
-    backgroundColor: '#F6163C',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#F6163C',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.8,
-        shadowRadius: 6,
-      },
-    }),
-  },
   targetBorderColor: {
     borderColor: 'rgba(255, 255, 255, 0.25)',
   },
   shutterBtnBg: {
-    backgroundColor: 'rgba(246, 22, 60, 0.1)',
-  },
-  dashedBorderBox: {
-    backgroundColor: 'rgba(248, 250, 252, 0.5)',
-  },
-  cloudIconWrapperBg: {
-    backgroundColor: 'rgba(246, 22, 60, 0.05)',
+    backgroundColor: 'rgba(246, 22, 60, 0.9)',
   },
   uploadBtnShadow: {
     ...Platform.select({
       ios: {
         shadowColor: '#F6163C',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.2,
+        shadowOpacity: 0.3,
         shadowRadius: 8,
       },
       android: {
-        elevation: 2,
+        elevation: 4,
       },
     }),
+  },
+  cloudIconWrapperBg: {
+    backgroundColor: '#FFF1F2',
+  },
+  dashedBorderBox: {
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FAFAFA',
   },
 });
 

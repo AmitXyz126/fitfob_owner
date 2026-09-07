@@ -199,10 +199,8 @@ export const userDetailsApi = {
       clubCategory: data.clubCategory,
       services: data.services,
       facilities: data.facilities,
-      openingTime: data.openingTime,
-      closingTime: data.closingTime,
-      weekday: data.weekday,
-      weekend: data.weekend,
+      weekdayScheduling: data.weekdayScheduling,
+     
     };
     const response = await api.post(ENDPOINTS.STEP_4, payload);
     return response.data;

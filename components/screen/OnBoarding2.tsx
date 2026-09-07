@@ -291,7 +291,7 @@ const OnBoarding2_Part2 = ({ onConfirm, onMapTouchStart, onMapTouchEnd }: OnBoar
   };
 
   // --- 3. OSM Search  ---
-  const searchTimeout = useRef<NodeJS.Timeout | null>(null);
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const searchLocation = async (text: any) => {
     setSearchQuery(text);

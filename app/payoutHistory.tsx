@@ -348,7 +348,7 @@ const PayoutHistory = () => {
             colors={['#FFFFFF', '#FFF1F2', '#FEF2F2', '#FFFFFF']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
           />
 
           {/* Background Floating Animated Glowing Orbs */}

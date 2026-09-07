@@ -160,9 +160,9 @@ console.log(initialData,"initialdata")
 
   const hasValidPhone = digitsCount >= 10;
   const hasValidEmail = finalEmail.length > 0 && emailRegex.test(finalEmail);
-  const isContactValid = hasValidPhone || hasValidEmail;
+  const isEmailFormatValid = !finalEmail || emailRegex.test(finalEmail);
 
-  const isStep1Valid = isLogoValid && isClubNameValid && isOwnerNameValid && isContactValid;
+  const isStep1Valid = isLogoValid && isClubNameValid && isOwnerNameValid && hasValidPhone && isEmailFormatValid;
 
   useEffect(() => {
     if (onValidationChange) {
@@ -238,11 +238,12 @@ console.log(initialData,"initialdata")
       const hasValidPhone = digitsCount >= 10;
       const hasValidEmail = finalEmail.length > 0 && emailRegex.test(finalEmail);
 
-      if (!hasValidPhone && !hasValidEmail) {
-        return Alert.alert(
-          'Required',
-          'Please provide either a valid 10-digit phone number or a valid email address.'
-        );
+      if (!hasValidPhone) {
+        return Alert.alert('Required', 'Please enter a valid 10-digit phone number.');
+      }
+
+      if (finalEmail.length > 0 && !emailRegex.test(finalEmail)) {
+        return Alert.alert('Invalid Email', 'Please enter a valid email address.');
       }
 
       const payload = {
@@ -339,7 +340,7 @@ console.log(initialData,"initialdata")
 
         <View>
           <Text className="mb-2 ml-1 mt-4 font-medium text-[13px] text-slate-500">
-            Phone Number{isPhoneLocked ? ' (from account)' : isEmailLocked ? ' (optional)' : ''}
+            Phone Number{isPhoneLocked ? ' (from account)' : ''}
           </Text>
           <View
             className={`h-14 w-full flex-row items-center rounded-xl border px-3 ${isSubmitting || isPhoneLocked ? 'border-slate-200 bg-slate-100' : 'border-slate-200 bg-white'}`}>

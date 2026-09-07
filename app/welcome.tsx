@@ -6,6 +6,8 @@ import {
   Pressable,
   FlatList,
   Image,
+  Animated,
+  Easing,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
@@ -26,9 +28,91 @@ const loopImages = [images[images.length - 1], ...images, images[0]];
 
 const { width } = Dimensions.get('window');
 
+const MOTIVATIONAL_DATA = [
+  {
+    tag: 'PUSH YOUR LIMITS',
+    line1: 'Sweat Today,',
+    line2: 'Conquer Tomorrow',
+    quote: 'Turn your fitness club into a powerhouse of champions.',
+  },
+  {
+    tag: 'POWER & PASSION',
+    line1: 'Greatness Is Built',
+    line2: 'One Rep At A Time',
+    quote: 'Inspire your members to break barriers and shatter goals.',
+  },
+  {
+    tag: 'LEAD THE REVOLUTION',
+    line1: 'Discipline Over',
+    line2: 'Temporary Motivation',
+    quote: 'Fuel the fire of dedication inside your fitness community.',
+  },
+  {
+    tag: 'RELENTLESS DRIVE',
+    line1: 'Transform Ambition',
+    line2: 'Into Real Strength',
+    quote: 'Create an atmosphere where hard work speaks louder than words.',
+  },
+  {
+    tag: 'UNSTOPPABLE EMPIRE',
+    line1: 'Forge Legends,',
+    line2: 'Break All Boundaries',
+    quote: 'Empower every athlete and celebrate every single victory.',
+  },
+];
+
 export default function Welcome() {
   const [index, setIndex] = useState(1);
   const ref = useRef<FlatList>(null);
+
+  // Staggered converging animation values:
+  // Tag slides from left, Line 1 from left, Line 2 from right, Quote from bottom
+  const tagAnim = useRef(new Animated.Value(0)).current;
+  const line1Anim = useRef(new Animated.Value(0)).current;
+  const line2Anim = useRef(new Animated.Value(0)).current;
+  const quoteAnim = useRef(new Animated.Value(0)).current;
+
+  const realIndex = (index - 1 + images.length) % images.length;
+  const currentMotivational = MOTIVATIONAL_DATA[realIndex] || MOTIVATIONAL_DATA[0];
+
+  useEffect(() => {
+    // Reset to separated positions
+    tagAnim.setValue(0);
+    line1Anim.setValue(0);
+    line2Anim.setValue(0);
+    quoteAnim.setValue(0);
+
+    // Converge together smoothly
+    Animated.parallel([
+      Animated.timing(tagAnim, {
+        toValue: 1,
+        duration: 450,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(line1Anim, {
+        toValue: 1,
+        duration: 480,
+        easing: Easing.out(Easing.back(1.15)),
+        useNativeDriver: true,
+      }),
+      Animated.timing(line2Anim, {
+        toValue: 1,
+        duration: 480,
+        easing: Easing.out(Easing.back(1.15)),
+        useNativeDriver: true,
+      }),
+      Animated.sequence([
+        Animated.delay(120),
+        Animated.timing(quoteAnim, {
+          toValue: 1,
+          duration: 400,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+  }, [realIndex]);
 
   // ⏱ Autoplay
   useEffect(() => {
@@ -87,9 +171,9 @@ export default function Welcome() {
       {/* Overlay UI */}
       <View className="absolute inset-0 h-full justify-between">
         <LinearGradient
-          colors={['rgba(0,0,0,0)', '#000000']}
+          colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.5)', '#000000']}
           start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
+          end={{ x: 0, y: 1 }}
           style={{
             height: '100%',
             justifyContent: 'space-between',
@@ -106,7 +190,6 @@ export default function Welcome() {
             {/* Indicators */}
             <View className="mb-6 flex-row">
               {images.map((_, i) => {
-                const realIndex = index - 1;
                 return (
                   <View
                     key={i}
@@ -124,7 +207,82 @@ export default function Welcome() {
           </View>
 
           {/* Bottom CTA */}
-          <View className="pb-12">
+          <View className="pb-14">
+            {/* Stylish Converging Motivational Comment */}
+            <View className="mb-10">
+              {/* Tag Line from Left */}
+              <Animated.View
+                style={{
+                  opacity: tagAnim,
+                  transform: [
+                    {
+                      translateX: tagAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-35, 0],
+                      }),
+                    },
+                  ],
+                }}
+                className="flex-row items-center mb-2">
+                <View className="h-[2px] w-6 bg-primary mr-2 rounded-full" />
+                <Text className="font-sans font-bold text-xs uppercase tracking-widest text-primary">
+                  {currentMotivational.tag}
+                </Text>
+              </Animated.View>
+
+              {/* Title Lines: Line 1 from Left, Line 2 from Right -> Converge into One */}
+              <View>
+                <Animated.Text
+                  style={{
+                    opacity: line1Anim,
+                    transform: [
+                      {
+                        translateX: line1Anim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-45, 0],
+                        }),
+                      },
+                    ],
+                  }}
+                  className="font-sans text-[28px] font-extrabold leading-[34px] text-white">
+                  {currentMotivational.line1}
+                </Animated.Text>
+
+                <Animated.Text
+                  style={{
+                    opacity: line2Anim,
+                    transform: [
+                      {
+                        translateX: line2Anim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [45, 0],
+                        }),
+                      },
+                    ],
+                  }}
+                  className="font-sans text-[28px] font-extrabold leading-[34px] text-white">
+                  {currentMotivational.line2}
+                </Animated.Text>
+              </View>
+
+              {/* Quote from Bottom */}
+              <Animated.Text
+                style={{
+                  opacity: quoteAnim,
+                  transform: [
+                    {
+                      translateY: quoteAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [18, 0],
+                      }),
+                    },
+                  ],
+                }}
+                className="font-sans text-sm font-normal text-white/80 mt-2 leading-5">
+                {currentMotivational.quote}
+              </Animated.Text>
+            </View>
+
             <Pressable
               onPress={() => router.push('/auth/Login')}
               className="mb-4 rounded-2xl border border-primary bg-primary py-4">

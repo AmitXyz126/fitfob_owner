@@ -490,12 +490,12 @@ export default function CheckinsScreen() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Container style={{ backgroundColor: '#FAF9FC', overflow: 'hidden' }}>
         {/* HIGH-LEVEL ANIMATED BACKGROUND MESH & ORBS */}
-        <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
           {/* Orb 1: Top-Left Glowing Red Mesh Blob */}
           <Animated.View style={[styles.orb, styles.orb1, orb1Style]}>
             <LinearGradient
               colors={['rgba(246, 22, 60, 0.32)', 'rgba(255, 107, 129, 0.15)', 'rgba(255, 255, 255, 0)']}
-              style={StyleSheet.absoluteFillObject}
+              style={StyleSheet.absoluteFill}
             />
           </Animated.View>
 
@@ -503,7 +503,7 @@ export default function CheckinsScreen() {
           <Animated.View style={[styles.orb, styles.orb2, orb2Style]}>
             <LinearGradient
               colors={['rgba(139, 92, 246, 0.28)', 'rgba(236, 72, 153, 0.12)', 'rgba(255, 255, 255, 0)']}
-              style={StyleSheet.absoluteFillObject}
+              style={StyleSheet.absoluteFill}
             />
           </Animated.View>
 
@@ -511,7 +511,7 @@ export default function CheckinsScreen() {
           <Animated.View style={[styles.orb, styles.orb3, orb3Style]}>
             <LinearGradient
               colors={['rgba(56, 189, 248, 0.25)', 'rgba(246, 22, 60, 0.08)', 'rgba(255, 255, 255, 0)']}
-              style={StyleSheet.absoluteFillObject}
+              style={StyleSheet.absoluteFill}
             />
           </Animated.View>
 
@@ -519,7 +519,7 @@ export default function CheckinsScreen() {
           <Animated.View style={[styles.scannerAura, scannerAuraStyle]}>
             <LinearGradient
               colors={['rgba(246, 22, 60, 0.28)', 'rgba(251, 113, 133, 0.08)', 'transparent']}
-              style={StyleSheet.absoluteFillObject}
+              style={StyleSheet.absoluteFill}
             />
           </Animated.View>
         </View>
@@ -560,7 +560,7 @@ export default function CheckinsScreen() {
               {/* CAMERA SCANNER WRAPPER WITH RADAR SONAR WAVE RINGS */}
               <View className="relative items-center justify-center py-2 my-2">
                 {/* Concentric Pulsing Radar Sonar Waves */}
-                <View style={StyleSheet.absoluteFillObject} pointerEvents="none" className="items-center justify-center">
+                <View style={StyleSheet.absoluteFill} pointerEvents="none" className="items-center justify-center">
                   <Animated.View style={[styles.radarRing, radar1Style]} />
                   <Animated.View style={[styles.radarRing, radar2Style]} />
                   <Animated.View style={[styles.radarRing, radar3Style]} />
@@ -574,7 +574,7 @@ export default function CheckinsScreen() {
                       onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
                       barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
                       enableTorch={torch}
-                      style={StyleSheet.absoluteFillObject}
+                      style={StyleSheet.absoluteFill}
                     />
                   ) : (
                     <View className="items-center p-6">
@@ -604,7 +604,7 @@ export default function CheckinsScreen() {
 
                   {/* Scanner Target Frame with Pulsing Glowing Corners */}
                   {permission?.granted && (
-                    <View style={StyleSheet.absoluteFillObject} pointerEvents="none" className="items-center justify-center">
+                    <View style={StyleSheet.absoluteFill} pointerEvents="none" className="items-center justify-center">
                       <Animated.View style={[{ width: 180, height: 180, borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.25)' }, cornerStyle]}>
                         <View className="absolute -left-1 -top-1 h-7 w-7 rounded-tl-xl border-l-4 border-t-4 border-[#F6163C]" style={styles.cornerGlow} />
                         <View className="absolute -right-1 -top-1 h-7 w-7 rounded-tr-xl border-r-4 border-t-4 border-[#F6163C]" style={styles.cornerGlow} />

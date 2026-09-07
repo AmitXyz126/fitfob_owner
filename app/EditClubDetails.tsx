@@ -8,11 +8,9 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
-  Switch,
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Modal,
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,13 +18,11 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Button } from '@/components/Button';
 import { Container } from '@/components/Container';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useUserDetail, useClubOwnerMe } from '@/hooks/useUserDetail';
 import { userDetailsApi } from '@/api/userdetailsApi';
 import GymLoader from '@/components/GymLoader';
-import Toast from 'react-native-toast-message';
 
 const EditClubDetails = () => {
   const router = useRouter();
@@ -45,12 +41,6 @@ const EditClubDetails = () => {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [isVerified, setIsVerified] = useState(false);
-
-  // --- TIME & DAY STATES ---
-  const [weekdayRange, setWeekdayRange] = useState('Monday to Friday');
-  const [weekendRange, setWeekendRange] = useState('Saturday & Sunday');
-  const [startTime, setStartTime] = useState(new Date().setHours(5, 0));
-  const [endTime, setEndTime] = useState(new Date().setHours(22, 0));
 
   const extractUri = (val: any): string => {
     if (!val) return '';
@@ -71,45 +61,10 @@ const EditClubDetails = () => {
     return str;
   };
 
-  const parseTimeToTimestamp = (timeVal: any): number | null => {
-    if (!timeVal) return null;
-    if (typeof timeVal === 'number' && !isNaN(timeVal)) {
-      return timeVal;
-    }
-    const str = String(timeVal).trim();
-    if (!str) return null;
-
-    const ampmMatch = str.match(/(\d+):(\d+)\s*(AM|PM)/i);
-    if (ampmMatch) {
-      let hours = parseInt(ampmMatch[1], 10);
-      const minutes = parseInt(ampmMatch[2], 10);
-      const ampm = ampmMatch[3].toUpperCase();
-      if (ampm === 'PM' && hours < 12) hours += 12;
-      if (ampm === 'AM' && hours === 12) hours = 0;
-      const d = new Date();
-      d.setHours(hours, minutes, 0, 0);
-      return d.getTime();
-    }
-
-    const parts = str.split(':');
-    if (parts.length >= 2) {
-      const hours = parseInt(parts[0], 10);
-      const minutes = parseInt(parts[1], 10);
-      if (!isNaN(hours) && !isNaN(minutes)) {
-        const d = new Date();
-        d.setHours(hours, minutes, 0, 0);
-        return d.getTime();
-      }
-    }
-
-    return null;
-  };
-
   useEffect(() => {
     const populateForm = async () => {
       let savedClubProfile: any = null;
       let savedStep1: any = null;
-      let savedStep3: any = null;
       try {
         const json1 = await AsyncStorage.getItem('club_profile');
         if (json1) savedClubProfile = JSON.parse(json1);
@@ -122,13 +77,6 @@ const EditClubDetails = () => {
         if (step1Key) {
           const json2 = await AsyncStorage.getItem(step1Key);
           if (json2) savedStep1 = JSON.parse(json2);
-        }
-
-        const step3Keys = keys.filter((k) => k.includes('onboarding_step3_data') || k.includes('onboarding_step4'));
-        let step3Key = userKey ? step3Keys.find((k) => k.includes(String(userKey))) : null;
-        if (step3Key) {
-          const json3 = await AsyncStorage.getItem(step3Key);
-          if (json3) savedStep3 = JSON.parse(json3);
         }
       } catch (e) {
         console.log('AsyncStorage error:', e);
@@ -218,48 +166,11 @@ const EditClubDetails = () => {
 
       const logo = extractUri(rawLogo);
 
-      const wDay =
-        myOwnerData?.weekday ||
-        pData?.weekday ||
-        savedClubProfile?.weekday ||
-        savedStep3?.weekdayRange ||
-        savedStep3?.weekday ||
-        'Monday to Friday';
-      const wEnd =
-        myOwnerData?.weekend ||
-        pData?.weekend ||
-        savedClubProfile?.weekend ||
-        savedStep3?.weekendRange ||
-        savedStep3?.weekend ||
-        'Saturday & Sunday';
-
       if (cName) setClubName(cName);
       if (oName) setOwnerName(oName);
       if (pPhone) setPhone(String(pPhone));
       if (pEmail) setEmail(pEmail);
       if (logo) setClubImage(logo);
-      if (wDay) setWeekdayRange(wDay);
-      if (wEnd) setWeekendRange(wEnd);
-
-      const openT =
-        myOwnerData?.openingTime ||
-        pData?.openingTime ||
-        pData?.opening_time ||
-        savedClubProfile?.openingTime ||
-        savedStep3?.openingTime ||
-        savedStep3?.startTime;
-      const parsedOpen = parseTimeToTimestamp(openT);
-      if (parsedOpen) setStartTime(parsedOpen);
-
-      const closeT =
-        myOwnerData?.closingTime ||
-        pData?.closingTime ||
-        pData?.closing_time ||
-        savedClubProfile?.closingTime ||
-        savedStep3?.closingTime ||
-        savedStep3?.endTime;
-      const parsedClose = parseTimeToTimestamp(closeT);
-      if (parsedClose) setEndTime(parsedClose);
 
       if (myOwnerData?.id || pData?.status === 'completed' || pData?.isApprovedOwner) {
         setIsVerified(true);
@@ -268,30 +179,6 @@ const EditClubDetails = () => {
 
     populateForm();
   }, [profileStatus, myOwnerData, user]);
-
-  const [showPicker, setShowPicker] = useState<'start' | 'end' | null>(null);
-  const [showDayModal, setShowDayModal] = useState<'weekday' | 'weekend' | null>(null);
-
-  const weekdayOptions = ['Monday to Friday', 'Monday to Saturday', 'Monday to Sunday', 'Monday to Thursday'];
-  const weekendOptions = ['Saturday & Sunday', 'Sunday Only', 'Saturday Only', 'Closed'];
-
-  const formatTimeParts = (timeValue: any) => {
-    const date = new Date(timeValue);
-    let hours = date.getHours();
-    const minutes = date.getMinutes();
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12 || 12;
-    const strHours = hours < 10 ? `0${hours}` : hours;
-    const strMinutes = minutes < 10 ? `0${minutes}` : minutes;
-    return { time: `${strHours}:${strMinutes}`, ampm };
-  };
-
-  const formatTimeToApiStr = (ts: number): string => {
-    const d = new Date(ts);
-    const hours = String(d.getHours()).padStart(2, '0');
-    const minutes = String(d.getMinutes()).padStart(2, '0');
-    return `${hours}:${minutes}:00.000`;
-  };
 
   const handlePickImage = async () => {
     try {
@@ -323,8 +210,8 @@ const EditClubDetails = () => {
           const firstItem = Array.isArray(uploadRes)
             ? uploadRes[0]
             : uploadRes?.data && Array.isArray(uploadRes.data)
-            ? uploadRes.data[0]
-            : uploadRes;
+              ? uploadRes.data[0]
+              : uploadRes;
 
           if (firstItem && (firstItem.id || firstItem.documentId)) {
             setUploadedLogoId(firstItem.id || firstItem.documentId);
@@ -382,7 +269,7 @@ const EditClubDetails = () => {
         const json3 = await AsyncStorage.getItem(step3Key);
         if (json3) savedStep3 = JSON.parse(json3);
       }
-    } catch (e) {}
+    } catch (e) { }
 
     const existingLogoId =
       uploadedLogoId ||
@@ -471,11 +358,48 @@ const EditClubDetails = () => {
       phoneNumber: phone.trim(),
       email: email.trim(),
       clubName: clubName.trim(),
-      openingTime: formatTimeToApiStr(startTime),
-      closingTime: formatTimeToApiStr(endTime),
-      weekday: weekdayRange,
-      weekend: weekendRange,
     };
+
+    // Preserve existing scheduling/timings if present
+    const existingWeekdayScheduling =
+      myOwnerData?.weekdayScheduling ||
+      pData?.weekdayScheduling ||
+      user?.clubOwnerDetail?.weekdayScheduling ||
+      savedClubProfile?.weekdayScheduling ||
+      savedStep3?.weekdayScheduling;
+    if (existingWeekdayScheduling) payloadData.weekdayScheduling = existingWeekdayScheduling;
+
+    const existingOpeningTime =
+      myOwnerData?.openingTime ||
+      pData?.openingTime ||
+      user?.clubOwnerDetail?.openingTime ||
+      savedClubProfile?.openingTime ||
+      savedStep3?.openingTime;
+    if (existingOpeningTime) payloadData.openingTime = existingOpeningTime;
+
+    const existingClosingTime =
+      myOwnerData?.closingTime ||
+      pData?.closingTime ||
+      user?.clubOwnerDetail?.closingTime ||
+      savedClubProfile?.closingTime ||
+      savedStep3?.closingTime;
+    if (existingClosingTime) payloadData.closingTime = existingClosingTime;
+
+    const existingWeekday =
+      myOwnerData?.weekday ||
+      pData?.weekday ||
+      user?.clubOwnerDetail?.weekday ||
+      savedClubProfile?.weekday ||
+      savedStep3?.weekday;
+    if (existingWeekday) payloadData.weekday = existingWeekday;
+
+    const existingWeekend =
+      myOwnerData?.weekend ||
+      pData?.weekend ||
+      user?.clubOwnerDetail?.weekend ||
+      savedClubProfile?.weekend ||
+      savedStep3?.weekend;
+    if (existingWeekend) payloadData.weekend = existingWeekend;
 
     if (resolvedFacilities) payloadData.facilities = resolvedFacilities;
     if (resolvedServices) payloadData.services = resolvedServices;
@@ -509,10 +433,6 @@ const EditClubDetails = () => {
             ownerName: payloadData.ownerName,
             phoneNumber: payloadData.phoneNumber,
             email: payloadData.email,
-            openingTime: payloadData.openingTime,
-            closingTime: payloadData.closingTime,
-            weekday: payloadData.weekday,
-            weekend: payloadData.weekend,
             ...(newLogoUri ? { image: newLogoUri, logo: newLogoUri } : {}),
           };
           await AsyncStorage.setItem('club_profile', JSON.stringify(updated));
@@ -585,24 +505,24 @@ const EditClubDetails = () => {
             </TouchableOpacity>
           </View>
 
-          {/* FORM FIELDS - ALL SET TO h-14 */}
+          {/* FORM FIELDS */}
           <View className="px-1">
             <Text className="mb-2 ml-1 text-sm text-[#697281] leading-5 font-sans">Gym/ Club Name</Text>
             <TextInput
               value={clubName}
               onChangeText={setClubName}
-              className="mb-5 h-14 rounded-xl border border-slate-200 bg-white px-4 text-base text-slate-800 "
+              className="mb-5 h-14 rounded-xl border border-slate-200 bg-white px-4 text-base text-slate-800"
             />
 
             <Text className="mb-2 ml-1 text-sm text-[#697281] leading-5 font-sans">Owner's Name</Text>
             <TextInput
               value={ownerName}
               onChangeText={setOwnerName}
-              className="mb-5 h-14 rounded-xl border border-slate-200 bg-white px-4 text-base text-slate-800 "
+              className="mb-5 h-14 rounded-xl border border-slate-200 bg-white px-4 text-base text-slate-800"
             />
 
             <Text className="mb-2 ml-1 text-sm text-[#697281] leading-5 font-sans">Phone Number</Text>
-            <View className="mb-5 h-14 flex-row items-center rounded-xl border border-slate-200 bg-white px-3 ">
+            <View className="mb-5 h-14 flex-row items-center rounded-xl border border-slate-200 bg-white px-3">
               <Image source={{ uri: 'https://flagcdn.com/w40/in.png' }} className="mr-2 h-4 w-6 rounded-sm" />
               <Ionicons name="chevron-down" size={14} color="#64748B" />
               <View style={{ width: 1, height: '40%', backgroundColor: '#E2E8F0', marginHorizontal: 12 }} />
@@ -616,95 +536,28 @@ const EditClubDetails = () => {
               />
             </View>
 
-            <Text className="mb-2 ml-1 text-sm text-[#697281] leading-5 font-sans">Email Address</Text>
-            <TextInput
-              value={email}
-              keyboardType="email-address"
-              onChangeText={setEmail}
-              placeholder="Enter email address"
-              placeholderTextColor="#94A3B8"
-              className="mb-5 h-14 rounded-xl border border-slate-200 bg-white px-4 text-base text-slate-800"
-            />
-
-            {/* <View className="mb-8 flex-row items-center justify-between rounded-xl border border-slate-100 bg-white p-4 ">
-              <Text className="font-medium text-sm text-slate-500">Verification Status</Text>
-              <Switch
-                value={isVerified}
-                onValueChange={setIsVerified}
-                trackColor={{ false: '#E2E8F0', true: '#4ADE80' }}
-                thumbColor={'white'}
-              />
-            </View> */}
-
-            {/* TIMINGS SECTION */}
-            <Text className="mb-4 ml-1 font-bold text-xs uppercase  text-[]">Working Hours</Text>
-            <View className="mb-6 flex-row items-center justify-between gap-3">
-              <TouchableOpacity
-                onPress={() => setShowPicker(showPicker === 'start' ? null : 'start')}
-                className={`h-14 flex-1 flex-row items-center justify-between rounded-xl px-4 border ${showPicker === 'start' ? 'border-[#F6163C] bg-red-50' : 'border-slate-200 bg-white'} `}>
-                <Text className="font-bold text-base text-slate-900">{formatTimeParts(startTime).time}</Text>
-                <Text className="font-bold text-[10px] uppercase text-slate-400">{formatTimeParts(startTime).ampm}</Text>
-              </TouchableOpacity>
-
-              <Text className="font-bold text-xs italic text-slate-300">To</Text>
-
-              <TouchableOpacity
-                onPress={() => setShowPicker(showPicker === 'end' ? null : 'end')}
-                className={`h-14 flex-1 flex-row items-center justify-between rounded-xl px-4 border ${showPicker === 'end' ? 'border-[#F6163C] bg-red-50' : 'border-slate-200 bg-white'} `}>
-                <Text className="font-bold text-base text-slate-900">{formatTimeParts(endTime).time}</Text>
-                <Text className="font-bold text-[10px] uppercase text-slate-400">{formatTimeParts(endTime).ampm}</Text>
-              </TouchableOpacity>
-            </View>
-
-            {showPicker && (
-              <View className="mb-6 rounded-2xl border border-slate-100 bg-slate-50 p-2 ">
-                <View className="flex-row items-center justify-between px-4 py-2">
-                  <Text className="font-bold text-[10px] uppercase text-slate-400">Set {showPicker} Time</Text>
-                  {Platform.OS === 'ios' && (
-                    <TouchableOpacity onPress={() => setShowPicker(null)}>
-                      <Text className="font-bold text-[#F6163C]">Done</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-                <DateTimePicker
-                  value={new Date(showPicker === 'start' ? startTime : endTime)}
-                  mode="time"
-                  is24Hour={false}
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={(e, date) => {
-                    const currentPicker = showPicker;
-                    if (Platform.OS === 'android') setShowPicker(null);
-                    if (date && currentPicker) {
-                      currentPicker === 'start' ? setStartTime(date.getTime()) : setEndTime(date.getTime());
-                    }
-                  }}
-                  style={{ height: 120 }}
-                  textColor="#F6163C"
-                />
+            <View className="mb-2 ml-1 flex-row items-center justify-between">
+              <Text className="text-sm text-[#697281] leading-5 font-sans">Email Address</Text>
+              <View className="flex-row items-center">
+                <Ionicons name="lock-closed" size={12} color="#94A3B8" style={{ marginRight: 4 }} />
+                <Text className="text-[11px] font-medium text-slate-400">Non-editable</Text>
               </View>
-            )}
-
-            {/* DAY SELECTORS - Also h-14 */}
-            <Text className="mb-2 ml-1 text-sm text-[#697281] leading-5 font-sans">Weekdays Schedule</Text>
-            <TouchableOpacity
-              onPress={() => setShowDayModal('weekday')}
-              className="mb-5 h-14 flex-row items-center justify-between rounded-xl border border-slate-200 bg-white px-4 ">
-              <Text className="text-base text-slate-800">{weekdayRange}</Text>
-              <Ionicons name="chevron-down" size={20} color="#64748B" />
-            </TouchableOpacity>
-
-            <Text className="mb-2 ml-1 text-sm text-[#697281] leading-5 font-sans">Weekends Schedule</Text>
-            <TouchableOpacity
-              onPress={() => setShowDayModal('weekend')}
-              className="mb-10 h-14 flex-row items-center justify-between rounded-xl border border-slate-200 bg-white px-4 ">
-              <Text className="text-base text-slate-800">{weekendRange}</Text>
-              <Ionicons name="chevron-down" size={20} color="#64748B" />
-            </TouchableOpacity>
+            </View>
+            <View className="mb-8 h-14 flex-row items-center rounded-xl border border-slate-200 bg-slate-100 px-4">
+              <TextInput
+                value={email}
+                editable={false}
+                placeholder="Enter email address"
+                placeholderTextColor="#94A3B8"
+                className="flex-1 text-base text-slate-500"
+              />
+              <Ionicons name="lock-closed-outline" size={18} color="#94A3B8" />
+            </View>
           </View>
         </ScrollView>
 
         {/* BOTTOM BUTTONS */}
-        <View className="flex-row gap-3   bg-white px-6 py-4">
+        <View className="flex-row gap-3 bg-white px-6 py-4">
           <View className="flex-1">
             <Button
               title={isSaving || updateClubOwner.isPending ? 'Saving...' : 'Save Changes'}
@@ -724,30 +577,6 @@ const EditClubDetails = () => {
         </View>
 
       </KeyboardAvoidingView>
-
-      {/* --- DAY MODAL --- */}
-      <Modal visible={!!showDayModal} transparent animationType="slide">
-        <TouchableOpacity className="flex-1 justify-end bg-black/40" activeOpacity={1} onPress={() => setShowDayModal(null)}>
-          <View className="rounded-t-[32px] bg-white p-6 pb-12 shadow-2xl">
-            <View className="mb-6 h-1.5 w-12 self-center rounded-full bg-slate-200" />
-            <Text className="mb-6 text-center font-bold text-lg text-slate-800">Select Range</Text>
-            {(showDayModal === 'weekday' ? weekdayOptions : weekendOptions).map((option) => (
-              <TouchableOpacity
-                key={option}
-                onPress={() => {
-                  showDayModal === 'weekday' ? setWeekdayRange(option) : setWeekendRange(option);
-                  setShowDayModal(null);
-                }}
-                className="flex-row items-center justify-between border-b border-slate-50 py-4">
-                <Text className={`text-base ${(showDayModal === 'weekday' ? weekdayRange : weekendRange) === option ? 'font-bold text-[#F6163C]' : 'text-slate-700'}`}>
-                  {option}
-                </Text>
-                {(showDayModal === 'weekday' ? weekdayRange : weekendRange) === option && <Ionicons name="checkmark-circle" size={24} color="#F6163C" />}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </TouchableOpacity>
-      </Modal>
     </Container>
   );
 };
