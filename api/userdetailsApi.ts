@@ -232,6 +232,30 @@ export const userDetailsApi = {
 
     return response.data;
   },
+
+  verifyGovernmentDoc: async (fileData: any) => {
+    const formData = new FormData();
+
+    const fileToUpload = {
+      uri: fileData.uri,
+      name: fileData.name || 'document.jpg',
+      type: fileData.type || fileData.mimeType || 'image/jpeg',
+    };
+
+    formData.append('file', fileToUpload as any);
+
+    console.log('Verifying Govt Doc Payload:', fileToUpload.uri);
+
+    const response = await api.post(ENDPOINTS.VERIFY_GOVERNMENT_DOC, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        Accept: 'application/json',
+      },
+      transformRequest: (data) => data,
+    });
+
+    return response.data;
+  },
   // STEP 6: Confirm All Docs
   confirmGovtDocs: async () => {
     const response = await api.post(ENDPOINTS.Step_6, {});

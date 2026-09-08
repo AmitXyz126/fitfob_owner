@@ -140,6 +140,10 @@ export const useUserDetail = () => {
     },
   });
 
+  const verifyGovtDoc = useMutation({
+    mutationFn: (file: any) => userDetailsApi.verifyGovernmentDoc(file),
+  });
+
   const confirmDocs = useMutation({
     mutationFn: userDetailsApi.confirmGovtDocs,
     onSuccess: () => {
@@ -252,6 +256,7 @@ export const useUserDetail = () => {
     submitStep3,
     submitStep4,
     uploadDoc,
+    verifyGovtDoc,
     confirmDocs,
     submitStep7,
     updateClubOwner,

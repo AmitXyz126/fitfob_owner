@@ -34,10 +34,24 @@ const ensureDate = (val: any, defaultHour: number = 6): Date => {
     if (!isNaN(d.getTime())) return d;
   }
   if (typeof val === 'string') {
-    if (val.includes(':') && val.length <= 5) {
-      const [h, m] = val.split(':');
+    const clean = val.trim();
+    const ampmMatch = clean.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)/i);
+    if (ampmMatch) {
+      let hours = parseInt(ampmMatch[1], 10);
+      const minutes = parseInt(ampmMatch[2], 10);
+      const ampm = ampmMatch[3].toUpperCase();
+      if (ampm === 'PM' && hours < 12) hours += 12;
+      if (ampm === 'AM' && hours === 12) hours = 0;
       const d = new Date();
-      d.setHours(parseInt(h, 10) || 0, parseInt(m, 10) || 0, 0, 0);
+      d.setHours(hours, minutes, 0, 0);
+      return d;
+    }
+    const time24Match = clean.match(/^(\d{1,2}):(\d{2})/);
+    if (time24Match) {
+      const hours = parseInt(time24Match[1], 10);
+      const minutes = parseInt(time24Match[2], 10);
+      const d = new Date();
+      d.setHours(hours, minutes, 0, 0);
       return d;
     }
     const d = new Date(val);
@@ -46,6 +60,16 @@ const ensureDate = (val: any, defaultHour: number = 6): Date => {
   const fallback = new Date();
   fallback.setHours(defaultHour, 0, 0, 0);
   return fallback;
+};
+
+const formatTime12h = (timeInput: any, defaultHour: number = 6): string => {
+  const dateObj = ensureDate(timeInput, defaultHour);
+  let hours = dateObj.getHours();
+  const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  const strHours = String(hours).padStart(2, '0');
+  return `${strHours}:${minutes} ${ampm}`;
 };
 
 const createInitialDaySchedules = () => {
@@ -217,9 +241,38 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
     initData();
   }, [initialData, userData, isInitialized, STORAGE_KEY]);
 
+  const formatTime24h = (timeInput: any, defaultHour: number = 6) => {
+    const dateObj = ensureDate(timeInput, defaultHour);
+    const hours = String(dateObj.getHours()).padStart(2, '0');
+    const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
   // 2. Draft backup
   useEffect(() => {
     if (isInitialized) {
+      const openStr = formatTime24h(everydayOpenTime, 6);
+      const closeStr = formatTime24h(everydayCloseTime, 22);
+
+      let weekdayScheduling: Record<string, { openingTime: string; closingTime: string }> = {};
+      if (isEverydayMode) {
+        weekdayScheduling = {
+          everyday: {
+            openingTime: openStr,
+            closingTime: closeStr,
+          },
+        };
+      } else {
+        DAYS_CONFIG.forEach(({ key }) => {
+          if (daySchedules[key]?.isOpen) {
+            weekdayScheduling[key] = {
+              openingTime: formatTime24h(daySchedules[key].openTime, 6),
+              closingTime: formatTime24h(daySchedules[key].closeTime, 22),
+            };
+          }
+        });
+      }
+
       const draft = {
         clubCategory,
         fitnessTypes,
@@ -228,6 +281,9 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
         everydayOpenTime,
         everydayCloseTime,
         daySchedules,
+        weekdayScheduling,
+        openingTime: openStr,
+        closingTime: closeStr,
       };
       AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
     }
@@ -242,13 +298,6 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
     isInitialized,
     STORAGE_KEY,
   ]);
-
-  const formatTime24h = (timeInput: any, defaultHour: number = 6) => {
-    const dateObj = ensureDate(timeInput, defaultHour);
-    const hours = String(dateObj.getHours()).padStart(2, '0');
-    const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-    return `${hours}:${minutes}`;
-  };
 
   const formatTimeParts = (timeInput: any, defaultHour: number = 6) => {
     const dateObj = ensureDate(timeInput, defaultHour);
@@ -353,8 +402,8 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
       let defaultClosingTime = '22:00';
 
       if (isEverydayMode) {
-        const openStr = formatTime24h(everydayOpenTime, 6);
-        const closeStr = formatTime24h(everydayCloseTime, 22);
+        const openStr = formatTime12h(everydayOpenTime, 6);
+        const closeStr = formatTime12h(everydayCloseTime, 22);
         defaultOpeningTime = openStr;
         defaultClosingTime = closeStr;
         weekdayScheduling = {
@@ -372,16 +421,16 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
         DAYS_CONFIG.forEach(({ key }) => {
           if (daySchedules[key]?.isOpen) {
             weekdayScheduling[key] = {
-              openingTime: formatTime24h(daySchedules[key].openTime, 6),
-              closingTime: formatTime24h(daySchedules[key].closeTime, 22),
+              openingTime: formatTime12h(daySchedules[key].openTime, 6),
+              closingTime: formatTime12h(daySchedules[key].closeTime, 22),
             };
           }
         });
 
         const firstOpenDay = openDays[0]?.key;
         if (firstOpenDay && daySchedules[firstOpenDay]) {
-          defaultOpeningTime = formatTime24h(daySchedules[firstOpenDay].openTime, 6);
-          defaultClosingTime = formatTime24h(daySchedules[firstOpenDay].closeTime, 22);
+          defaultOpeningTime = formatTime12h(daySchedules[firstOpenDay].openTime, 6);
+          defaultClosingTime = formatTime12h(daySchedules[firstOpenDay].closeTime, 22);
         }
       }
 
@@ -396,6 +445,39 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
 
       try {
         await submitStep4.mutateAsync(payload);
+
+        try {
+          const serializedDaySchedules: Record<string, { isOpen: boolean; openTime: string; closeTime: string }> = {};
+          DAYS_CONFIG.forEach(({ key }) => {
+            const item = daySchedules[key];
+            serializedDaySchedules[key] = {
+              isOpen: isEverydayMode ? true : Boolean(item?.isOpen),
+              openTime: formatTime12h(isEverydayMode ? everydayOpenTime : item?.openTime, 6),
+              closeTime: formatTime12h(isEverydayMode ? everydayCloseTime : item?.closeTime, 22),
+            };
+          });
+
+          const savedClub = await AsyncStorage.getItem('club_profile');
+          const parsedClub = savedClub ? JSON.parse(savedClub) : {};
+          const updatedClub = {
+            ...parsedClub,
+            services: fitnessTypes,
+            facilities: amenities,
+            amenities,
+            clubCategory,
+            weekdayScheduling,
+            openingTime: defaultOpeningTime,
+            closingTime: defaultClosingTime,
+            isEverydayMode,
+            everydayOpenTime: defaultOpeningTime,
+            everydayCloseTime: defaultClosingTime,
+            daySchedules: serializedDaySchedules,
+          };
+          await AsyncStorage.setItem('club_profile', JSON.stringify(updatedClub));
+        } catch (storageErr) {
+          console.error('Failed to sync club_profile from OnBoarding3:', storageErr);
+        }
+
         if (props.onNext) props.onNext();
       } catch (err: any) {
         console.error('Error submitting step 4:', err);

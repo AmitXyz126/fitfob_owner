@@ -15,6 +15,8 @@ import { Container } from '@/components/Container';
 import { Button } from '@/components/Button';
 import GymLoader from '@/components/GymLoader';
 import { useUserDetail, useClubOwnerMe } from '@/hooks/useUserDetail';
+import { useAuthStore } from '@/store/useAuthStore';
+import { useQueryClient } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CustomTimePickerModal } from '@/components/CustomTimePickerModal';
 import Toast from 'react-native-toast-message';
@@ -31,8 +33,12 @@ const DAYS_CONFIG = [
 
 export default function ClubTimingsScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { user } = useAuthStore();
+  const userKey = user?.id || user?.email || 'guest';
   const { profileStatus, updateClubOwner } = useUserDetail();
   const { data: myOwnerData } = useClubOwnerMe();
+  const hasLoadedRef = useRef(false);
 
   // --- CLOCK ANIMATION VALUES ---
   const secondValue = useRef(new Animated.Value(0)).current;
@@ -82,14 +88,20 @@ export default function ClubTimingsScreen() {
   });
 
   // --- TIME HELPERS ---
-  const parseTimeStringToDate = (timeStr?: string, defaultHour: number = 6) => {
+  const parseTimeStringToDate = (timeStr?: any, defaultHour: number = 6): Date => {
     const d = new Date();
     if (!timeStr) {
       d.setHours(defaultHour, 0, 0, 0);
       return d;
     }
+    if (timeStr instanceof Date && !isNaN(timeStr.getTime())) {
+      return new Date(timeStr.getTime());
+    }
+
     const clean = String(timeStr).trim();
-    const ampmMatch = clean.match(/(\d+):(\d+)\s*(AM|PM)/i);
+
+    // 1. "06:00 AM", "6:30 PM", "10:00:00 PM"
+    const ampmMatch = clean.match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)/i);
     if (ampmMatch) {
       let hours = parseInt(ampmMatch[1], 10);
       const minutes = parseInt(ampmMatch[2], 10);
@@ -99,34 +111,59 @@ export default function ClubTimingsScreen() {
       d.setHours(hours, minutes, 0, 0);
       return d;
     }
-    const parts = clean.split(':');
-    if (parts.length >= 2) {
-      const hours = parseInt(parts[0], 10);
-      const minutes = parseInt(parts[1], 10);
+
+    // 2. ISO timestamp containing 'T': e.g. "2026-09-08T06:30:00" or Date string
+    if (clean.includes('T')) {
+      const parsedIso = new Date(clean);
+      if (!isNaN(parsedIso.getTime())) {
+        d.setHours(parsedIso.getHours(), parsedIso.getMinutes(), 0, 0);
+        return d;
+      }
+      const isoTimeMatch = clean.match(/T(\d{1,2}):(\d{2})/);
+      if (isoTimeMatch) {
+        d.setHours(parseInt(isoTimeMatch[1], 10), parseInt(isoTimeMatch[2], 10), 0, 0);
+        return d;
+      }
+    }
+
+    // 3. 24-hour time format: "06:00", "06:00:00", "22:30", "7:45"
+    const time24Match = clean.match(/^(\d{1,2}):(\d{2})/);
+    if (time24Match) {
+      const hours = parseInt(time24Match[1], 10);
+      const minutes = parseInt(time24Match[2], 10);
       if (!isNaN(hours) && !isNaN(minutes)) {
         d.setHours(hours, minutes, 0, 0);
         return d;
       }
     }
+
     d.setHours(defaultHour, 0, 0, 0);
     return d;
   };
 
   const ensureDate = (val: any, defaultHour: number = 6): Date => {
-    if (val instanceof Date && !isNaN(val.getTime())) return val;
-    if (typeof val === 'number') {
-      const d = new Date(val);
-      if (!isNaN(d.getTime())) return d;
-    }
-    if (typeof val === 'string') {
-      return parseTimeStringToDate(val, defaultHour);
-    }
-    const fallback = new Date();
-    fallback.setHours(defaultHour, 0, 0, 0);
-    return fallback;
+    return parseTimeStringToDate(val, defaultHour);
+  };
+
+  const formatTime12h = (timeInput: any, defaultHour: number = 6): string => {
+    const dateObj = ensureDate(timeInput, defaultHour);
+    let hours = dateObj.getHours();
+    const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12;
+    const strHours = String(hours).padStart(2, '0');
+    return `${strHours}:${minutes} ${ampm}`;
   };
 
   const formatTime24h = (timeInput: any, defaultHour: number = 6) => {
+    if (typeof timeInput === 'string') {
+      const clean = timeInput.trim();
+      const time24Match = clean.match(/^(\d{1,2}):(\d{2})$/);
+      if (time24Match) {
+        const h = String(parseInt(time24Match[1], 10)).padStart(2, '0');
+        return `${h}:${time24Match[2]}`;
+      }
+    }
     const dateObj = ensureDate(timeInput, defaultHour);
     const hours = String(dateObj.getHours()).padStart(2, '0');
     const minutes = String(dateObj.getMinutes()).padStart(2, '0');
@@ -173,6 +210,8 @@ export default function ClubTimingsScreen() {
 
   // --- LOAD INITIAL DATA ---
   useEffect(() => {
+    if (hasLoadedRef.current) return;
+
     const loadData = async () => {
       let savedClubProfile: any = null;
       let savedStep3: any = null;
@@ -182,9 +221,21 @@ export default function ClubTimingsScreen() {
         if (json1) savedClubProfile = JSON.parse(json1);
 
         const keys = await AsyncStorage.getAllKeys();
-        const step3Key = keys.find((k) => k.includes('onboarding_step3_data'));
-        if (step3Key) {
-          const json3 = await AsyncStorage.getItem(step3Key);
+        const pId = profileStatus?.id || profileStatus?.pendingClubOwnerId || user?.id || user?.email;
+        const userSpecificStep3Key = pId ? `@onboarding_step3_data_${pId}` : null;
+
+        let foundStep3Key = null;
+        if (userSpecificStep3Key && keys.includes(userSpecificStep3Key)) {
+          foundStep3Key = userSpecificStep3Key;
+        } else {
+          const step3Keys = keys.filter((k) => k.includes('onboarding_step3_data'));
+          if (step3Keys.length > 0) {
+            foundStep3Key = step3Keys[step3Keys.length - 1];
+          }
+        }
+
+        if (foundStep3Key) {
+          const json3 = await AsyncStorage.getItem(foundStep3Key);
           if (json3) savedStep3 = JSON.parse(json3);
         }
 
@@ -197,34 +248,92 @@ export default function ClubTimingsScreen() {
         console.log('Error reading storage in clubTimings:', e);
       }
 
+      // 1. If savedClubProfile already has local daySchedules, use that directly
+      const preferredProfile = savedClubProfile?.daySchedules
+        ? savedClubProfile
+        : savedStep3?.daySchedules
+        ? savedStep3
+        : null;
+
+      if (preferredProfile?.daySchedules) {
+        const isEveryday = Boolean(preferredProfile.isEverydayMode);
+        setIsEverydayMode(isEveryday);
+        if (preferredProfile.everydayOpenTime) {
+          setEverydayOpenTime(parseTimeStringToDate(preferredProfile.everydayOpenTime, 6));
+        }
+        if (preferredProfile.everydayCloseTime) {
+          setEverydayCloseTime(parseTimeStringToDate(preferredProfile.everydayCloseTime, 22));
+        }
+
+        const restored: Record<string, { isOpen: boolean; openTime: Date; closeTime: Date }> = {};
+        DAYS_CONFIG.forEach(({ key }) => {
+          const item = preferredProfile.daySchedules[key];
+          if (item) {
+            restored[key] = {
+              isOpen: Boolean(item.isOpen),
+              openTime: parseTimeStringToDate(item.openTime, 6),
+              closeTime: parseTimeStringToDate(item.closeTime, 22),
+            };
+          } else {
+            restored[key] = {
+              isOpen: false,
+              openTime: parseTimeStringToDate(undefined, 6),
+              closeTime: parseTimeStringToDate(undefined, 22),
+            };
+          }
+        });
+        setDaySchedules(restored);
+        hasLoadedRef.current = true;
+        setIsLoaded(true);
+        return;
+      }
+
       const pData = profileStatus?.data || profileStatus || {};
 
-      const scheduling =
-        myOwnerData?.weekdayScheduling ||
-        pData?.weekdayScheduling ||
-        pData?.scheduling ||
+      let scheduling: any =
         savedClubProfile?.weekdayScheduling ||
         savedStep3?.weekdayScheduling ||
+        myOwnerData?.weekdayScheduling ||
+        myOwnerData?.weekday_scheduling ||
+        pData?.weekdayScheduling ||
+        pData?.weekday_scheduling ||
+        pData?.scheduling ||
+        pData?.pendingClubOwner?.weekdayScheduling ||
+        pData?.clubOwnerDetail?.weekdayScheduling ||
         savedStep4?.weekdayScheduling;
 
+      if (typeof scheduling === 'string') {
+        try {
+          scheduling = JSON.parse(scheduling);
+        } catch (e) {
+          // ignore
+        }
+      }
+
       const rawOpen =
+        savedClubProfile?.everydayOpenTime ||
+        savedClubProfile?.openingTime ||
+        savedStep3?.everydayOpenTime ||
+        savedStep3?.openingTime ||
         myOwnerData?.openingTime ||
+        myOwnerData?.opening_time ||
         pData?.openingTime ||
         pData?.opening_time ||
-        savedClubProfile?.openingTime ||
-        savedStep3?.startTime ||
-        savedStep3?.openingTime ||
-        savedStep4?.startTime ||
+        pData?.pendingClubOwner?.openingTime ||
+        pData?.clubOwnerDetail?.openingTime ||
         savedStep4?.openingTime;
 
       const rawClose =
+        savedClubProfile?.everydayCloseTime ||
+        savedClubProfile?.closingTime ||
+        savedStep3?.everydayCloseTime ||
+        savedStep3?.closingTime ||
         myOwnerData?.closingTime ||
+        myOwnerData?.closing_time ||
         pData?.closingTime ||
         pData?.closing_time ||
-        savedClubProfile?.closingTime ||
-        savedStep3?.endTime ||
-        savedStep3?.closingTime ||
-        savedStep4?.endTime ||
+        pData?.pendingClubOwner?.closingTime ||
+        pData?.clubOwnerDetail?.closingTime ||
         savedStep4?.closingTime;
 
       if (scheduling && typeof scheduling === 'object') {
@@ -265,6 +374,9 @@ export default function ClubTimingsScreen() {
             if (firstDay) {
               setEverydayOpenTime(parseTimeStringToDate(firstDay.openingTime, 6));
               setEverydayCloseTime(parseTimeStringToDate(firstDay.closingTime, 22));
+            } else if (savedStep3?.everydayOpenTime) {
+              setEverydayOpenTime(parseTimeStringToDate(savedStep3.everydayOpenTime, 6));
+              setEverydayCloseTime(parseTimeStringToDate(savedStep3.everydayCloseTime, 22));
             }
           }
 
@@ -301,11 +413,98 @@ export default function ClubTimingsScreen() {
         setDaySchedules(restored);
       }
 
+      hasLoadedRef.current = true;
       setIsLoaded(true);
     };
 
     loadData();
-  }, [profileStatus, myOwnerData]);
+  }, [profileStatus, myOwnerData, user]);
+
+  // Auto-persist timing changes immediately to local storage
+  useEffect(() => {
+    if (!isLoaded) return;
+    const autoSaveDraft = async () => {
+      try {
+        let weekdaySchedulingPayload: any = {};
+        const openTimeStr = formatTime12h(everydayOpenTime, 6);
+        const closeTimeStr = formatTime12h(everydayCloseTime, 22);
+
+        if (isEverydayMode) {
+          weekdaySchedulingPayload = {
+            everyday: {
+              openingTime: openTimeStr,
+              closingTime: closeTimeStr,
+            },
+          };
+        } else {
+          DAYS_CONFIG.forEach(({ key }) => {
+            if (daySchedules[key]?.isOpen) {
+              weekdaySchedulingPayload[key] = {
+                openingTime: formatTime12h(daySchedules[key].openTime, 6),
+                closingTime: formatTime12h(daySchedules[key].closeTime, 22),
+              };
+            }
+          });
+        }
+
+        const serializedDaySchedules: Record<string, { isOpen: boolean; openTime: string; closeTime: string }> = {};
+        DAYS_CONFIG.forEach(({ key }) => {
+          const item = daySchedules[key];
+          serializedDaySchedules[key] = {
+            isOpen: isEverydayMode ? true : Boolean(item?.isOpen),
+            openTime: formatTime12h(isEverydayMode ? everydayOpenTime : item?.openTime, 6),
+            closeTime: formatTime12h(isEverydayMode ? everydayCloseTime : item?.closeTime, 22),
+          };
+        });
+
+        const existing = await AsyncStorage.getItem('club_profile');
+        const parsed = existing ? JSON.parse(existing) : {};
+        const updated = {
+          ...parsed,
+          weekdayScheduling: weekdaySchedulingPayload,
+          isEverydayMode,
+          everydayOpenTime: openTimeStr,
+          everydayCloseTime: closeTimeStr,
+          openingTime: openTimeStr,
+          closingTime: closeTimeStr,
+          daySchedules: serializedDaySchedules,
+        };
+        await AsyncStorage.setItem('club_profile', JSON.stringify(updated));
+
+        const keys = await AsyncStorage.getAllKeys();
+        const pId = profileStatus?.id || profileStatus?.pendingClubOwnerId || user?.id || user?.email;
+        const userSpecificStep3Key = pId ? `@onboarding_step3_data_${pId}` : null;
+        const step3Keys = keys.filter((k) => k.includes('onboarding_step3_data'));
+        const targetKeys = new Set<string>();
+        if (userSpecificStep3Key) targetKeys.add(userSpecificStep3Key);
+        step3Keys.forEach((k) => targetKeys.add(k));
+
+        for (const key of targetKeys) {
+          try {
+            const raw3 = await AsyncStorage.getItem(key);
+            const p3 = raw3 ? JSON.parse(raw3) : {};
+            await AsyncStorage.setItem(
+              key,
+              JSON.stringify({
+                ...p3,
+                weekdayScheduling: weekdaySchedulingPayload,
+                isEverydayMode,
+                everydayOpenTime: openTimeStr,
+                everydayCloseTime: closeTimeStr,
+                openingTime: openTimeStr,
+                closingTime: closeTimeStr,
+                daySchedules: serializedDaySchedules,
+              })
+            );
+          } catch {}
+        }
+      } catch (e) {
+        console.log('Error auto-saving timing draft:', e);
+      }
+    };
+
+    autoSaveDraft();
+  }, [daySchedules, isEverydayMode, everydayOpenTime, everydayCloseTime, isLoaded]);
 
   // --- ACTIONS ---
   const toggleEverydayMode = (enabled: boolean) => {
@@ -327,7 +526,22 @@ export default function ClubTimingsScreen() {
   };
 
   const toggleDayOpen = (dayKey: string) => {
-    if (isEverydayMode) return;
+    if (isEverydayMode) {
+      setIsEverydayMode(false);
+      setDaySchedules((prev) => {
+        const next: Record<string, { isOpen: boolean; openTime: Date; closeTime: Date }> = {};
+        DAYS_CONFIG.forEach(({ key }) => {
+          next[key] = {
+            isOpen: key === dayKey ? false : true,
+            openTime: prev[key]?.openTime || everydayOpenTime,
+            closeTime: prev[key]?.closeTime || everydayCloseTime,
+          };
+        });
+        return next;
+      });
+      return;
+    }
+
     setDaySchedules((prev) => {
       const current = prev[dayKey] || {
         isOpen: true,
@@ -393,8 +607,8 @@ export default function ClubTimingsScreen() {
     let weekendStr = 'Saturday & Sunday';
 
     if (isEverydayMode) {
-      openTimeStr = formatTime24h(everydayOpenTime, 6);
-      closeTimeStr = formatTime24h(everydayCloseTime, 22);
+      openTimeStr = formatTime12h(everydayOpenTime, 6);
+      closeTimeStr = formatTime12h(everydayCloseTime, 22);
 
       weekdaySchedulingPayload = {
         everyday: {
@@ -414,14 +628,14 @@ export default function ClubTimingsScreen() {
 
       activeDays.forEach(({ key }) => {
         weekdaySchedulingPayload[key] = {
-          openingTime: formatTime24h(daySchedules[key].openTime, 6),
-          closingTime: formatTime24h(daySchedules[key].closeTime, 22),
+          openingTime: formatTime12h(daySchedules[key].openTime, 6),
+          closingTime: formatTime12h(daySchedules[key].closeTime, 22),
         };
       });
 
       const firstActive = activeDays[0];
-      openTimeStr = formatTime24h(daySchedules[firstActive.key].openTime, 6);
-      closeTimeStr = formatTime24h(daySchedules[firstActive.key].closeTime, 22);
+      openTimeStr = formatTime12h(daySchedules[firstActive.key].openTime, 6);
+      closeTimeStr = formatTime12h(daySchedules[firstActive.key].closeTime, 22);
 
       const isMonToFri =
         ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].every((d) => daySchedules[d]?.isOpen) &&
@@ -448,10 +662,6 @@ export default function ClubTimingsScreen() {
 
     const payload: any = {
       weekdayScheduling: weekdaySchedulingPayload,
-      openingTime: `${openTimeStr}:00.000`,
-      closingTime: `${closeTimeStr}:00.000`,
-      weekday: weekdayStr,
-      weekend: weekendStr,
     };
 
     setIsSaving(true);
@@ -461,37 +671,100 @@ export default function ClubTimingsScreen() {
       onSuccess: async () => {
         setIsSaving(false);
         try {
+          const serializedDaySchedules: Record<string, { isOpen: boolean; openTime: string; closeTime: string }> = {};
+          DAYS_CONFIG.forEach(({ key }) => {
+            const item = daySchedules[key];
+            serializedDaySchedules[key] = {
+              isOpen: isEverydayMode ? true : Boolean(item?.isOpen),
+              openTime: formatTime12h(isEverydayMode ? everydayOpenTime : item?.openTime, 6),
+              closeTime: formatTime12h(isEverydayMode ? everydayCloseTime : item?.closeTime, 22),
+            };
+          });
+
           // Update AsyncStorage club_profile
           const existing = await AsyncStorage.getItem('club_profile');
           const parsed = existing ? JSON.parse(existing) : {};
           const updated = {
             ...parsed,
             weekdayScheduling: weekdaySchedulingPayload,
-            openingTime: payload.openingTime,
-            closingTime: payload.closingTime,
-            weekday: weekdayStr,
-            weekend: weekendStr,
+            isEverydayMode,
+            everydayOpenTime: openTimeStr,
+            everydayCloseTime: closeTimeStr,
+            openingTime: openTimeStr,
+            closingTime: closeTimeStr,
+            daySchedules: serializedDaySchedules,
           };
           await AsyncStorage.setItem('club_profile', JSON.stringify(updated));
 
+          // Also update cached club_owner_me in AsyncStorage
+          const cachedOwnerMeStr = await AsyncStorage.getItem('club_owner_me');
+          if (cachedOwnerMeStr) {
+            try {
+              const parsedOwnerMe = JSON.parse(cachedOwnerMeStr);
+              await AsyncStorage.setItem(
+                'club_owner_me',
+                JSON.stringify({
+                  ...parsedOwnerMe,
+                  weekdayScheduling: weekdaySchedulingPayload,
+                  openingTime: openTimeStr,
+                  closingTime: closeTimeStr,
+                })
+              );
+            } catch {}
+          }
+
+          // Immediately update React Query cache so previous screen (clubProfile) reflects new data synchronously
+          queryClient.setQueryData(['my-club-owner-me', userKey], (old: any) => {
+            if (!old) return old;
+            return {
+              ...old,
+              weekdayScheduling: weekdaySchedulingPayload,
+              openingTime: openTimeStr,
+              closingTime: closeTimeStr,
+            };
+          });
+          queryClient.setQueryData(['club-owner-me', userKey], (old: any) => {
+            if (!old) return old;
+            return {
+              ...old,
+              weekdayScheduling: weekdaySchedulingPayload,
+              openingTime: openTimeStr,
+              closingTime: closeTimeStr,
+            };
+          });
+
+          // Invalidate queries in background
+          queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
+          queryClient.invalidateQueries({ queryKey: ['my-club-owner-me'] });
+
           // Also update draft steps if present
           const keys = await AsyncStorage.getAllKeys();
-          const step3Key = keys.find((k) => k.includes('onboarding_step3_data'));
-          if (step3Key) {
-            const raw3 = await AsyncStorage.getItem(step3Key);
-            if (raw3) {
-              const p3 = JSON.parse(raw3);
+          const pId = profileStatus?.id || profileStatus?.pendingClubOwnerId || user?.id || user?.email;
+          const userSpecificStep3Key = pId ? `@onboarding_step3_data_${pId}` : null;
+          const step3Keys = keys.filter((k) => k.includes('onboarding_step3_data'));
+          const targetKeys = new Set<string>();
+          if (userSpecificStep3Key) targetKeys.add(userSpecificStep3Key);
+          step3Keys.forEach((k) => targetKeys.add(k));
+
+          for (const key of targetKeys) {
+            try {
+              const raw3 = await AsyncStorage.getItem(key);
+              const p3 = raw3 ? JSON.parse(raw3) : {};
               await AsyncStorage.setItem(
-                step3Key,
+                key,
                 JSON.stringify({
                   ...p3,
                   weekdayScheduling: weekdaySchedulingPayload,
                   isEverydayMode,
-                  everydayOpenTime,
-                  everydayCloseTime,
-                  daySchedules,
+                  everydayOpenTime: openTimeStr,
+                  everydayCloseTime: closeTimeStr,
+                  openingTime: openTimeStr,
+                  closingTime: closeTimeStr,
+                  daySchedules: serializedDaySchedules,
                 })
               );
+            } catch {
+              // ignore per-key error
             }
           }
         } catch (e) {
@@ -792,18 +1065,15 @@ export default function ClubTimingsScreen() {
                 {/* Day Column + Toggle */}
                 <View className="w-[38%] shrink-0 flex-row items-center">
                   <Switch
-                    value={isEverydayMode ? true : dayData.isOpen}
-                    disabled={isEverydayMode}
+                    value={isEverydayMode ? true : Boolean(dayData.isOpen)}
                     onValueChange={() => toggleDayOpen(key)}
                     trackColor={{ false: '#CBD5E1', true: '#F6163C' }}
                     thumbColor="#FFFFFF"
                     ios_backgroundColor="#CBD5E1"
-                    style={{ opacity: isEverydayMode ? 0.6 : 1 }}
                   />
                   <TouchableOpacity
                     onPress={() => toggleDayOpen(key)}
-                    disabled={isEverydayMode}
-                    activeOpacity={isEverydayMode ? 1 : 0.7}
+                    activeOpacity={0.7}
                     className="flex-1 shrink ml-2">
                     <Text
                       numberOfLines={1}

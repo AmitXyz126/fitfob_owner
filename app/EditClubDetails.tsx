@@ -362,44 +362,12 @@ const EditClubDetails = () => {
 
     // Preserve existing scheduling/timings if present
     const existingWeekdayScheduling =
+      savedClubProfile?.weekdayScheduling ||
       myOwnerData?.weekdayScheduling ||
       pData?.weekdayScheduling ||
       user?.clubOwnerDetail?.weekdayScheduling ||
-      savedClubProfile?.weekdayScheduling ||
       savedStep3?.weekdayScheduling;
     if (existingWeekdayScheduling) payloadData.weekdayScheduling = existingWeekdayScheduling;
-
-    const existingOpeningTime =
-      myOwnerData?.openingTime ||
-      pData?.openingTime ||
-      user?.clubOwnerDetail?.openingTime ||
-      savedClubProfile?.openingTime ||
-      savedStep3?.openingTime;
-    if (existingOpeningTime) payloadData.openingTime = existingOpeningTime;
-
-    const existingClosingTime =
-      myOwnerData?.closingTime ||
-      pData?.closingTime ||
-      user?.clubOwnerDetail?.closingTime ||
-      savedClubProfile?.closingTime ||
-      savedStep3?.closingTime;
-    if (existingClosingTime) payloadData.closingTime = existingClosingTime;
-
-    const existingWeekday =
-      myOwnerData?.weekday ||
-      pData?.weekday ||
-      user?.clubOwnerDetail?.weekday ||
-      savedClubProfile?.weekday ||
-      savedStep3?.weekday;
-    if (existingWeekday) payloadData.weekday = existingWeekday;
-
-    const existingWeekend =
-      myOwnerData?.weekend ||
-      pData?.weekend ||
-      user?.clubOwnerDetail?.weekend ||
-      savedClubProfile?.weekend ||
-      savedStep3?.weekend;
-    if (existingWeekend) payloadData.weekend = existingWeekend;
 
     if (resolvedFacilities) payloadData.facilities = resolvedFacilities;
     if (resolvedServices) payloadData.services = resolvedServices;

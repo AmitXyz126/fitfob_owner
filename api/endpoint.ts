@@ -22,6 +22,7 @@ export const ENDPOINTS = {
   STEP_3: `${BASE_URL}/api/pending-club-owner/address-details`,
   STEP_4: `${BASE_URL}/api/pending-club-owner/configure-club`,
   Step_5: `${BASE_URL}/api/pending-club-owner/upload-government-doc`,
+  VERIFY_GOVERNMENT_DOC: `${BASE_URL}/api/pending-club-owner/verify-government-doc`,
   Step_6: `${BASE_URL}/api/pending-club-owner/confirm-government-docs`,
   Get: `${BASE_URL}/api/pending-club-owner/documents`,
   STEP_7: `${BASE_URL}/api/pending-club-owner/upload-club-photos`,

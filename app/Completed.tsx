@@ -97,9 +97,14 @@ const FitFobTickBadge = () => {
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.gradientBadge}>
-          {/* Inner subtle glow ring */}
+          {/* Inner subtle glow ring with Gym Barbell + Verified Badge */}
           <View style={styles.innerGlowRing}>
-            <Ionicons name="checkmark" size={68} color="#FFFFFF" />
+            <View style={styles.iconCenterWrapper}>
+              <Ionicons name="barbell" size={54} color="#FFFFFF" />
+              <View style={styles.miniVerifyBadge}>
+                <Ionicons name="checkmark-sharp" size={13} color="#FFFFFF" />
+              </View>
+            </View>
           </View>
         </LinearGradient>
       </Animated.View>
@@ -129,63 +134,88 @@ const Completed = () => {
           <FitFobTickBadge />
 
           {/* Tag Pill */}
-          <View className="mb-3 flex-row items-center rounded-full border border-red-200 bg-red-50 px-3.5 py-1">
+          <View className="mb-3 flex-row items-center rounded-lg border border-red-200 bg-red-50 px-3.5 py-1">
             <Ionicons name="shield-checkmark" size={14} color="#F6163C" style={{ marginRight: 5 }} />
-            <Text className="font-bold text-[11px] uppercase tracking-wider text-[#F6163C]">
+            <Text className="font-bold text-[10px] uppercase tracking-wider text-[#F6163C]">
               Onboarding Complete
             </Text>
           </View>
 
           {/* Heading */}
-          <Text className="text-center font-bold text-[30px] leading-10 text-slate-900">
-            You're All Set! 🎉
-          </Text>
+          {/* <Text className="text-center font-bold text-[26px] leading-10 text-slate-900 mt-4">
+            Congratulations 🎉
+          </Text> */}
 
           {/* Subtitle */}
-          <Text className="mt-2 text-center text-sm leading-6 text-slate-500 max-w-[320px]">
+          {/* <Text className="mt-2 text-center text-sm leading-6 text-slate-500 max-w-[320px]">
             Your club details, timings schedule, and documents have been successfully submitted for review.
-          </Text>
+          </Text> */}
 
           {/* Summary Checklist Card */}
           <View className="mt-8 w-full rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
-            <Text className="mb-3 font-bold text-[13px] uppercase tracking-wider text-slate-400">
+            <Text className="mb-3 font-bold text-[13px]  tracking-wider text-slate-400">
               Completed Steps
             </Text>
 
-            {/* Checklist Item 1 */}
-            <View className="flex-row items-center py-2">
-              <View className="mr-3 h-7 w-7 items-center justify-center rounded-full bg-red-100/80">
-                <Ionicons name="checkmark-sharp" size={16} color="#F6163C" />
+            {/* Checklist Item 1: Gym / Club Info */}
+            <View className="flex-row items-center py-2.5">
+              <View className="mr-3.5 h-10 w-10 items-center justify-center rounded-2xl bg-red-50 border border-red-100/80">
+                <Ionicons name="barbell-outline" size={20} color="#F6163C" />
               </View>
               <View className="flex-1">
-                <Text className="font-bold text-[14px] text-slate-800">Basic & Club Info</Text>
-                <Text className="text-[12px] text-slate-500">Contact details and location verified</Text>
+                <Text className="font-bold text-[14px] text-slate-800">Basic & Gym Details</Text>
+                <Text className="text-[12px] text-slate-500">Club name, type & location verified</Text>
+              </View>
+              <View className="h-6 w-6 items-center justify-center rounded-full bg-emerald-50 border border-emerald-200">
+                <Ionicons name="checkmark" size={14} color="#10B981" />
               </View>
             </View>
 
-            <View className="my-1 h-[1px] bg-slate-200/60" />
+            <View className="my-0.5 h-[1px] bg-slate-200/50" />
 
-            {/* Checklist Item 2 */}
-            <View className="flex-row items-center py-2">
-              <View className="mr-3 h-7 w-7 items-center justify-center rounded-full bg-red-100/80">
-                <Ionicons name="checkmark-sharp" size={16} color="#F6163C" />
+            {/* Checklist Item 2: Operating Schedule */}
+            <View className="flex-row items-center py-2.5">
+              <View className="mr-3.5 h-10 w-10 items-center justify-center rounded-2xl bg-red-50 border border-red-100/80">
+                <Ionicons name="time-outline" size={20} color="#F6163C" />
               </View>
               <View className="flex-1">
                 <Text className="font-bold text-[14px] text-slate-800">Operating Schedule</Text>
                 <Text className="text-[12px] text-slate-500">Opening and closing timings configured</Text>
               </View>
+              <View className="h-6 w-6 items-center justify-center rounded-full bg-emerald-50 border border-emerald-200">
+                <Ionicons name="checkmark" size={14} color="#10B981" />
+              </View>
             </View>
 
-            <View className="my-1 h-[1px] bg-slate-200/60" />
+            <View className="my-0.5 h-[1px] bg-slate-200/50" />
 
-            {/* Checklist Item 3 */}
-            <View className="flex-row items-center py-2">
-              <View className="mr-3 h-7 w-7 items-center justify-center rounded-full bg-red-100/80">
-                <Ionicons name="checkmark-sharp" size={16} color="#F6163C" />
+            {/* Checklist Item 3: Govt Verification Documents */}
+            <View className="flex-row items-center py-2.5">
+              <View className="mr-3.5 h-10 w-10 items-center justify-center rounded-2xl bg-red-50 border border-red-100/80">
+                <Ionicons name="shield-checkmark-outline" size={20} color="#F6163C" />
               </View>
               <View className="flex-1">
                 <Text className="font-bold text-[14px] text-slate-800">Govt Verification Documents</Text>
                 <Text className="text-[12px] text-slate-500">Documents uploaded for compliance</Text>
+              </View>
+              <View className="h-6 w-6 items-center justify-center rounded-full bg-emerald-50 border border-emerald-200">
+                <Ionicons name="checkmark" size={14} color="#10B981" />
+              </View>
+            </View>
+
+            <View className="my-0.5 h-[1px] bg-slate-200/50" />
+
+            {/* Checklist Item 4: Club & Facility Photos */}
+            <View className="flex-row items-center py-2.5">
+              <View className="mr-3.5 h-10 w-10 items-center justify-center rounded-2xl bg-red-50 border border-red-100/80">
+                <Ionicons name="images-outline" size={20} color="#F6163C" />
+              </View>
+              <View className="flex-1">
+                <Text className="font-bold text-[14px] text-slate-800">Club & Facility Photos</Text>
+                <Text className="text-[12px] text-slate-500">Showcasing gym areas and facilities</Text>
+              </View>
+              <View className="h-6 w-6 items-center justify-center rounded-full bg-emerald-50 border border-emerald-200">
+                <Ionicons name="checkmark" size={14} color="#10B981" />
               </View>
             </View>
           </View>
@@ -262,5 +292,25 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.35)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconCenterWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  miniVerifyBadge: {
+    position: 'absolute',
+    bottom: -4,
+    right: -10,
+    backgroundColor: '#10B981',
+    borderRadius: 12,
+    padding: 3,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
 });

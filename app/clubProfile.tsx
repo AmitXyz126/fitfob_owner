@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, memo } from 'react';
+import React, { useState, useEffect, useRef, memo, useCallback } from 'react';
 import { View, Text, Image, TouchableOpacity, ScrollView, ImageBackground, Dimensions, Animated, Easing, StyleSheet } from 'react-native';
 import {
   ChevronLeft,
@@ -15,7 +15,7 @@ import {
   Lock,
   Layers,
 } from 'lucide-react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Container } from '@/components/Container';
 import LineGradient from '@/components/lineGradient/LineGradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -277,6 +277,117 @@ const MenuOption = memo(({
   </TouchableOpacity>
 ));
 
+const formatDisplayTime = (timeInput: any, defaultHour: number = 6): string => {
+  if (!timeInput) {
+    const d = new Date();
+    d.setHours(defaultHour, 0, 0, 0);
+    let h = d.getHours();
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return `${String(h).padStart(2, '0')}:00 ${ampm}`;
+  }
+
+  if (timeInput instanceof Date && !isNaN(timeInput.getTime())) {
+    let h = timeInput.getHours();
+    const m = timeInput.getMinutes();
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+  }
+
+  const str = String(timeInput).trim();
+  const ampmMatch = str.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)$/i);
+  if (ampmMatch) {
+    const h = parseInt(ampmMatch[1], 10);
+    const m = ampmMatch[2];
+    const ampm = ampmMatch[3].toUpperCase();
+    return `${String(h).padStart(2, '0')}:${m} ${ampm}`;
+  }
+
+  if (str.includes('T')) {
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      let h = d.getHours();
+      const m = d.getMinutes();
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
+    }
+  }
+
+  const time24Match = str.match(/^(\d{1,2}):(\d{2})/);
+  if (time24Match) {
+    let h = parseInt(time24Match[1], 10);
+    const m = time24Match[2];
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return `${String(h).padStart(2, '0')}:${m} ${ampm}`;
+  }
+
+  return str;
+};
+
+const resolveTimingRange = (
+  scheduling: any,
+  rawOpen: any,
+  rawClose: any,
+  everydayOpen: any,
+  everydayClose: any,
+  daySchedules: any
+): string => {
+  let parsedScheduling = scheduling;
+  if (typeof parsedScheduling === 'string') {
+    try {
+      parsedScheduling = JSON.parse(parsedScheduling);
+    } catch {
+      // ignore
+    }
+  }
+
+  // 1. Check scheduling object
+  if (parsedScheduling && typeof parsedScheduling === 'object') {
+    if (parsedScheduling.everyday) {
+      const open = formatDisplayTime(parsedScheduling.everyday.openingTime, 6);
+      const close = formatDisplayTime(parsedScheduling.everyday.closingTime, 22);
+      return `${open} - ${close}`;
+    }
+
+    const dayKeys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const activeDays = dayKeys.filter((k) => parsedScheduling[k]);
+    if (activeDays.length > 0) {
+      const first = parsedScheduling[activeDays[0]];
+      const open = formatDisplayTime(first.openingTime, 6);
+      const close = formatDisplayTime(first.closingTime, 22);
+      return `${open} - ${close}`;
+    }
+  }
+
+  // 2. Check everyday open/close times
+  if (everydayOpen && everydayClose) {
+    return `${formatDisplayTime(everydayOpen, 6)} - ${formatDisplayTime(everydayClose, 22)}`;
+  }
+
+  // 3. Check rawOpen and rawClose
+  if (rawOpen || rawClose) {
+    const open = formatDisplayTime(rawOpen, 6);
+    const close = formatDisplayTime(rawClose, 22);
+    return `${open} - ${close}`;
+  }
+
+  // 4. Check daySchedules
+  if (daySchedules && typeof daySchedules === 'object') {
+    const dayKeys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const activeKey = dayKeys.find((k) => daySchedules[k]?.isOpen);
+    if (activeKey && daySchedules[activeKey]) {
+      const open = formatDisplayTime(daySchedules[activeKey].openTime, 6);
+      const close = formatDisplayTime(daySchedules[activeKey].closeTime, 22);
+      return `${open} - ${close}`;
+    }
+  }
+
+  return '';
+};
+
 const ClubProfileScreen = () => {
   const router = useRouter();
 
@@ -296,6 +407,7 @@ const ClubProfileScreen = () => {
   });
 
   const [storedOwnerName, setStoredOwnerName] = useState<string>('');
+  const [timingDisplay, setTimingDisplay] = useState<string>('');
 
   const getDisplayName = () => {
     const rawName =
@@ -373,165 +485,254 @@ const ClubProfileScreen = () => {
     return str;
   };
 
-  // --- Fetch Data from React Query Cached Hook ---
-  useEffect(() => {
-    const loadClubData = async () => {
-      try {
-        let logoFromStorage: any = null;
-        let addressFromStorage: string | null = null;
-        let clubNameFromStorage: string | null = null;
-        let servicesFromStorage: string[] = [];
-        let amenitiesFromStorage: string[] = [];
-        let categoryFromStorage: string = '';
+  // --- Fetch Data from React Query Cached Hook & Local Storage ---
+  const loadClubData = useCallback(async () => {
+    try {
+      let logoFromStorage: any = null;
+      let addressFromStorage: string | null = null;
+      let clubNameFromStorage: string | null = null;
+      let servicesFromStorage: string[] = [];
+      let amenitiesFromStorage: string[] = [];
+      let categoryFromStorage: string = '';
+      let timingFromStorage: any = null;
+      let openTimeFromStorage: string | null = null;
+      let closeTimeFromStorage: string | null = null;
+      let everydayOpenFromStorage: any = null;
+      let everydayCloseFromStorage: any = null;
+      let daySchedulesFromStorage: any = null;
 
-        const savedData = await AsyncStorage.getItem('club_profile');
-        if (savedData) {
-          const parsedData = JSON.parse(savedData);
-          if (parsedData.image) logoFromStorage = parsedData.image;
-          if (parsedData.logo) logoFromStorage = parsedData.logo;
-          if (parsedData.address) addressFromStorage = parsedData.address;
-          if (parsedData.clubName) clubNameFromStorage = parsedData.clubName;
-          if (parsedData.ownerName) setStoredOwnerName(parsedData.ownerName);
-          if (parsedData.services) servicesFromStorage = parseArrayData(parsedData.services);
-          if (parsedData.amenities) amenitiesFromStorage = parseArrayData(parsedData.amenities);
-          if (parsedData.clubCategory) categoryFromStorage = parsedData.clubCategory;
-        }
+      const savedData = await AsyncStorage.getItem('club_profile');
+      if (savedData) {
+        const parsedData = JSON.parse(savedData);
+        if (parsedData.image) logoFromStorage = parsedData.image;
+        if (parsedData.logo) logoFromStorage = parsedData.logo;
+        if (parsedData.address) addressFromStorage = parsedData.address;
+        if (parsedData.clubName) clubNameFromStorage = parsedData.clubName;
+        if (parsedData.ownerName) setStoredOwnerName(parsedData.ownerName);
+        if (parsedData.services) servicesFromStorage = parseArrayData(parsedData.services);
+        if (parsedData.amenities) amenitiesFromStorage = parseArrayData(parsedData.amenities);
+        if (parsedData.clubCategory) categoryFromStorage = parsedData.clubCategory;
+        if (parsedData.weekdayScheduling) timingFromStorage = parsedData.weekdayScheduling;
+        if (parsedData.openingTime) openTimeFromStorage = parsedData.openingTime;
+        if (parsedData.closingTime) closeTimeFromStorage = parsedData.closingTime;
+        if (parsedData.everydayOpenTime) everydayOpenFromStorage = parsedData.everydayOpenTime;
+        if (parsedData.everydayCloseTime) everydayCloseFromStorage = parsedData.everydayCloseTime;
+        if (parsedData.daySchedules) daySchedulesFromStorage = parsedData.daySchedules;
+      }
 
-        const keys = await AsyncStorage.getAllKeys();
+      const keys = await AsyncStorage.getAllKeys();
+      const pId = profileStatus?.id || profileStatus?.pendingClubOwnerId || user?.id || user?.email;
+      const userSpecificStep3Key = pId ? `@onboarding_step3_data_${pId}` : null;
 
-        // Step 1
-        const step1Keys = keys.filter((k) => k.includes('onboarding_step1_data'));
-        if (step1Keys.length > 0) {
-          const lastStep1Key = step1Keys[step1Keys.length - 1];
-          const step1Json = await AsyncStorage.getItem(lastStep1Key);
-          if (step1Json) {
-            const parsedStep1 = JSON.parse(step1Json);
-            if (!logoFromStorage) {
-              logoFromStorage = parsedStep1.image || parsedStep1.logo || parsedStep1.logoUrl || parsedStep1.logoId;
-            }
-            if (!clubNameFromStorage) {
-              clubNameFromStorage = parsedStep1.clubName || parsedStep1.name;
-            }
+      // Step 1
+      const step1Keys = keys.filter((k) => k.includes('onboarding_step1_data'));
+      if (step1Keys.length > 0) {
+        const lastStep1Key = step1Keys[step1Keys.length - 1];
+        const step1Json = await AsyncStorage.getItem(lastStep1Key);
+        if (step1Json) {
+          const parsedStep1 = JSON.parse(step1Json);
+          if (!logoFromStorage) {
+            logoFromStorage = parsedStep1.image || parsedStep1.logo || parsedStep1.logoUrl || parsedStep1.logoId;
+          }
+          if (!clubNameFromStorage) {
+            clubNameFromStorage = parsedStep1.clubName || parsedStep1.name;
           }
         }
+      }
 
-        // Step 3 (Services & Amenities)
+      // Step 3 (Services & Amenities & Timings)
+      let foundStep3Key = null;
+      if (userSpecificStep3Key && keys.includes(userSpecificStep3Key)) {
+        foundStep3Key = userSpecificStep3Key;
+      } else {
         const step3Keys = keys.filter((k) => k.includes('onboarding_step3_data'));
         if (step3Keys.length > 0) {
-          const lastStep3Key = step3Keys[step3Keys.length - 1];
-          const step3Json = await AsyncStorage.getItem(lastStep3Key);
-          if (step3Json) {
-            const parsedStep3 = JSON.parse(step3Json);
-            if (servicesFromStorage.length === 0) {
-              servicesFromStorage = parseArrayData(parsedStep3.fitnessTypes || parsedStep3.services);
-            }
-            if (amenitiesFromStorage.length === 0) {
-              amenitiesFromStorage = parseArrayData(parsedStep3.amenities || parsedStep3.facilities);
-            }
-            if (!categoryFromStorage) {
-              categoryFromStorage = parsedStep3.clubCategory || '';
-            }
+          foundStep3Key = step3Keys[step3Keys.length - 1];
+        }
+      }
+
+      if (foundStep3Key) {
+        const step3Json = await AsyncStorage.getItem(foundStep3Key);
+        if (step3Json) {
+          const parsedStep3 = JSON.parse(step3Json);
+          if (servicesFromStorage.length === 0) {
+            servicesFromStorage = parseArrayData(parsedStep3.fitnessTypes || parsedStep3.services);
+          }
+          if (amenitiesFromStorage.length === 0) {
+            amenitiesFromStorage = parseArrayData(parsedStep3.amenities || parsedStep3.facilities);
+          }
+          if (!categoryFromStorage) {
+            categoryFromStorage = parsedStep3.clubCategory || '';
+          }
+          if (!timingFromStorage && parsedStep3.weekdayScheduling) {
+            timingFromStorage = parsedStep3.weekdayScheduling;
+          }
+          if (!openTimeFromStorage && parsedStep3.openingTime) {
+            openTimeFromStorage = parsedStep3.openingTime;
+          }
+          if (!closeTimeFromStorage && parsedStep3.closingTime) {
+            closeTimeFromStorage = parsedStep3.closingTime;
+          }
+          if (!everydayOpenFromStorage && parsedStep3.everydayOpenTime) {
+            everydayOpenFromStorage = parsedStep3.everydayOpenTime;
+          }
+          if (!everydayCloseFromStorage && parsedStep3.everydayCloseTime) {
+            everydayCloseFromStorage = parsedStep3.everydayCloseTime;
+          }
+          if (!daySchedulesFromStorage && parsedStep3.daySchedules) {
+            daySchedulesFromStorage = parsedStep3.daySchedules;
           }
         }
-
-        const pData = myOwnerData || profileStatus?.data || profileStatus || {};
-
-        // Resolve Logo Image
-        const rawLogo =
-          myOwnerData?.logoUrl ||
-          myOwnerData?.logo ||
-          myOwnerData?.logo_url ||
-          myOwnerData?.image ||
-          user?.clubOwnerDetail?.logoUrl ||
-          user?.clubOwnerDetail?.logo ||
-          user?.clubOwnerDetail?.image ||
-          user?.logoUrl ||
-          user?.logo ||
-          pData?.clubOwnerDetail?.logoUrl ||
-          pData?.clubOwnerDetail?.logo ||
-          pData?.logoUrl ||
-          pData?.logo ||
-          pData?.pendingClubOwner?.logoUrl ||
-          pData?.pendingClubOwner?.logo ||
-          logoFromStorage ||
-          null;
-
-        const finalLogoUri = getImageUriString(rawLogo);
-
-        setProfileImageUri(finalLogoUri || null);
-        setImageError(false);
-
-        // Resolve Services
-        const rawServices =
-          myOwnerData?.services ||
-          myOwnerData?.fitnessTypes ||
-          pData?.services ||
-          pData?.fitnessTypes ||
-          pData?.pendingClubOwner?.services ||
-          pData?.pendingClubOwner?.fitnessTypes ||
-          user?.clubOwnerDetail?.services ||
-          user?.clubOwnerDetail?.fitnessTypes ||
-          servicesFromStorage;
-
-        const resolvedServices = parseArrayData(rawServices);
-        setServicesList(resolvedServices.length > 0 ? resolvedServices : servicesFromStorage);
-
-        // Resolve Amenities
-        const rawAmenities =
-          myOwnerData?.facilities ||
-          myOwnerData?.amenities ||
-          pData?.facilities ||
-          pData?.amenities ||
-          pData?.pendingClubOwner?.facilities ||
-          pData?.pendingClubOwner?.amenities ||
-          user?.clubOwnerDetail?.facilities ||
-          user?.clubOwnerDetail?.amenities ||
-          amenitiesFromStorage;
-
-        const resolvedAmenities = parseArrayData(rawAmenities);
-        setAmenitiesList(resolvedAmenities.length > 0 ? resolvedAmenities : amenitiesFromStorage);
-
-        // Resolve Club Category
-        const resolvedCategory =
-          myOwnerData?.clubCategory ||
-          myOwnerData?.category ||
-          pData?.clubCategory ||
-          pData?.category ||
-          pData?.pendingClubOwner?.clubCategory ||
-          user?.clubOwnerDetail?.clubCategory ||
-          categoryFromStorage ||
-          '';
-
-        setClubCategory(resolvedCategory);
-
-        // Resolve Club Name & Address
-        const resolvedClubName =
-          myOwnerData?.clubName ||
-          myOwnerData?.name ||
-          pData?.clubName ||
-          pData?.club_name ||
-          pData?.pendingClubOwner?.clubName ||
-          clubNameFromStorage ||
-          'Fitness Club';
-
-        const resolvedAddress =
-          myOwnerData?.clubAddress ||
-          myOwnerData?.address ||
-          pData?.clubAddress ||
-          addressFromStorage ||
-          'Your Club Location';
-
-        setClubInfo({
-          name: resolvedClubName,
-          image: finalLogoUri,
-          address: resolvedAddress,
-        });
-      } catch (error) {
-        console.error('Failed to load club profile data:', error);
       }
-    };
-    loadClubData();
+
+      const pData = myOwnerData || profileStatus?.data || profileStatus || {};
+
+      // Resolve Logo Image
+      const rawLogo =
+        myOwnerData?.logoUrl ||
+        myOwnerData?.logo ||
+        myOwnerData?.logo_url ||
+        myOwnerData?.image ||
+        user?.clubOwnerDetail?.logoUrl ||
+        user?.clubOwnerDetail?.logo ||
+        user?.clubOwnerDetail?.image ||
+        user?.logoUrl ||
+        user?.logo ||
+        pData?.clubOwnerDetail?.logoUrl ||
+        pData?.clubOwnerDetail?.logo ||
+        pData?.logoUrl ||
+        pData?.logo ||
+        pData?.pendingClubOwner?.logoUrl ||
+        pData?.pendingClubOwner?.logo ||
+        logoFromStorage ||
+        null;
+
+      const finalLogoUri = getImageUriString(rawLogo);
+
+      setProfileImageUri(finalLogoUri || null);
+      setImageError(false);
+
+      // Resolve Services
+      const rawServices =
+        myOwnerData?.services ||
+        myOwnerData?.fitnessTypes ||
+        pData?.services ||
+        pData?.fitnessTypes ||
+        pData?.pendingClubOwner?.services ||
+        pData?.pendingClubOwner?.fitnessTypes ||
+        user?.clubOwnerDetail?.services ||
+        user?.clubOwnerDetail?.fitnessTypes ||
+        servicesFromStorage;
+
+      const resolvedServices = parseArrayData(rawServices);
+      setServicesList(resolvedServices.length > 0 ? resolvedServices : servicesFromStorage);
+
+      // Resolve Amenities
+      const rawAmenities =
+        myOwnerData?.facilities ||
+        myOwnerData?.amenities ||
+        pData?.facilities ||
+        pData?.amenities ||
+        pData?.pendingClubOwner?.facilities ||
+        pData?.pendingClubOwner?.amenities ||
+        user?.clubOwnerDetail?.facilities ||
+        user?.clubOwnerDetail?.amenities ||
+        amenitiesFromStorage;
+
+      const resolvedAmenities = parseArrayData(rawAmenities);
+      setAmenitiesList(resolvedAmenities.length > 0 ? resolvedAmenities : amenitiesFromStorage);
+
+      // Resolve Club Category
+      const resolvedCategory =
+        myOwnerData?.clubCategory ||
+        myOwnerData?.category ||
+        pData?.clubCategory ||
+        pData?.category ||
+        pData?.pendingClubOwner?.clubCategory ||
+        user?.clubOwnerDetail?.clubCategory ||
+        categoryFromStorage ||
+        '';
+
+      setClubCategory(resolvedCategory);
+
+      // Resolve Club Name & Address
+      const resolvedClubName =
+        myOwnerData?.clubName ||
+        myOwnerData?.name ||
+        pData?.clubName ||
+        pData?.club_name ||
+        pData?.pendingClubOwner?.clubName ||
+        clubNameFromStorage ||
+        'Fitness Club';
+
+      const resolvedAddress =
+        myOwnerData?.clubAddress ||
+        myOwnerData?.address ||
+        pData?.clubAddress ||
+        addressFromStorage ||
+        'Your Club Location';
+
+      setClubInfo({
+        name: resolvedClubName,
+        image: finalLogoUri,
+        address: resolvedAddress,
+      });
+
+      // Resolve Club Timings
+      const resolvedScheduling =
+        timingFromStorage ||
+        myOwnerData?.weekdayScheduling ||
+        myOwnerData?.weekday_scheduling ||
+        pData?.weekdayScheduling ||
+        pData?.weekday_scheduling ||
+        pData?.scheduling ||
+        pData?.pendingClubOwner?.weekdayScheduling ||
+        pData?.clubOwnerDetail?.weekdayScheduling;
+
+      const resolvedOpen =
+        openTimeFromStorage ||
+        everydayOpenFromStorage ||
+        myOwnerData?.openingTime ||
+        myOwnerData?.opening_time ||
+        pData?.openingTime ||
+        pData?.opening_time ||
+        pData?.pendingClubOwner?.openingTime ||
+        pData?.clubOwnerDetail?.openingTime;
+
+      const resolvedClose =
+        closeTimeFromStorage ||
+        everydayCloseFromStorage ||
+        myOwnerData?.closingTime ||
+        myOwnerData?.closing_time ||
+        pData?.closingTime ||
+        pData?.closing_time ||
+        pData?.pendingClubOwner?.closingTime ||
+        pData?.clubOwnerDetail?.closingTime;
+
+      const finalTiming = resolveTimingRange(
+        resolvedScheduling,
+        resolvedOpen,
+        resolvedClose,
+        everydayOpenFromStorage,
+        everydayCloseFromStorage,
+        daySchedulesFromStorage
+      );
+
+      setTimingDisplay(finalTiming || '06:00 AM - 10:00 PM');
+    } catch (error) {
+      console.error('Failed to load club profile data:', error);
+    }
   }, [myOwnerData, profileStatus, user]);
+
+  useEffect(() => {
+    loadClubData();
+  }, [loadClubData]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadClubData();
+    }, [loadClubData])
+  );
 
   return (
     <Container>
@@ -647,6 +848,7 @@ const ClubProfileScreen = () => {
           <MenuOption
             icon={Clock}
             title="Timings"
+            value={timingDisplay || undefined}
             onPress={() => router.push('/clubTimings')}
           />
           <LineGradient />

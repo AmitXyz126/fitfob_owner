@@ -1,4 +1,4 @@
-import { useState, useRef, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useRef, useImperativeHandle, forwardRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,8 +17,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useUserDetail } from '@/hooks/useUserDetail';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import Toast from 'react-native-toast-message';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface OnBoarding4Handle {
   openModal: () => void;
@@ -31,14 +33,23 @@ interface Props {
 }
 
 const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
-  const router = useRouter();
   const { onUploadSuccess, onUploadDone } = props;
-  const { uploadDoc, refetch } = useUserDetail();
+  const { uploadDoc, verifyGovtDoc, refetch } = useUserDetail();
+  const { user } = useAuthStore();
+
+  const userKey = user?.id || user?.email || 'guest';
+  const STORAGE_KEY_FILES = `@onboarding_verified_files_${userKey}`;
+  const STORAGE_KEY_SCANNED = `@onboarding_scanned_data_${userKey}`;
+  const STORAGE_KEY_DOCNAME = `@onboarding_doc_name_${userKey}`;
 
   const [activeTab, setActiveTab] = useState<'camera' | 'file'>('camera');
   const [docName, setDocName] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<any[]>([]);
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+
+  // Verification State
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyingMessage, setVerifyingMessage] = useState('Scanning & Verifying Document...');
 
   // Camera State
   const [permission, requestPermission] = useCameraPermissions();
@@ -47,26 +58,112 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
   const [scannedData, setScannedData] = useState<any>(null);
 
   useImperativeHandle(ref, () => ({
-    openModal: () => { },
+    openModal: () => {},
   }));
 
-  // Capture Photo with Camera
+  // Restore saved verified documents from AsyncStorage when app is re-opened
+  useEffect(() => {
+    const loadSavedVerifiedDocs = async () => {
+      try {
+        const savedFilesStr = await AsyncStorage.getItem(STORAGE_KEY_FILES);
+        const savedScannedStr = await AsyncStorage.getItem(STORAGE_KEY_SCANNED);
+        const savedDocName = await AsyncStorage.getItem(STORAGE_KEY_DOCNAME);
+
+        if (savedFilesStr) {
+          const parsedFiles = JSON.parse(savedFilesStr);
+          if (Array.isArray(parsedFiles) && parsedFiles.length > 0) {
+            setSelectedFiles(parsedFiles);
+          }
+        }
+
+        if (savedScannedStr) {
+          const parsedScanned = JSON.parse(savedScannedStr);
+          if (parsedScanned && parsedScanned.uri) {
+            setScannedData(parsedScanned);
+          }
+        }
+
+        if (savedDocName) {
+          setDocName(savedDocName);
+        }
+      } catch (e) {
+        console.log('Error restoring verified documents from AsyncStorage:', e);
+      }
+    };
+
+    loadSavedVerifiedDocs();
+  }, [userKey]);
+
+  // Helper to verify a single document with the backend API
+  const verifyFileItem = async (fileData: { uri: string; name?: string; type?: string }) => {
+    const verifyRes = await verifyGovtDoc.mutateAsync(fileData);
+    const data = verifyRes?.data?.valid !== undefined ? verifyRes.data : verifyRes;
+    return data;
+  };
+
+  // Capture Photo with Camera and Verify Immediately
   const takePicture = async () => {
-    if (!cameraRef.current || isCapturing) return;
+    if (!cameraRef.current || isCapturing || isVerifying) return;
     try {
       setIsCapturing(true);
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
       if (photo) {
-        const fileObj = {
-          id: `${Date.now()}_${Math.random()}`,
+        setIsVerifying(true);
+        setVerifyingMessage('Scanning & Verifying Document...');
+
+        const fileData = {
           uri: photo.uri,
           name: `camera_${Date.now()}.jpg`,
           type: 'image/jpeg',
-          docName: docName.trim() || `Document ${selectedFiles.length + 1}`,
         };
-        setSelectedFiles((prev) => [...prev, fileObj]);
-        setScannedData(fileObj);
-        setDocName('');
+
+        try {
+          const data = await verifyFileItem(fileData);
+
+          if (data?.valid === true) {
+            const detectedName = data.displayName || data.documentType || 'Government Document';
+            const fileObj = {
+              id: `${Date.now()}_${Math.random()}`,
+              uri: photo.uri,
+              name: fileData.name,
+              type: fileData.type,
+              docName: detectedName,
+              verified: true,
+              documentType: data.documentType,
+              displayName: data.displayName,
+              verificationMessage: data.message,
+            };
+
+            const updatedFiles = [...selectedFiles.filter((f) => f.id !== fileObj.id), fileObj];
+            setSelectedFiles(updatedFiles);
+            setScannedData(fileObj);
+            setDocName(detectedName);
+
+            // Persist immediately to AsyncStorage so quitting app doesn't lose verified document
+            await AsyncStorage.setItem(STORAGE_KEY_FILES, JSON.stringify(updatedFiles));
+            await AsyncStorage.setItem(STORAGE_KEY_SCANNED, JSON.stringify(fileObj));
+            await AsyncStorage.setItem(STORAGE_KEY_DOCNAME, detectedName);
+
+            Toast.show({
+              type: 'success',
+              text1: 'Document Verified! ✅',
+              text2: data.message || `${detectedName} verified successfully.`,
+            });
+          } else {
+            Alert.alert(
+              'Document Verification Failed ❌',
+              data?.message || 'Invalid government document. Please scan a genuine government document (e.g. GST, PAN, etc.).'
+            );
+          }
+        } catch (err: any) {
+          console.error('Verification error:', err);
+          Alert.alert(
+            'Verification Failed ❌',
+            err?.response?.data?.message || err?.message || 'Failed to verify government document. Please try again with a clear photo.'
+          );
+        } finally {
+          setIsVerifying(false);
+        }
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to capture photo. Please try again.');
@@ -75,11 +172,96 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
     }
   };
 
-  const resetCameraCapture = () => {
+  const resetCameraCapture = async () => {
     if (scannedData) {
-      setSelectedFiles((prev) => prev.filter((item) => item.id !== scannedData.id));
+      const updated = selectedFiles.filter((item) => item.id !== scannedData.id);
+      setSelectedFiles(updated);
+      await AsyncStorage.setItem(STORAGE_KEY_FILES, JSON.stringify(updated));
     }
     setScannedData(null);
+    await AsyncStorage.removeItem(STORAGE_KEY_SCANNED);
+    await AsyncStorage.removeItem(STORAGE_KEY_DOCNAME);
+  };
+
+  // Helper to verify and add files from gallery or document picker
+  const verifyAndAddFiles = async (
+    files: Array<{ uri: string; name?: string; type?: string; size?: number }>
+  ) => {
+    if (!files || files.length === 0) return;
+
+    setIsVerifying(true);
+    let verifiedCount = 0;
+    const failedMessages: string[] = [];
+    const newVerifiedList: any[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      setVerifyingMessage(
+        files.length > 1
+          ? `Verifying document ${i + 1} of ${files.length}...`
+          : 'Scanning & Verifying Document...'
+      );
+
+      try {
+        const filePayload = {
+          uri: f.uri,
+          name: f.name || `doc_${Date.now()}.jpg`,
+          type: f.type || 'image/jpeg',
+        };
+        const data = await verifyFileItem(filePayload);
+
+        if (data?.valid === true) {
+          const detectedName = data.displayName || data.documentType || 'Government Document';
+          const fileObj = {
+            id: `${Date.now()}_${i}_${Math.random()}`,
+            uri: f.uri,
+            name: filePayload.name,
+            type: filePayload.type,
+            size: f.size,
+            docName: detectedName,
+            verified: true,
+            documentType: data.documentType,
+            displayName: data.displayName,
+            verificationMessage: data.message,
+          };
+          newVerifiedList.push(fileObj);
+          verifiedCount++;
+        } else {
+          failedMessages.push(
+            `${f.name || `Document ${i + 1}`}: ${data?.message || 'Not a valid government document.'}`
+          );
+        }
+      } catch (err: any) {
+        failedMessages.push(
+          `${f.name || `Document ${i + 1}`}: ${err?.response?.data?.message || err?.message || 'Verification failed'}`
+        );
+      }
+    }
+
+    if (newVerifiedList.length > 0) {
+      setSelectedFiles((prev) => {
+        const combined = [...prev, ...newVerifiedList];
+        AsyncStorage.setItem(STORAGE_KEY_FILES, JSON.stringify(combined)).catch(console.log);
+        return combined;
+      });
+    }
+
+    setIsVerifying(false);
+
+    if (verifiedCount > 0) {
+      Toast.show({
+        type: 'success',
+        text1: `${verifiedCount} Document(s) Verified! ✅`,
+        text2: 'Government document verified successfully.',
+      });
+    }
+
+    if (failedMessages.length > 0) {
+      Alert.alert(
+        'Document Verification Failed ❌',
+        failedMessages.join('\n') || 'Only genuine government documents can be accepted.'
+      );
+    }
   };
 
   // Gallery Picker
@@ -95,22 +277,14 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
       quality: 0.8,
     });
     if (!result.canceled && result.assets.length > 0) {
-      const newFiles = result.assets.map((asset, idx) => ({
-        id: `${Date.now()}_${idx}_${Math.random()}`,
-        uri: asset.uri,
-        name: asset.fileName || `photo_${Date.now()}_${idx + 1}.jpg`,
-        type: asset.mimeType || 'image/jpeg',
-        size: asset.fileSize,
-        docName: docName.trim()
-          ? result.assets.length === 1
-            ? docName.trim()
-            : `${docName.trim()} ${idx + 1}`
-          : asset.fileName
-            ? asset.fileName.split('.')[0]
-            : `Document ${selectedFiles.length + idx + 1}`,
-      }));
-      setSelectedFiles((prev) => [...prev, ...newFiles]);
-      setDocName('');
+      await verifyAndAddFiles(
+        result.assets.map((asset) => ({
+          uri: asset.uri,
+          name: asset.fileName || `photo_${Date.now()}.jpg`,
+          type: asset.mimeType || 'image/jpeg',
+          size: asset.fileSize,
+        }))
+      );
     }
   };
 
@@ -123,22 +297,14 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
         copyToCacheDirectory: true,
       });
       if (!result.canceled && result.assets.length > 0) {
-        const newFiles = result.assets.map((file, idx) => ({
-          id: `${Date.now()}_${idx}_${Math.random()}`,
-          uri: file.uri,
-          name: file.name,
-          type: file.mimeType || 'application/pdf',
-          size: file.size,
-          docName: docName.trim()
-            ? result.assets.length === 1
-              ? docName.trim()
-              : `${docName.trim()} ${idx + 1}`
-            : file.name
-              ? file.name.split('.')[0]
-              : `Document ${selectedFiles.length + idx + 1}`,
-        }));
-        setSelectedFiles((prev) => [...prev, ...newFiles]);
-        setDocName('');
+        await verifyAndAddFiles(
+          result.assets.map((file) => ({
+            uri: file.uri,
+            name: file.name,
+            type: file.mimeType || 'application/pdf',
+            size: file.size,
+          }))
+        );
       }
     } catch (err) {
       Alert.alert('Error', 'Failed to select document.');
@@ -153,20 +319,56 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
     ]);
   };
 
-  const removeFile = (id: string) => {
-    setSelectedFiles((prev) => prev.filter((item) => item.id !== id));
+  const removeFile = async (id: string) => {
+    const updated = selectedFiles.filter((item) => item.id !== id);
+    setSelectedFiles(updated);
+    await AsyncStorage.setItem(STORAGE_KEY_FILES, JSON.stringify(updated));
+
+    if (scannedData?.id === id) {
+      setScannedData(null);
+      await AsyncStorage.removeItem(STORAGE_KEY_SCANNED);
+      await AsyncStorage.removeItem(STORAGE_KEY_DOCNAME);
+    }
   };
 
   const updateFileDocName = (id: string, text: string) => {
-    setSelectedFiles((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, docName: text } : item))
-    );
+    setSelectedFiles((prev) => {
+      const updated = prev.map((item) => (item.id === id ? { ...item, docName: text } : item));
+      AsyncStorage.setItem(STORAGE_KEY_FILES, JSON.stringify(updated)).catch(console.log);
+      return updated;
+    });
+    if (scannedData?.id === id) {
+      setScannedData((prev: any) => {
+        const updated = prev ? { ...prev, docName: text } : prev;
+        if (updated) {
+          AsyncStorage.setItem(STORAGE_KEY_SCANNED, JSON.stringify(updated)).catch(console.log);
+        }
+        return updated;
+      });
+      AsyncStorage.setItem(STORAGE_KEY_DOCNAME, text).catch(console.log);
+    }
   };
 
-  // Upload Logic
+  // Upload Logic - Only verified documents can be uploaded
   const handleFinalUpload = async () => {
+    if (isVerifying) {
+      return Alert.alert('Please Wait', 'Document verification is currently in progress.');
+    }
+
     if (selectedFiles.length === 0) {
-      return Alert.alert('Required', 'Please scan or select at least one document file.');
+      return Alert.alert(
+        'Document Required',
+        'Please scan or upload a verified government document first. Only verified documents can proceed.'
+      );
+    }
+
+    // Check if any file is unverified
+    const unverifiedFiles = selectedFiles.filter((item) => !item.verified);
+    if (unverifiedFiles.length > 0) {
+      return Alert.alert(
+        'Verification Required ❌',
+        'One or more selected documents could not be verified as a government document. Please scan a valid document.'
+      );
     }
 
     for (let i = 0; i < selectedFiles.length; i++) {
@@ -197,6 +399,12 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
       setSelectedFiles([]);
       setDocName('');
       setUploadingIndex(null);
+
+      // Clean up local verified persistence since it is now uploaded to server
+      await AsyncStorage.removeItem(STORAGE_KEY_FILES);
+      await AsyncStorage.removeItem(STORAGE_KEY_SCANNED);
+      await AsyncStorage.removeItem(STORAGE_KEY_DOCNAME);
+
       if (onUploadDone) onUploadDone(null);
       if (onUploadSuccess) onUploadSuccess(null);
     } catch (error: any) {
@@ -218,19 +426,13 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
       {/* Title Header */}
       <View className="mb-6 flex-row items-center justify-between">
         <Text className="font-bold text-[24px] text-[#1C1C1C]">Upload Govt Document</Text>
-        {/* {selectedFiles.length > 0 && (
-          <View className="rounded-full bg-red-50 px-3 py-1 border border-red-100">
-            <Text className="font-bold text-xs text-[#F6163C]">
-              {selectedFiles.length} {selectedFiles.length === 1 ? 'File' : 'Files'} Selected
-            </Text>
-          </View>
-        )} */}
       </View>
 
       {/* Mode Selector Tabs */}
       <View className="mb-6 flex-row rounded-2xl bg-slate-100 p-1">
         <TouchableOpacity
           onPress={() => setActiveTab('camera')}
+          disabled={isVerifying || isUploading}
           className="flex-1 flex-row items-center justify-center rounded-xl py-3.5"
           style={activeTab === 'camera' ? styles.activeTabShadow : null}>
           <Ionicons
@@ -245,6 +447,7 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => setActiveTab('file')}
+          disabled={isVerifying || isUploading}
           className="flex-1 flex-row items-center justify-center rounded-xl py-3.5"
           style={activeTab === 'file' ? styles.activeTabShadow : null}>
           <Ionicons
@@ -266,10 +469,10 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
           <TextInput
             value={docName}
             onChangeText={setDocName}
-            placeholder="e.g. Aadhar Card, License, PAN, GST"
+            placeholder="e.g. GST Certificate, PAN, License (Auto-detected on scan)"
             placeholderTextColor="#94A3B8"
             className="h-14 w-full rounded-2xl border border-slate-100 bg-[#F8FAFC] px-5 font-semibold text-slate-900"
-            editable={!isUploading}
+            editable={!isUploading && !isVerifying}
           />
         </View>
       )}
@@ -279,19 +482,48 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
         {activeTab === 'camera' ? (
           // Camera Tab
           <View className="relative h-80 w-full overflow-hidden rounded-[30px] border border-slate-100 bg-slate-900">
+            {/* Scanning / Verification Overlay */}
+            {isVerifying && (
+              <View
+                className="absolute inset-0 z-30 items-center justify-center p-6"
+                style={styles.verifyingOverlay}>
+                <View
+                  className="h-16 w-16 items-center justify-center rounded-2xl border mb-3"
+                  style={styles.verifyingIconBox}>
+                  <ActivityIndicator size="large" color="#10B981" />
+                </View>
+                <Text className="text-white font-bold text-base text-center px-4">
+                  {verifyingMessage}
+                </Text>
+                <Text className="text-slate-400 text-xs text-center mt-1">
+                  Validating document with government records...
+                </Text>
+              </View>
+            )}
+
             {scannedData ? (
-              // Captured Preview
+              // Captured Preview with Verified Badge
               <View className="flex-1">
                 <Image source={{ uri: scannedData.uri }} className="flex-1" resizeMode="cover" />
                 <View className="absolute inset-0 items-center justify-center" style={styles.overlayBg}>
-                  <View className="mb-4 h-16 w-16 items-center justify-center rounded-full bg-emerald-500">
-                    <Ionicons name="checkmark" size={32} color="white" />
+                  <View
+                    className="mb-2 h-14 w-14 items-center justify-center rounded-full bg-emerald-500"
+                    style={styles.verifiedBadgeShadow}>
+                    <Ionicons name="shield-checkmark" size={28} color="white" />
+                  </View>
+                  <Text className="font-bold text-base text-white text-center px-4 mb-1">
+                    {scannedData.displayName || scannedData.docName || 'Government Document'}
+                  </Text>
+                  <View className="flex-row items-center bg-emerald-600 px-3 py-1 rounded-full mb-4">
+                    <Ionicons name="checkmark-circle" size={14} color="white" />
+                    <Text className="text-white text-xs font-bold ml-1.5">Verified Document</Text>
                   </View>
                   <TouchableOpacity
                     onPress={resetCameraCapture}
-                    className="flex-row items-center rounded-full px-6 py-2.5 border border-white/30"
+                    disabled={isVerifying || isUploading}
+                    className="flex-row items-center rounded-full px-6 py-2.5"
                     style={styles.retakeBtnBg}>
-                    <Ionicons name="refresh-outline" size={18} color="white" className="mr-1.5" />
+                    <Ionicons name="refresh-outline" size={18} color="white" />
                     <Text className="font-bold text-sm text-white ml-1.5">Retake Photo</Text>
                   </TouchableOpacity>
                 </View>
@@ -312,16 +544,21 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
                     <View className="absolute right-0 top-0 h-6 w-6 rounded-tr-lg border-r-4 border-t-4 border-[#F6163C]" />
                     <View className="absolute bottom-0 left-0 h-6 w-6 rounded-bl-lg border-b-4 border-l-4 border-[#F6163C]" />
                     <View className="absolute bottom-0 right-0 h-6 w-6 rounded-br-lg border-b-4 border-r-4 border-[#F6163C]" />
+                    <View style={styles.frameLabelWrapper}>
+                      <Text style={styles.frameLabelText}>
+                        Align Government Document
+                      </Text>
+                    </View>
                   </View>
 
                   {/* Shutter Button */}
                   <TouchableOpacity
                     onPress={takePicture}
-                    disabled={isCapturing}
+                    disabled={isCapturing || isVerifying}
                     activeOpacity={0.85}
                     className="absolute bottom-6 h-16 w-16 items-center justify-center rounded-full border-4 border-white"
                     style={styles.shutterBtnBg}>
-                    {isCapturing ? (
+                    {isCapturing || isVerifying ? (
                       <ActivityIndicator color="white" />
                     ) : (
                       <View className="h-11 w-11 rounded-full bg-white" />
@@ -347,21 +584,38 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
         ) : (
           // File / Gallery Tab
           <View>
-            <TouchableOpacity
-              onPress={handleSelectSource}
-              activeOpacity={0.7}
-              style={[styles.dashedBorderBox, { borderStyle: 'dashed' }]}
-              className="h-44 items-center justify-center rounded-[30px] border-2 border-slate-200 p-6">
-              <View className="h-12 w-12 items-center justify-center rounded-full mb-2" style={styles.cloudIconWrapperBg}>
-                <Ionicons name="cloud-upload" size={24} color="#F6163C" />
+            {isVerifying ? (
+              <View
+                className="h-44 items-center justify-center rounded-[30px] border-2 border-dashed border-emerald-300 p-6"
+                style={styles.fileVerifyingBox}>
+                <View className="h-12 w-12 items-center justify-center rounded-full bg-emerald-100 mb-2">
+                  <ActivityIndicator size="small" color="#10B981" />
+                </View>
+                <Text className="font-bold text-base text-emerald-800 text-center">
+                  {verifyingMessage}
+                </Text>
+                <Text className="mt-1 text-center text-xs text-emerald-600">
+                  Validating document with government records...
+                </Text>
               </View>
-              <Text className="font-bold text-base text-slate-700">
-                {selectedFiles.length > 0 ? 'Select More PDF or Image Files' : 'Choose PDF or Image Files'}
-              </Text>
-              <Text className="mt-1 text-center text-xs text-slate-400">
-                Select files from photo gallery or device storage
-              </Text>
-            </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                onPress={handleSelectSource}
+                disabled={isUploading}
+                activeOpacity={0.7}
+                style={[styles.dashedBorderBox, { borderStyle: 'dashed' }]}
+                className="h-44 items-center justify-center rounded-[30px] border-2 border-slate-200 p-6">
+                <View className="h-12 w-12 items-center justify-center rounded-full mb-2" style={styles.cloudIconWrapperBg}>
+                  <Ionicons name="cloud-upload" size={24} color="#F6163C" />
+                </View>
+                <Text className="font-bold text-base text-slate-700">
+                  {selectedFiles.length > 0 ? 'Select More PDF or Image Files' : 'Choose PDF or Image Files'}
+                </Text>
+                <Text className="mt-1 text-center text-xs text-slate-400">
+                  Files are automatically verified upon selection
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </View>
@@ -370,8 +624,11 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
       {selectedFiles.length > 0 && (
         <View className="mb-6">
           <View className="mb-3 flex-row items-center justify-between">
-            <Text className="font-bold text-slate-800 text-base">Selected Documents to Upload</Text>
-            <TouchableOpacity onPress={handleSelectSource} activeOpacity={0.7}>
+            <Text className="font-bold text-slate-800 text-base">Verified Documents</Text>
+            <TouchableOpacity
+              onPress={handleSelectSource}
+              disabled={isVerifying || isUploading}
+              activeOpacity={0.7}>
               <Text className="font-bold text-xs text-[#F6163C]">+ Add More</Text>
             </TouchableOpacity>
           </View>
@@ -391,11 +648,19 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
                       />
                     </View>
                     <View className="ml-3 flex-1">
-                      <Text className="font-semibold text-slate-700 text-xs" numberOfLines={1}>
-                        {file.name}
-                      </Text>
+                      <View className="flex-row items-center gap-1.5 flex-wrap">
+                        <Text className="font-semibold text-slate-700 text-xs" numberOfLines={1}>
+                          {file.name}
+                        </Text>
+                        {file.verified && (
+                          <View className="flex-row items-center bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                            <Ionicons name="shield-checkmark" size={10} color="#10B981" />
+                            <Text className="text-[10px] font-bold text-emerald-700 ml-1">Verified</Text>
+                          </View>
+                        )}
+                      </View>
                       {file.size && (
-                        <Text className="text-[10px] text-slate-400">
+                        <Text className="text-[10px] text-slate-400 mt-0.5">
                           {(file.size / (1024 * 1024)).toFixed(2)} MB
                         </Text>
                       )}
@@ -403,23 +668,31 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
                   </View>
                   <TouchableOpacity
                     onPress={() => removeFile(file.id)}
-                    disabled={isUploading}
-                    className="ml-2 h-8 w-8 items-center justify-center rounded-full bg-slate-200/60">
+                    disabled={isUploading || isVerifying}
+                    className="ml-2 h-8 w-8 items-center justify-center rounded-full"
+                    style={styles.deleteBtnBg}>
                     <Ionicons name="trash-outline" size={16} color="#EF4444" />
                   </TouchableOpacity>
                 </View>
 
                 <View className="mt-3">
-                  <Text className="text-[11px] font-semibold text-slate-400 mb-1">
-                    Document Name #{idx + 1}
-                  </Text>
+                  <View className="flex-row items-center justify-between mb-1">
+                    <Text className="text-[11px] font-semibold text-slate-400">
+                      Document Name #{idx + 1}
+                    </Text>
+                    {file.displayName && (
+                      <Text className="text-[10px] font-semibold text-emerald-600">
+                        {file.displayName}
+                      </Text>
+                    )}
+                  </View>
                   <TextInput
                     value={file.docName}
                     onChangeText={(text) => updateFileDocName(file.id, text)}
-                    placeholder="e.g. Aadhar Card, GST, License"
+                    placeholder="e.g. GST Certificate, PAN"
                     placeholderTextColor="#94A3B8"
                     className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-900"
-                    editable={!isUploading}
+                    editable={!isUploading && !isVerifying}
                   />
                 </View>
               </View>
@@ -432,11 +705,14 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
       <View className="mt-auto pb-8">
         <TouchableOpacity
           onPress={handleFinalUpload}
-          disabled={isUploading}
+          disabled={isUploading || isVerifying || selectedFiles.length === 0}
           activeOpacity={0.8}
-          className={`h-14 w-full flex-row items-center justify-center rounded-2xl ${isUploading ? 'bg-slate-400' : 'bg-[#F6163C]'
-            }`}
-          style={styles.uploadBtnShadow}>
+          className={`h-14 w-full flex-row items-center justify-center rounded-2xl ${
+            isUploading || isVerifying || selectedFiles.length === 0
+              ? 'bg-slate-300'
+              : 'bg-[#F6163C]'
+          }`}
+          style={selectedFiles.length > 0 && !isUploading && !isVerifying ? styles.uploadBtnShadow : null}>
           {isUploading ? (
             <View className="flex-row items-center">
               <ActivityIndicator color="white" />
@@ -446,13 +722,22 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
                   : 'Uploading...'}
               </Text>
             </View>
+          ) : isVerifying ? (
+            <View className="flex-row items-center">
+              <ActivityIndicator color="white" size="small" />
+              <Text className="ml-3 font-bold text-[15px] text-white">
+                Verifying Document...
+              </Text>
+            </View>
           ) : (
             <>
-              <Ionicons name="cloud-upload-outline" size={20} color="white" />
+              <Ionicons name="shield-checkmark-outline" size={20} color="white" />
               <Text className="ml-2 font-bold text-[16px] text-white">
-                {selectedFiles.length <= 1
-                  ? 'Upload Document'
-                  : `Upload ${selectedFiles.length} Documents`}
+                {selectedFiles.length === 0
+                  ? 'Scan Document to Proceed'
+                  : selectedFiles.length === 1
+                  ? 'Submit Verified Document'
+                  : `Submit ${selectedFiles.length} Verified Documents`}
               </Text>
             </>
           )}
@@ -533,13 +818,51 @@ const styles = StyleSheet.create({
   },
   retakeBtnBg: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   targetBorderColor: {
     borderColor: 'rgba(255, 255, 255, 0.25)',
   },
+  frameLabelWrapper: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  frameLabelText: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 12,
+    fontWeight: '500',
+  },
   shutterBtnBg: {
     backgroundColor: 'rgba(246, 22, 60, 0.9)',
+  },
+  verifyingOverlay: {
+    backgroundColor: 'rgba(2, 6, 23, 0.85)',
+  },
+  verifyingIconBox: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    borderColor: 'rgba(16, 185, 129, 0.4)',
+  },
+  verifiedBadgeShadow: {
+    ...Platform.select({
+      ios: {
+        shadowColor: '#10B981',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
+  },
+  fileVerifyingBox: {
+    backgroundColor: 'rgba(236, 253, 245, 0.5)',
+  },
+  deleteBtnBg: {
+    backgroundColor: 'rgba(226, 232, 240, 0.6)',
   },
   uploadBtnShadow: {
     ...Platform.select({

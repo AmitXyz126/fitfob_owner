@@ -21,7 +21,7 @@ export default function ReviewStatusScreen() {
       setIsChecking(true);
       // 1. Hit /api/verify-approval/verification-status endpoint
       const statusRes = await userDetailsApi.getVerificationStatus();
-      
+
       const vStatus = statusRes?.verification_status || statusRes?.status || profileStatus?.verification_status;
       const reason = statusRes?.rejection_reason || statusRes?.reason || null;
 
@@ -133,9 +133,6 @@ export default function ReviewStatusScreen() {
           <Ionicons name="chevron-back" size={24} color="#64748B" />
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={handleLogout} activeOpacity={0.7} className="px-3 py-1">
-          <Text className="text-xs font-bold text-[#F6163C]">Switch Account</Text>
-        </TouchableOpacity>
       </View>
 
       {/* --- PENDING / UNDER REVIEW VIEW --- */}
@@ -153,8 +150,8 @@ export default function ReviewStatusScreen() {
 
           <Image
             className="mt-6"
-            source={require('../assets/images/submission.png')}
-            style={{ width: 130, height: 130 }}
+            source={require('../assets/images/review_status.png')}
+            style={{ width: '100%', height: 280 }}
             resizeMode="contain"
           />
         </View>
