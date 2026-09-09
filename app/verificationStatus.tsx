@@ -1,33 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Easing, DimensionValue } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Container } from '@/components/Container';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useUserDetail } from '@/hooks/useUserDetail';
 
-const CONFETTI_COUNT = 45;
-const COLORS = ['#F6163C', '#FFD700', '#3B82F6', '#10B981', '#EC4899', '#8B5CF6', '#F59E0B'];
+const CONFETTI_COUNT = 36;
+const GYM_ICONS = [
+  { lib: 'mci', name: 'dumbbell' },
+  { lib: 'ion', name: 'barbell' },
+  { lib: 'mci', name: 'kettlebell' },
+  { lib: 'mci', name: 'arm-flex' },
+  { lib: 'mci', name: 'weight' },
+  { lib: 'mci', name: 'weight-lifter' },
+  { lib: 'ion', name: 'trophy' },
+  { lib: 'ion', name: 'flame' },
+  { lib: 'ion', name: 'medal' },
+  { lib: 'mci', name: 'heart-flash' },
+] as const;
 
-interface ConfettiPiece {
+const GYM_COLORS = ['#F6163C', '#FF2A4D', '#D90429', '#FF6B00', '#FFD700', '#E11D48', '#FF4D6D', '#3B82F6'];
+
+interface GymParticle {
   id: number;
+  iconLib: 'mci' | 'ion';
+  iconName: string;
   color: string;
-  width: number;
-  height: number;
-  borderRadius: number;
+  size: number;
   position: Animated.ValueXY;
   rotation: Animated.Value;
   opacity: Animated.Value;
 }
 
-const createParticles = (): ConfettiPiece[] => {
+const createParticles = (): GymParticle[] => {
   return Array.from({ length: CONFETTI_COUNT }).map((_, index) => {
+    const iconDef = GYM_ICONS[index % GYM_ICONS.length];
     return {
       id: index,
-      color: COLORS[index % COLORS.length],
-      width: Math.random() * 8 + 6,
-      height: Math.random() * 12 + 6,
-      borderRadius: Math.random() > 0.5 ? 0 : 3,
+      iconLib: iconDef.lib,
+      iconName: iconDef.name,
+      color: GYM_COLORS[index % GYM_COLORS.length],
+      size: Math.floor(Math.random() * 10 + 20), // 20px to 30px
       position: new Animated.ValueXY({ x: 0, y: 0 }),
       rotation: new Animated.Value(0),
       opacity: new Animated.Value(1),
@@ -47,40 +61,16 @@ export default function VerificationStatusScreen() {
   // Radar/Ripple background loop
   const rippleValue = React.useRef(new Animated.Value(0)).current;
 
-  // Confetti particles
-  const [particles] = useState<ConfettiPiece[]>(createParticles);
+  // Gym assets particles
+  const [particles] = useState<GymParticle[]>(createParticles);
 
-  React.useEffect(() => {
-    // 1. Pop the Shield
-    Animated.spring(shieldScale, {
-      toValue: 1,
-      tension: 50,
-      friction: 6,
-      useNativeDriver: true,
-    }).start();
+  const triggerBlast = useCallback(() => {
+    particles.forEach((p) => {
+      p.position.setValue({ x: 0, y: 0 });
+      p.rotation.setValue(0);
+      p.opacity.setValue(1);
+    });
 
-    // 2. Pop the Checkmark after shield pop
-    Animated.sequence([
-      Animated.delay(350),
-      Animated.spring(checkScale, {
-        toValue: 1,
-        tension: 60,
-        friction: 5,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    // 3. Start radar ripple loop
-    Animated.loop(
-      Animated.timing(rippleValue, {
-        toValue: 1,
-        duration: 2000,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: true,
-      })
-    ).start();
-
-    // 4. Confetti Blast animations
     const blastAnimations = particles.map((p) => {
       const blastX = (Math.random() - 0.5) * 360; // shoot sideways
       const blastY = -120 - Math.random() * 180;  // shoot upwards
@@ -130,7 +120,41 @@ export default function VerificationStatusScreen() {
     });
 
     Animated.parallel(blastAnimations).start();
-  }, [shieldScale, checkScale, rippleValue, particles]);
+  }, [particles]);
+
+  React.useEffect(() => {
+    // 1. Pop the Shield
+    Animated.spring(shieldScale, {
+      toValue: 1,
+      tension: 50,
+      friction: 6,
+      useNativeDriver: true,
+    }).start();
+
+    // 2. Pop the Checkmark after shield pop
+    Animated.sequence([
+      Animated.delay(350),
+      Animated.spring(checkScale, {
+        toValue: 1,
+        tension: 60,
+        friction: 5,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // 3. Start radar ripple loop
+    Animated.loop(
+      Animated.timing(rippleValue, {
+        toValue: 1,
+        duration: 2000,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      })
+    ).start();
+
+    // 4. Trigger Gym Assets Celebration Blast
+    triggerBlast();
+  }, [shieldScale, checkScale, rippleValue, triggerBlast]);
 
   const rippleScale = rippleValue.interpolate({
     inputRange: [0, 1],
@@ -144,12 +168,12 @@ export default function VerificationStatusScreen() {
 
   // Format ID or use a default one
   const ownerId = user?.clubOwnerDetail?.clubId
-  console.log(user , "hey user")
+  console.log(user, "hey user")
   const ownerEmail = user?.email || profileStatus?.email || 'owner@fitfob.com';
 
   return (
     <Container>
-      {/* Confetti Overlay */}
+      {/* Gym Assets Confetti Blast Overlay */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none" className="z-50 items-center justify-center">
         {particles.map((p) => {
           const spin = p.rotation.interpolate({
@@ -162,10 +186,6 @@ export default function VerificationStatusScreen() {
               key={p.id}
               style={{
                 position: 'absolute',
-                width: p.width,
-                height: p.height,
-                backgroundColor: p.color,
-                borderRadius: p.borderRadius,
                 transform: [
                   { translateX: p.position.x },
                   { translateY: p.position.y },
@@ -173,7 +193,13 @@ export default function VerificationStatusScreen() {
                 ],
                 opacity: p.opacity,
               }}
-            />
+            >
+              {p.iconLib === 'mci' ? (
+                <MaterialCommunityIcons name={p.iconName as any} size={p.size} color={p.color} />
+              ) : (
+                <Ionicons name={p.iconName as any} size={p.size} color={p.color} />
+              )}
+            </Animated.View>
           );
         })}
       </View>
@@ -196,15 +222,20 @@ export default function VerificationStatusScreen() {
       <View className="flex-1 px-1 mt-6">
         {/* Shield Icon Wrapper */}
         <View className="items-center mb-6">
-          {/* Animated Glowing Radar Ripple & Pop Icon */}
-          <View style={{ width: 100, height: 100, alignItems: 'center', justifycontent: 'center', position: 'relative' } as any} className="mb-4">
+          {/* Animated Glowing Radar Ripple & Pop Icon (Tap to replay burst) */}
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={triggerBlast}
+            style={{ width: 100, height: 100, alignItems: 'center', justifyContent: 'center', position: 'relative' }}
+            className="mb-4"
+          >
             {/* Pulsing Ripple Circle */}
             <Animated.View style={{
               position: 'absolute',
               width: 72,
               height: 72,
               borderRadius: 36,
-              backgroundColor: '#A7F3D0',
+              backgroundColor: '#FECDD3',
               transform: [{ scale: rippleScale }],
               opacity: rippleOpacity,
               zIndex: 1,
@@ -216,7 +247,7 @@ export default function VerificationStatusScreen() {
               width: 80,
               height: 80,
               borderRadius: 40,
-              backgroundColor: '#E8F8F5',
+              backgroundColor: '#FFF1F2',
               alignItems: 'center',
               justifyContent: 'center',
               transform: [{ scale: shieldScale }],
@@ -224,18 +255,18 @@ export default function VerificationStatusScreen() {
             }}>
               {/* Checkmark popping up inside shield */}
               <Animated.View style={{ transform: [{ scale: checkScale }] }}>
-                <Ionicons name="shield-checkmark" size={40} color="#10B981" />
+                <Ionicons name="shield-checkmark" size={40} color="#F6163C" />
               </Animated.View>
             </Animated.View>
-          </View>
+          </TouchableOpacity>
 
           {/* Title & Badge */}
           <Text className="font-sans font-extrabold text-[20px] text-[#1C1C1C] text-center">
             Your Account is Verified!
           </Text>
 
-          <View className="mt-2.5 rounded-full bg-[#E8F8F5] px-4 py-1.5 border border-[#A3E635]/20">
-            <Text className="font-sans font-bold text-[11px] text-[#10B981] uppercase tracking-wider">
+          <View className="mt-2.5 rounded-full bg-[#FFF1F2] px-4 py-1.5 border border-[#F6163C]/20">
+            <Text className="font-sans font-bold text-[11px] text-[#F6163C] uppercase tracking-wider">
               Approved & Active
             </Text>
           </View>
@@ -252,12 +283,6 @@ export default function VerificationStatusScreen() {
             <Text className="font-sans font-medium text-slate-400 text-[13px]">Verified ID</Text>
             <Text className="font-sans font-bold text-[#1C1C1C] text-[13px]">{ownerId}</Text>
           </View>
-
-          <View className="flex-row justify-between py-3 border-b border-slate-100">
-            <Text className="font-sans font-medium text-slate-400 text-[13px]">Document Type</Text>
-            <Text className="font-sans font-bold text-[#1C1C1C] text-[13px]">Business License & ID</Text>
-          </View>
-
           <View className="flex-row justify-between py-3">
             <Text className="font-sans font-medium text-slate-400 text-[13px]">Registered Email</Text>
             <Text className="font-sans font-bold text-[#1C1C1C] text-[13px]">{ownerEmail}</Text>

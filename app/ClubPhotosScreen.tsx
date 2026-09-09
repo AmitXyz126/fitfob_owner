@@ -1,6 +1,22 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
-import { ChevronLeft, Image as ImageIcon, Plus, X } from 'lucide-react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  Image,
+  Alert,
+  ActivityIndicator,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import {
+  ChevronLeft,
+  Image as ImageIconLucide,
+  Plus as PlusIcon,
+  X as XIcon,
+} from 'lucide-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Container } from '@/components/Container';
@@ -17,7 +33,11 @@ const ClubPhotosScreen = () => {
   const { profileStatus, updateClubOwner } = useUserDetail();
   const { data: myOwnerData } = useClubOwnerMe();
 
-  const [photos, setPhotos] = useState<{ id: string; uri: string; rawId?: number | null; isUploading?: boolean }[]>([]);
+  const [images, setImages] = useState<(string | null)[]>(Array(6).fill(null));
+  const [descriptions, setDescriptions] = useState<string[]>(Array(6).fill(''));
+  const [rawIds, setRawIds] = useState<(number | null)[]>(Array(6).fill(null));
+  const [uploadingSlots, setUploadingSlots] = useState<boolean[]>(Array(6).fill(false));
+  const [showMore, setShowMore] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   const getImageUriString = (val: any): string => {
@@ -72,37 +92,59 @@ const ClubPhotosScreen = () => {
             } catch (e) { }
           }
 
-          let combinedPhotos: any[] = [];
+          let sourcePhotos: any[] = [];
           if (Array.isArray(remotePhotos) && remotePhotos.length > 0) {
-            combinedPhotos = remotePhotos;
+            sourcePhotos = remotePhotos;
           } else if (parsedLocal.length > 0) {
-            combinedPhotos = parsedLocal;
+            sourcePhotos = parsedLocal;
           }
 
-          if (combinedPhotos.length > 0) {
-            const mapped = combinedPhotos
-              .map((item: any, idx: number) => {
+          if (sourcePhotos.length > 0) {
+            const newImages = [...Array(6).fill(null)];
+            const newDescriptions = [...Array(6).fill('')];
+            const newRawIds = [...Array(6).fill(null)];
+            let hasMoreThan4 = false;
+
+            sourcePhotos.forEach((item: any, idx: number) => {
+              if (idx < 6) {
                 const uri = getImageUriString(item);
-                const id = String(item?.id || item?.rawId || idx);
-                const rawId = typeof item === 'object' && item?.id ? item.id : item?.rawId || null;
-                return {
-                  id,
-                  uri,
-                  rawId,
-                  isUploading: false,
-                };
-              })
-              .filter((item: any) => Boolean(item.uri));
+                if (uri) {
+                  newImages[idx] = uri;
 
-            if (mapped.length > 0) {
-              setPhotos(mapped);
-              await AsyncStorage.setItem('club_photos', JSON.stringify(mapped));
-              return;
+                  const localMatch = Array.isArray(parsedLocal)
+                    ? parsedLocal.find(
+                      (l: any) =>
+                        l.uri === uri ||
+                        (item.id && l.rawId === item.id) ||
+                        l.id === String(idx)
+                    )
+                    : null;
+
+                  newDescriptions[idx] =
+                    item.description ||
+                    item.caption ||
+                    item.title ||
+                    localMatch?.description ||
+                    '';
+
+                  newRawIds[idx] =
+                    typeof item === 'object' && item?.id
+                      ? item.id
+                      : item?.rawId || localMatch?.rawId || null;
+
+                  if (idx >= 4) {
+                    hasMoreThan4 = true;
+                  }
+                }
+              }
+            });
+
+            setImages(newImages);
+            setDescriptions(newDescriptions);
+            setRawIds(newRawIds);
+            if (hasMoreThan4) {
+              setShowMore(true);
             }
-          }
-
-          if (parsedLocal.length > 0) {
-            setPhotos(parsedLocal);
           }
         } catch (e) {
           console.log('Error loading club photos:', e);
@@ -112,12 +154,7 @@ const ClubPhotosScreen = () => {
     }, [profileStatus, myOwnerData, user])
   );
 
-  const pickImage = async () => {
-    if (photos.length >= 6) {
-      Alert.alert('Limit Reached', 'Only 6 photos can be uploaded.');
-      return;
-    }
-
+  const pickImage = async (index: number) => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission Denied', 'Gallery access is required.');
@@ -127,26 +164,33 @@ const ClubPhotosScreen = () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      aspect: [4, 3],
+      aspect: [1, 1],
       quality: 0.8,
     });
 
     if (result.canceled || !result.assets?.[0]?.uri) return;
 
     const selectedUri = result.assets[0].uri;
-    const tempId = Date.now().toString();
 
-    // 1. Render selected photo immediately with per-card uploading overlay
-    setPhotos((prev) => [...prev, { id: tempId, uri: selectedUri, isUploading: true }]);
+    // Set local image immediately & mark slot as uploading
+    setImages((prev) => {
+      const updated = [...prev];
+      updated[index] = selectedUri;
+      return updated;
+    });
+    setUploadingSlots((prev) => {
+      const updated = [...prev];
+      updated[index] = true;
+      return updated;
+    });
 
     try {
-      console.log('🚀 Uploading photo to /api/upload...');
+      console.log(`Uploading photo slot #${index + 1}...`);
       const uploadRes = await userDetailsApi.uploadFile({
         uri: selectedUri,
-        name: `club_photo_${Date.now()}.jpg`,
+        name: `club_photo_${index}_${Date.now()}.jpg`,
         type: 'image/jpeg',
       });
-      console.log('📸 Upload res from /api/upload:', uploadRes);
 
       let logoId: number | null = null;
       let uploadedUrl: string | null = null;
@@ -164,13 +208,14 @@ const ClubPhotosScreen = () => {
 
       const finalUri = getImageUriString(uploadedUrl || selectedUri);
 
-      // 2. Mark upload complete on this specific card & update uri/rawId
-      setPhotos((prev) => {
-        const updated = prev.map((p) =>
-          p.id === tempId ? { ...p, uri: finalUri, rawId: logoId, isUploading: false } : p
-        );
-        const cleanToStore = updated.map(({ isUploading, ...rest }) => rest);
-        AsyncStorage.setItem('club_photos', JSON.stringify(cleanToStore));
+      setImages((prev) => {
+        const updated = [...prev];
+        updated[index] = finalUri;
+        return updated;
+      });
+      setRawIds((prev) => {
+        const updated = [...prev];
+        updated[index] = logoId;
         return updated;
       });
 
@@ -186,33 +231,68 @@ const ClubPhotosScreen = () => {
         text1: 'Upload Failed',
         text2: error?.message || 'Failed to upload photo to server.',
       });
-      setPhotos((prev) =>
-        prev.map((p) => (p.id === tempId ? { ...p, isUploading: false } : p))
-      );
+    } finally {
+      setUploadingSlots((prev) => {
+        const updated = [...prev];
+        updated[index] = false;
+        return updated;
+      });
     }
   };
 
-  const removePhoto = async (id: string) => {
-    const updated = photos.filter((p) => p.id !== id);
-    setPhotos(updated);
-    try {
-      const cleanToStore = updated.map(({ isUploading, ...rest }) => rest);
-      await AsyncStorage.setItem('club_photos', JSON.stringify(cleanToStore));
-    } catch (e) {
-      console.log('Error updating AsyncStorage:', e);
-    }
+  const removePhoto = (index: number) => {
+    setImages((prev) => {
+      const updated = [...prev];
+      updated[index] = null;
+      return updated;
+    });
+    setDescriptions((prev) => {
+      const updated = [...prev];
+      updated[index] = '';
+      return updated;
+    });
+    setRawIds((prev) => {
+      const updated = [...prev];
+      updated[index] = null;
+      return updated;
+    });
+  };
+
+  const handleDescriptionChange = (index: number, text: string) => {
+    setDescriptions((prev) => {
+      const updated = [...prev];
+      updated[index] = text;
+      return updated;
+    });
   };
 
   const handleSaveAll = async () => {
-    if (photos.length === 0) {
+    const hasAnyPhoto = images.some((img) => !!img);
+    if (!hasAnyPhoto) {
       Alert.alert('No Photos', 'Please add at least one photo.');
       return;
     }
 
     setIsSaving(true);
     try {
-      const cleanToStore = photos.map(({ isUploading, ...rest }) => rest);
-      await AsyncStorage.setItem('club_photos', JSON.stringify(cleanToStore));
+      const validItems = images
+        .map((uri, idx) => {
+          if (!uri) return null;
+          return {
+            id: String(rawIds[idx] || idx),
+            uri,
+            rawId: rawIds[idx] || null,
+            description: descriptions[idx]?.trim() || '',
+          };
+        })
+        .filter(Boolean) as {
+          id: string;
+          uri: string;
+          rawId: number | null;
+          description: string;
+        }[];
+
+      await AsyncStorage.setItem('club_photos', JSON.stringify(validItems));
 
       try {
         const ownerId =
@@ -223,11 +303,21 @@ const ClubPhotosScreen = () => {
           user?.clubOwnerDetail?.id ||
           user?.id;
 
-        const photoUrisOrIds = cleanToStore.map((p) => p.rawId || p.uri);
+        const photoUrisOrIds = validItems.map((p) => p.rawId || p.uri);
+        const clubPhotoDetails = validItems.map((p) => ({
+          id: p.rawId,
+          uri: p.uri,
+          url: p.uri,
+          description: p.description,
+          caption: p.description,
+        }));
+
         await updateClubOwner.mutateAsync({
           id: ownerId,
           clubPhotos: photoUrisOrIds,
           photos: photoUrisOrIds,
+          clubPhotoDetails,
+          photosWithDescription: clubPhotoDetails,
         });
       } catch (e) {
         console.log('updateClubOwner photos sync note:', e);
@@ -251,10 +341,14 @@ const ClubPhotosScreen = () => {
     }
   };
 
-  const isAnyUploading = photos.some((p) => p.isUploading);
+  const isAnyUploading = uploadingSlots.some(Boolean);
+  const photosCount = images.filter(Boolean).length;
+  const visibleCount = showMore ? 6 : 4;
+  const visibleImages = images.slice(0, visibleCount);
 
   return (
     <Container>
+      {/* Header */}
       <View className="flex-row items-center py-4">
         <TouchableOpacity onPress={() => router.back()} className="mr-4">
           <ChevronLeft color="black" size={24} />
@@ -264,86 +358,165 @@ const ClubPhotosScreen = () => {
         </Text>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
-        <View className="mt-4">
-          <Text className="text-2xl font-bold text-[#1C1C1C]">Upload Club Photos</Text>
-          <Text className="mt-1 text-sm text-gray-400 leading-5">
-            Upload 1 to 6 photos of your gym so members know what to expect
-          </Text>
-        </View>
-
-        <View className="mt-8 flex-row flex-wrap justify-between">
-          {/* Selected Photos Grid */}
-          {photos.map((item) => (
-            <View key={item.id} className="relative mb-4 w-[48%] h-32 overflow-hidden rounded-2xl bg-gray-100">
-              <Image source={{ uri: item.uri }} className="h-full w-full" resizeMode="cover" />
-
-              {/* Individual Spinner Loading Overlay for uploading photo */}
-              {item.isUploading && (
-                <View className="absolute inset-0 items-center justify-center bg-black/40 rounded-2xl">
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                  <Text className="mt-1.5 text-[11px] font-bold text-white">Uploading...</Text>
-                </View>
-              )}
-
-              {/* Delete Button (only if not uploading) */}
-              {!item.isUploading && (
-                <TouchableOpacity
-                  onPress={() => removePhoto(item.id)}
-                  activeOpacity={0.8}
-                  className="absolute top-2 right-2 h-7 w-7 items-center justify-center rounded-full bg-[#F6163C] border border-white/40 shadow-md z-10"
-                >
-                  <Ionicons name="trash-outline" size={14} color="#FFFFFF" />
-                </TouchableOpacity>
-              )}
-            </View>
-          ))}
-
-          {/* Remaining Empty Slots */}
-          {Array.from({ length: Math.max(0, 6 - photos.length) }).map((_, index) => (
-            <TouchableOpacity
-              key={`empty-${index}`}
-              onPress={pickImage}
-              disabled={isAnyUploading}
-              className="mb-4 h-32 w-[48%] items-center justify-center rounded-2xl bg-gray-50 border border-dashed border-gray-200"
-            >
-              <ImageIcon size={32} color="#D1D5DB" />
-              <View className="absolute bottom-2 right-2 rounded-full bg-white p-0.5 shadow-sm">
-                <Plus size={12} color="#9CA3AF" />
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <View className="mt-6">
-          <Text className="font-bold text-gray-800">Tips for high quality photos</Text>
-          <View className="mt-3">
-            <Text className="text-xs text-[#697281] font-sans font-normal leading-4 mb-1">• Upload 1 to 6 photos to showcase your gym facilities.</Text>
-            <Text className="text-xs text-[#697281] font-sans font-normal leading-4 mb-1">• High-quality images attract more members.</Text>
-            <Text className="text-xs text-[#697281] font-sans font-normal leading-4 mb-1">• Cover gym area, reception, and changing rooms.</Text>
-          </View>
-        </View>
-      </ScrollView>
-
-      {/* Save Button */}
-      <View className="py-4">
-        <TouchableOpacity
-          onPress={handleSaveAll}
-          disabled={photos.length === 0 || isAnyUploading || isSaving}
-          className={`w-full items-center justify-center rounded-2xl py-4 shadow-lg ${photos.length === 0 || isAnyUploading || isSaving
-              ? 'bg-gray-300'
-              : 'bg-[#F6163C] shadow-red-200'
-            }`}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingBottom: 20 }}
+          className="flex-1"
         >
-          {isSaving ? (
-            <ActivityIndicator color="white" size="small" />
-          ) : (
-            <Text className="font-bold text-white">
-              {photos.length === 0 ? 'Add Photos' : `Save Photos (${photos.length}/6)`}
+          {/* Title & Subtitle */}
+          <View className="mt-4">
+            <Text className="font-bold text-[28px] text-slate-900">Upload Club Photos</Text>
+            <Text className="mt-2 text-[14px] leading-5 text-slate-400">
+              Upload great photos of your gym so members know what to expect
             </Text>
+          </View>
+
+          {/* Photo Cards Grid (4 initially, expands to 6 on Show More) */}
+          <View className="mt-8 flex-row flex-wrap justify-between">
+            {visibleImages.map((imgUri, index) => (
+              <View
+                key={index}
+                className="mb-4 w-[48%] rounded-[20px] border border-slate-100 bg-[#F8FAFC] p-2.5"
+              >
+                {/* Image Preview / Upload Box */}
+                <View className="h-28 w-full overflow-hidden rounded-[15px]">
+                  {imgUri ? (
+                    <View className="relative h-full w-full bg-slate-100">
+                      <Image source={{ uri: imgUri }} className="h-full w-full" resizeMode="cover" />
+
+                      {uploadingSlots[index] ? (
+                        <View className="absolute inset-0 items-center justify-center bg-black/40 rounded-[15px]">
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                          <Text className="mt-1 text-[10px] font-bold text-white">Uploading...</Text>
+                        </View>
+                      ) : (
+                        <>
+                          <TouchableOpacity
+                            onPress={() => removePhoto(index)}
+                            activeOpacity={0.8}
+                            className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5"
+                          >
+                            <XIcon size={12} color="white" strokeWidth={3} />
+                          </TouchableOpacity>
+                          <View className="absolute bottom-1.5 left-2 rounded-full bg-black/45 px-2 py-0.5">
+                            <Text className="text-[10px] font-semibold text-white">
+                              Photo #{index + 1}
+                            </Text>
+                          </View>
+                        </>
+                      )}
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => pickImage(index)}
+                      activeOpacity={0.6}
+                      disabled={isAnyUploading}
+                      className="h-full w-full items-center justify-center rounded-[15px] border border-dashed border-slate-200 bg-white"
+                    >
+                      <ImageIconLucide size={28} color="#cbd5e1" strokeWidth={1.5} />
+                      <View className="absolute bottom-2 right-2 rounded-full border border-slate-100 bg-slate-50 p-1">
+                        <PlusIcon size={10} color="#94a3b8" strokeWidth={3} />
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Clean Caption Input with Pencil Icon */}
+                <View
+                  className={`mt-2.5 h-9 flex-row items-center rounded-xl border px-2.5 ${imgUri ? 'border-slate-200 bg-white' : 'border-slate-100 bg-slate-100/50'
+                    }`}
+                >
+                  <Ionicons
+                    name="create-outline"
+                    size={14}
+                    color={imgUri ? '#F6163C' : '#94A3B8'}
+                  />
+                  <TextInput
+                    value={descriptions[index] || ''}
+                    onChangeText={(text) => handleDescriptionChange(index, text)}
+                    placeholder={imgUri ? 'Add caption (e.g. Cardio)' : 'Add photo first'}
+                    placeholderTextColor="#94A3B8"
+                    editable={!!imgUri && !uploadingSlots[index]}
+                    maxLength={50}
+                    className="ml-2 flex-1 text-[11px] font-medium text-slate-800 p-0"
+                  />
+                </View>
+              </View>
+            ))}
+          </View>
+
+          {/* Show More / Show Less Toggle Button */}
+          {!showMore ? (
+            <TouchableOpacity
+              onPress={() => setShowMore(true)}
+              activeOpacity={0.7}
+              className="mb-4 w-full flex-row items-center justify-center rounded-2xl border border-dashed border-red-200 bg-red-50/50 py-3.5"
+            >
+              <Ionicons name="add-circle-outline" size={17} color="#F6163C" />
+              <Text className="ml-2 font-bold text-xs text-[#F6163C]">
+                + Show More (+2 Photos)
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              onPress={() => setShowMore(false)}
+              activeOpacity={0.7}
+              className="mb-4 w-full flex-row items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 py-2.5"
+            >
+              <Ionicons name="chevron-up-outline" size={16} color="#64748B" />
+              <Text className="ml-1.5 font-semibold text-xs text-slate-600">
+                Show Less
+              </Text>
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
-      </View>
+
+          {/* Tips for high quality photos */}
+          <View className="mt-2">
+            <Text className="mb-3 font-bold text-[16px] text-slate-800">
+              Tips for high quality photos
+            </Text>
+            <View className="gap-y-2">
+              <View className="flex-row items-start">
+                <Text className="mr-2 text-slate-400">•</Text>
+                <Text className="flex-1 text-[13px] text-slate-500">
+                  Upload up to 6 photos showcasing your gym facilities.
+                </Text>
+              </View>
+              <View className="flex-row items-start">
+                <Text className="mr-2 text-slate-400">•</Text>
+                <Text className="flex-1 text-[13px] text-slate-500">
+                  Add clear captions (e.g. Cardio Zone, Free Weights, Steam Bath) for members.
+                </Text>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+
+        {/* Save Button */}
+        <View className="py-4 bg-white">
+          <TouchableOpacity
+            onPress={handleSaveAll}
+            disabled={photosCount === 0 || isAnyUploading || isSaving}
+            className={`w-full items-center justify-center rounded-2xl py-4 shadow-lg ${photosCount === 0 || isAnyUploading || isSaving
+                ? 'bg-gray-300'
+                : 'bg-[#F6163C] shadow-red-200'
+              }`}
+          >
+            {isSaving ? (
+              <ActivityIndicator color="white" size="small" />
+            ) : (
+              <Text className="font-bold text-white text-base">
+                {photosCount === 0 ? 'Add Photos' : `Save Photos (${photosCount}/6)`}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
     </Container>
   );
 };

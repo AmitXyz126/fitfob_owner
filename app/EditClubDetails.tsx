@@ -168,7 +168,10 @@ const EditClubDetails = () => {
 
       if (cName) setClubName(cName);
       if (oName) setOwnerName(oName);
-      if (pPhone) setPhone(String(pPhone));
+      if (pPhone) {
+        const cleaned = String(pPhone).replace(/[^0-9]/g, '');
+        setPhone(cleaned.length > 10 ? cleaned.slice(-10) : cleaned);
+      }
       if (pEmail) setEmail(pEmail);
       if (logo) setClubImage(logo);
 
@@ -246,6 +249,12 @@ const EditClubDetails = () => {
 
     if (!clubName.trim()) return Alert.alert('Required', 'Please enter Club Name');
     if (!ownerName.trim()) return Alert.alert('Required', 'Please enter Owner Name');
+
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    if (!cleanPhone) return Alert.alert('Required', 'Please enter Phone Number');
+    if (cleanPhone.length !== 10) {
+      return Alert.alert('Invalid Phone Number', 'Please enter a valid 10-digit phone number');
+    }
 
     setIsSaving(true);
     const pData = profileStatus?.data || profileStatus || {};
@@ -355,7 +364,7 @@ const EditClubDetails = () => {
 
     const payloadData: any = {
       ownerName: ownerName.trim(),
-      phoneNumber: phone.trim(),
+      phoneNumber: cleanPhone,
       email: email.trim(),
       clubName: clubName.trim(),
     };
@@ -497,8 +506,12 @@ const EditClubDetails = () => {
               <TextInput
                 value={phone}
                 keyboardType="numeric"
-                onChangeText={setPhone}
-                placeholder="Enter phone number"
+                maxLength={10}
+                onChangeText={(text) => {
+                  const cleaned = text.replace(/[^0-9]/g, '').slice(0, 10);
+                  setPhone(cleaned);
+                }}
+                placeholder="Enter 10-digit number"
                 placeholderTextColor="#94A3B8"
                 className="flex-1 text-base text-slate-800"
               />

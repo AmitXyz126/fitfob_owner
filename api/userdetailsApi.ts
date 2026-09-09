@@ -275,25 +275,37 @@ export const userDetailsApi = {
     return response.data;
   },
 
-  uploadClubPhotos: async (photos: any[]) => {
+  uploadSingleClubPhoto: async (data: { file: { uri: string; name?: string; type?: string }; imageInfo: string }) => {
     const formData = new FormData();
+    formData.append('image', {
+      uri: data.file.uri,
+      name: data.file.name || `club_photo_${Date.now()}.jpg`,
+      type: data.file.type || 'image/jpeg',
+    } as any);
+    formData.append('imageInfo', data.imageInfo || '');
 
-    photos.forEach((photo, index) => {
-      formData.append('clubPhotos', {
-        uri: photo.uri,
-        name: photo.name || `photo_${index}_${Date.now()}.jpg`,
-        type: photo.type || 'image/jpeg',
-      } as any);
-    });
-
-    const response = await api.post(ENDPOINTS.STEP_7, formData, {
+    const response = await api.post(ENDPOINTS.UPLOAD_CLUB_PHOTO, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
         Accept: 'application/json',
       },
-      transformRequest: (data) => data,
+      transformRequest: (d) => d,
     });
+    return response.data;
+  },
 
+  getClubPhotos: async () => {
+    const response = await api.get(ENDPOINTS.GET_CLUB_PHOTOS);
+    return response.data;
+  },
+
+  deleteClubPhoto: async (documentId: string) => {
+    const response = await api.delete(ENDPOINTS.DELETE_CLUB_PHOTO(documentId));
+    return response.data;
+  },
+
+  confirmOnboarding: async () => {
+    const response = await api.post(ENDPOINTS.CONFIRM_ONBOARDING, {});
     return response.data;
   },
 

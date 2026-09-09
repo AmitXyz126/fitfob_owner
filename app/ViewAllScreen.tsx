@@ -9,7 +9,6 @@ import {
   Modal,
   StyleSheet,
   Pressable,
-  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -171,7 +170,6 @@ const CheckinItem = ({ item, index, scrollY, onSelect }: any) => {
 
 const ViewAllScreen = () => {
   const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedMember, setSelectedMember] = useState<any>(null);
 
   const scrollY = useSharedValue(0);
@@ -182,16 +180,13 @@ const ViewAllScreen = () => {
     },
   });
 
-  // Reset scroll offset on filter/search change to prevent index interpolation bounds crash
+  // Reset scroll offset on search change to prevent index interpolation bounds crash
   useEffect(() => {
     scrollY.value = 0;
-  }, [selectedCategory, search, scrollY]);
+  }, [search, scrollY]);
 
   const filteredData = ALL_CHECKINS.filter((item) => {
-    const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory =
-      selectedCategory === 'All' || item.type.toLowerCase() === selectedCategory.toLowerCase();
-    return matchesSearch && matchesCategory;
+    return item.name.toLowerCase().includes(search.toLowerCase());
   });
 
   return (
@@ -211,7 +206,7 @@ const ViewAllScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {/* --- PREMIUM INTERACTIVE SEARCH BAR & CATEGORY FILTERS --- */}
+      {/* --- PREMIUM INTERACTIVE SEARCH BAR --- */}
       <View className="mb-5">
         {/* Search Input Bar */}
         <View className="flex-row items-center rounded-2xl border border-slate-200 bg-white px-4 py-1 shadow-sm shadow-slate-100">
@@ -238,32 +233,6 @@ const ViewAllScreen = () => {
             </View>
           )}
         </View>
-
-        {/* Quick Category Filters */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="-mx-1 mt-3 px-1 flex-row">
-          {['All', 'Luxury', 'Premium', 'Standard'].map((cat) => {
-            const isSelected = selectedCategory === cat;
-            return (
-              <TouchableOpacity
-                key={cat}
-                onPress={() => setSelectedCategory(cat)}
-                activeOpacity={0.7}
-                className={`mr-2 rounded-[13px] border px-4 py-2 ${isSelected
-                    ? 'border-[#F6163C] bg-[#F6163C]'
-                    : 'border-slate-200 bg-white'
-                  }`}>
-                <Text
-                  className={`font-semibold text-[14px] ${isSelected ? 'text-white' : 'text-slate-600'
-                    }`}>
-                  {cat === 'All' ? 'All Passes' : cat}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
       </View>
 
       {/* --- RECENT CHECK-INS LIST WITH STACKING CARD SCROLL ANIMATION --- */}
@@ -285,18 +254,17 @@ const ViewAllScreen = () => {
               No Check-in History Found
             </Text>
             <Text className="mt-1 px-8 text-center text-[13px] leading-5 text-slate-500">
-              {search.length > 0 || selectedCategory !== 'All'
+              {search.length > 0
                 ? 'No check-ins match your search criteria.'
                 : 'All member check-in activities will be logged and listed right here.'}
             </Text>
-            {(search.length > 0 || selectedCategory !== 'All') && (
+            {search.length > 0 && (
               <TouchableOpacity
                 onPress={() => {
                   setSearch('');
-                  setSelectedCategory('All');
                 }}
                 className="mt-4 rounded-full bg-[#F6163C] px-5 py-2.5 shadow-sm">
-                <Text className="font-semibold text-xs text-white">Reset Filters</Text>
+                <Text className="font-semibold text-xs text-white">Reset Search</Text>
               </TouchableOpacity>
             )}
           </View>

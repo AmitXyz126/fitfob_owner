@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, Image, ActivityIndicator, Dimensions } from 'react-native';
 import { Container } from '@/components/Container';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -8,6 +8,8 @@ import { useUserDetail } from '@/hooks/useUserDetail';
 import { useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
 import { userDetailsApi } from '@/api/userdetailsApi';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function ReviewStatusScreen() {
   const { user, logOut } = useAuthStore();
@@ -136,32 +138,35 @@ export default function ReviewStatusScreen() {
       </View>
 
       {/* --- PENDING / UNDER REVIEW VIEW --- */}
-      <View className="flex-1 justify-between px-6 py-4">
-        <View className="flex-1 items-center justify-center">
+      <View className="flex-1  px-2 pb-3">
+        {/* Top: Heading & Subtitle */}
+        <View className="items-center px-4 pt-4">
           <Text className="text-center font-sans text-[24px] font-bold leading-8 text-[#1C1C1C]">
             We’re reviewing your submission
           </Text>
 
-          <Text className="mt-2 text-center font-sans text-[12px] font-normal leading-6 text-slate-500">
+          <Text className="mt-2 text-center font-sans text-[12px] font-normal leading-5 text-slate-500 max-w-[340px]">
             We need more time to verify your identity. This may be due to your document requiring
             manual review or delays with our third-party partner. We’ll update you once the review is
             complete.
           </Text>
+        </View>
 
+        {/* Center: Large HD Illustration */}
+        <View className="flex-1 items-center justify-center w-full" style={{ marginTop: -24, marginBottom: 8 }}>
           <Image
-            className="mt-6"
             source={require('../assets/images/review_status.png')}
-            style={{ width: '100%', height: 280 }}
+            style={{ width: SCREEN_WIDTH - 16, height: 440 }}
             resizeMode="contain"
           />
         </View>
 
-        <View className="mb-4">
+        <View className="px-2 mb-2">
           <TouchableOpacity
             onPress={() => checkStatusFlow(true)}
             disabled={isChecking || isFetchingStatus}
             activeOpacity={0.8}
-            className="h-16 w-full flex-row items-center justify-center rounded-2xl bg-[#F6163C]">
+            className="h-16 w-full flex-row items-center justify-center rounded-2xl bg-[#E23744]">
             {isChecking || isFetchingStatus ? (
               <ActivityIndicator color="white" />
             ) : (

@@ -3,7 +3,6 @@
     "name": "fitfob_owner",
     "slug": "fitFob_owner",
     "version": "1.0.0",
-    "jsEngine": "hermes",
     "scheme": [
       "fitfob-owner",
       "fb2349725998870415"

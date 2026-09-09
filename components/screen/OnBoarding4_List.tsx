@@ -1,18 +1,32 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   ActivityIndicator,
+  Modal,
+  SafeAreaView,
+  StatusBar,
+  Platform,
+  Linking,
+  Image,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useUserDetail } from '@/hooks/useUserDetail';
+import { WebView } from 'react-native-webview';
+import * as WebBrowser from 'expo-web-browser';
+import Toast from 'react-native-toast-message';
+
 interface Props {
   onAddMore: () => void;
+  onNext?: () => void;
 }
 
-export default function OnBoarding4_List({ onAddMore }: Props) {
+export default function OnBoarding4_List({ onAddMore, onNext }: Props) {
   const { documents, isDocsLoading, refetchDocs } = useUserDetail();
+  const [previewDoc, setPreviewDoc] = useState<any>(null);
+  const [previewVisible, setPreviewVisible] = useState(false);
 
   // Auto-refresh when the screen mounts
   useEffect(() => {
@@ -21,63 +35,277 @@ export default function OnBoarding4_List({ onAddMore }: Props) {
 
   const docList = documents?.documents || documents?.data || documents || [];
 
-  const renderItem = ({ item, index }: { item: any; index: number }) => (
-    <View
-      key={item?.id || item?._id || index.toString()}
-      className="mb-3 flex-row items-center rounded-[20px] bg-[#F3F4F6] p-4">
-      <View className="items-center justify-center rounded-xl bg-white p-2 border border-slate-100">
-        <Ionicons name="document-text-outline" size={28} color="#6B7280" />
-        <Text className="mt-[-4px] font-bold text-[8px] uppercase text-gray-500">
-          {item?.fileType?.includes('pdf') ? 'PDF' : 'IMG'}
-        </Text>
-      </View>
+  const getCleanDocUrl = (item: any) => {
+    let rawUrl =
+      item?.url ||
+      item?.fileUrl ||
+      item?.documentUrl ||
+      item?.docUrl ||
+      item?.filePath ||
+      item?.file?.url ||
+      item?.file?.fileUrl ||
+      item?.file?.uri ||
+      item?.uri ||
+      '';
 
-      <View className="ml-4 flex-1">
-        <Text className="font-semibold text-base text-[#374151]" numberOfLines={1}>
-          {item?.documentName || item?.name || 'Untitled Document'}
-        </Text>
-        <View className="mt-1 flex-row items-center">
-          <View className="mr-1 rounded-full bg-[#10B981] p-[2px]">
-            <Ionicons name="checkmark" size={10} color="white" />
-          </View>
-          <Text className="text-xs text-gray-400">
-            Uploaded: {item?.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'Recently'}
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
+    if (
+      rawUrl &&
+      typeof rawUrl === 'string' &&
+      !rawUrl.startsWith('http://') &&
+      !rawUrl.startsWith('https://') &&
+      !rawUrl.startsWith('file://') &&
+      !rawUrl.startsWith('content://') &&
+      !rawUrl.startsWith('data:')
+    ) {
+      const apiBase = process.env.EXPO_PUBLIC_API_URL || '';
+      rawUrl = `${apiBase.replace(/\/+$/, '')}/${rawUrl.replace(/^\/+/, '')}`;
+    }
+    return rawUrl;
+  };
+
+  const getPdfSource = (url?: string) => {
+    if (!url) return { uri: '' };
+    const isPdf =
+      url.toLowerCase().includes('.pdf') ||
+      url.toLowerCase().includes('/pdf') ||
+      previewDoc?.fileType?.includes('pdf');
+
+    if (
+      Platform.OS === 'android' &&
+      isPdf &&
+      !url.includes('docs.google.com/gview') &&
+      url.startsWith('http')
+    ) {
+      return {
+        uri: `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}`,
+      };
+    }
+    return { uri: url };
+  };
+
+  const handleOpenExternalUrl = async (url?: string) => {
+    if (!url) {
+      Toast.show({
+        type: 'info',
+        text1: 'Document Link Unavailable',
+        text2: 'No file URL available for this document.',
+      });
+      return;
+    }
+    try {
+      const isPdf = url.toLowerCase().includes('.pdf');
+      const targetUrl =
+        Platform.OS === 'android' &&
+        isPdf &&
+        !url.includes('docs.google.com') &&
+        url.startsWith('http')
+          ? `https://docs.google.com/viewer?url=${encodeURIComponent(url)}`
+          : url;
+
+      if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
+        await WebBrowser.openBrowserAsync(targetUrl);
+      } else {
+        await Linking.openURL(targetUrl);
+      }
+    } catch (e) {
+      console.log('Error opening external url:', e);
+    }
+  };
+
+  const handleOpenPreview = (item: any) => {
+    setPreviewDoc(item);
+    setPreviewVisible(true);
+  };
 
   if (isDocsLoading && !documents) {
     return (
-      <View className="flex-1 items-center justify-center bg-white">
+      <View className="flex-1 items-center justify-center bg-white py-16">
         <ActivityIndicator size="large" color="#F6163C" />
-        <Text className="mt-4 text-gray-400">Loading documents...</Text>
+        <Text className="mt-4 font-semibold text-slate-400">Loading documents...</Text>
       </View>
     );
   }
 
   return (
     <View className="flex-1 bg-white">
-      <Text className="mb-6 font-bold text-2xl text-[#111827]">Uploaded Documents</Text>
+      {/* Header */}
+      <View className="mb-5">
+        <View className="flex-row items-center justify-between">
+          <Text className="font-bold text-2xl text-slate-900">Uploaded Documents</Text>
+          <View className="flex-row items-center rounded-full bg-emerald-50 px-2.5 py-1 border border-emerald-200">
+            <Ionicons name="shield-checkmark" size={13} color="#10B981" />
+            <Text className="ml-1 text-xs font-bold text-emerald-700">
+              {docList.length} Verified
+            </Text>
+          </View>
+        </View>
+        <Text className="mt-1 text-sm text-slate-500 font-medium">
+          Review your verified government documents before proceeding to club photos.
+        </Text>
+      </View>
 
-      <View className="pb-5">
+      {/* Document List */}
+      <View className="pb-4">
         {docList.length === 0 ? (
-          <View className="items-center py-10">
-            <Text className="text-gray-400">No documents uploaded yet.</Text>
+          <View className="items-center py-12 rounded-2xl bg-slate-50 border border-slate-100 mb-4">
+            <Ionicons name="document-text-outline" size={48} color="#94A3B8" />
+            <Text className="mt-3 font-semibold text-slate-600">No documents uploaded yet.</Text>
+            <Text className="text-xs text-slate-400 mt-1">
+              Please upload at least one verified government document.
+            </Text>
           </View>
         ) : (
-          docList.map((item: any, index: number) => renderItem({ item, index }))
+          docList.map((item: any, index: number) => {
+            const isPdf = item?.fileType?.includes('pdf') || item?.type?.includes('pdf');
+            return (
+              <TouchableOpacity
+                key={item?.id || item?._id || index.toString()}
+                onPress={() => handleOpenPreview(item)}
+                activeOpacity={0.8}
+                className="mb-3.5 flex-row items-center rounded-2xl bg-[#F8FAFC] border border-slate-100 p-4 shadow-sm">
+                <View className="items-center justify-center rounded-xl bg-white p-2.5 border border-slate-100 shadow-sm">
+                  <Ionicons
+                    name={isPdf ? 'document-text' : 'image'}
+                    size={26}
+                    color="#F6163C"
+                  />
+                  <Text className="mt-[-2px] font-bold text-[8px] uppercase text-slate-500">
+                    {isPdf ? 'PDF' : 'IMG'}
+                  </Text>
+                </View>
+
+                <View className="ml-3.5 flex-1">
+                  <View className="flex-row items-center gap-1.5 flex-wrap">
+                    <Text className="font-bold text-sm text-slate-800" numberOfLines={1}>
+                      {item?.documentName || item?.name || 'Government Document'}
+                    </Text>
+                    <View className="flex-row items-center bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                      <Ionicons name="shield-checkmark" size={10} color="#10B981" />
+                      <Text className="text-[10px] font-bold text-emerald-700 ml-1">Verified</Text>
+                    </View>
+                  </View>
+                  <View className="mt-1 flex-row items-center">
+                    <Ionicons name="checkmark-circle" size={12} color="#10B981" />
+                    <Text className="text-xs text-slate-400 ml-1">
+                      Uploaded:{' '}
+                      {item?.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'Recently'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View className="ml-2 flex-row items-center rounded-xl bg-rose-50 px-3 py-1.5 border border-rose-100">
+                  <Ionicons name="eye-outline" size={14} color="#F6163C" />
+                  <Text className="ml-1 text-xs font-bold text-[#F6163C]">View</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })
         )}
 
+        {/* Add More Documents Button */}
         <TouchableOpacity
           onPress={onAddMore}
           activeOpacity={0.7}
-          className="mt-4 flex-row items-center justify-center rounded-[15px] border border-dashed border-gray-300 bg-[#F3F4F6] py-4">
-          <Ionicons name="add" size={20} color="#6B7280" />
-          <Text className="ml-2 font-semibold text-[#6B7280]">Add More Documents</Text>
+          className="mt-2 flex-row items-center justify-center rounded-2xl border-2 border-dashed border-rose-200 bg-rose-50/50 py-4">
+          <Ionicons name="add-circle-outline" size={20} color="#F6163C" />
+          <Text className="ml-2 font-bold text-sm text-[#F6163C]">
+            + Add Another Document (Camera / File)
+          </Text>
         </TouchableOpacity>
       </View>
+
+      {/* DOCUMENT PREVIEW MODAL */}
+      <Modal
+        visible={previewVisible}
+        transparent={false}
+        animationType="slide"
+        statusBarTranslucent={true}
+        onRequestClose={() => setPreviewVisible(false)}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#0F172A' }}>
+          <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
+          {/* Header Bar */}
+          <View
+            style={{
+              paddingTop: Platform.OS === 'android' ? 14 : 6,
+            }}
+            className="flex-row items-center justify-between pb-3 px-4 border-b border-slate-800">
+            <TouchableOpacity
+              onPress={() => setPreviewVisible(false)}
+              className="h-10 w-10 items-center justify-center rounded-full bg-white/10 active:bg-white/20">
+              <Ionicons name="close" size={22} color="#FFF" />
+            </TouchableOpacity>
+
+            <View className="flex-1 mx-3 items-center">
+              <Text className="font-bold text-base text-white text-center" numberOfLines={1}>
+                {previewDoc?.documentName || previewDoc?.name || 'Document Preview'}
+              </Text>
+              <View className="flex-row items-center mt-0.5">
+                <Ionicons name="shield-checkmark" size={11} color="#10B981" />
+                <Text className="ml-1 text-[11px] text-emerald-400 font-semibold">
+                  Verified Document
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => handleOpenExternalUrl(getCleanDocUrl(previewDoc))}
+              className="h-10 w-10 items-center justify-center rounded-full bg-white/10 active:bg-white/20">
+              <Ionicons name="open-outline" size={20} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Document Content View */}
+          <View className="flex-1 bg-slate-950 p-2">
+            {(() => {
+              const url = getCleanDocUrl(previewDoc);
+              const isPdf =
+                url.toLowerCase().includes('.pdf') ||
+                previewDoc?.fileType?.includes('pdf') ||
+                previewDoc?.type?.includes('pdf');
+
+              if (!url) {
+                return (
+                  <View className="flex-1 items-center justify-center p-6">
+                    <Ionicons name="document-text-outline" size={64} color="#64748B" />
+                    <Text className="text-white font-bold text-lg mt-4 text-center">
+                      {previewDoc?.documentName || previewDoc?.name || 'Document'}
+                    </Text>
+                    <Text className="text-slate-400 text-sm mt-2 text-center">
+                      Direct preview URL not available. Document is verified and safely stored.
+                    </Text>
+                  </View>
+                );
+              }
+
+              if (isPdf) {
+                return (
+                  <WebView
+                    source={getPdfSource(url)}
+                    startInLoadingState={true}
+                    renderLoading={() => (
+                      <View className="absolute inset-0 items-center justify-center bg-slate-950">
+                        <ActivityIndicator size="large" color="#F6163C" />
+                        <Text className="text-slate-400 text-xs mt-2">Loading PDF Document...</Text>
+                      </View>
+                    )}
+                    style={{ flex: 1, backgroundColor: '#020617' }}
+                  />
+                );
+              }
+
+              return (
+                <View className="flex-1 items-center justify-center">
+                  <Image
+                    source={{ uri: url }}
+                    resizeMode="contain"
+                    style={{ width: '100%', height: '100%' }}
+                  />
+                </View>
+              );
+            })()}
+          </View>
+        </SafeAreaView>
+      </Modal>
     </View>
   );
 }

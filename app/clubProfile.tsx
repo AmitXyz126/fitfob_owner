@@ -891,7 +891,7 @@ const ClubProfileScreen = () => {
       </ScrollView>
 
       {/* Logout Button (Fixed at bottom) */}
-      <View className="bg-white py-4 border-t border-slate-50">
+      <View className="bg-white py-5 border-t border-slate-50">
         <TouchableOpacity
           onPress={async () => {
             await useAuthStore.getState().logOut();
@@ -901,9 +901,9 @@ const ClubProfileScreen = () => {
             }
             router.replace('/welcome');
           }}
-          className="flex-row items-center justify-center rounded-[8px] bg-[#F8F8F8] py-4">
-          <LogOut size={20} color="#94A3B8" />
-          <Text className="ml-2 font-bold text-base text-gray-400">Logout</Text>
+          className="flex-row items-center justify-center rounded-[8px] bg-[#E23744] py-4">
+          <LogOut size={20} color="white" />
+          <Text className="ml-2 font-bold text-base text-white">Logout</Text>
         </TouchableOpacity>
       </View>
     </Container>

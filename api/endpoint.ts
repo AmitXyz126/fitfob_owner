@@ -25,7 +25,10 @@ export const ENDPOINTS = {
   VERIFY_GOVERNMENT_DOC: `${BASE_URL}/api/pending-club-owner/verify-government-doc`,
   Step_6: `${BASE_URL}/api/pending-club-owner/confirm-government-docs`,
   Get: `${BASE_URL}/api/pending-club-owner/documents`,
-  STEP_7: `${BASE_URL}/api/pending-club-owner/upload-club-photos`,
+  UPLOAD_CLUB_PHOTO: `${BASE_URL}/api/pending-club-owner/upload-club-photo`,
+  GET_CLUB_PHOTOS: `${BASE_URL}/api/pending-club-owner/club-photos`,
+  DELETE_CLUB_PHOTO: (documentId: string) => `${BASE_URL}/api/pending-club-owner/club-photos/${documentId}`,
+  CONFIRM_ONBOARDING: `${BASE_URL}/api/pending-club-owner/confirm`,
 
   
   CHANGE_PASSWORD: `${BASE_URL}/api/change-password`,

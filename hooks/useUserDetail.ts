@@ -48,6 +48,8 @@ export const useUserDetail = () => {
     queryFn: () => userDetailsApi.getDocuments(isApprovedOwner),
     enabled: !!user,
     retry: 1,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 20 * 60 * 1000,
   });
 
   const submitStep1 = useMutation({
@@ -153,26 +155,79 @@ export const useUserDetail = () => {
     },
   });
 
-  // --- NEW: STEP 7 PHOTOS MUTATION ---
-  const submitStep7 = useMutation({
-    mutationFn: (photos: any[]) => userDetailsApi.uploadClubPhotos(photos),
-    onSuccess: (data) => {
+  const {
+    data: clubPhotos,
+    isLoading: isClubPhotosLoading,
+    refetch: refetchClubPhotos,
+  } = useQuery({
+    queryKey: ['pending-club-photos', userKey],
+    queryFn: userDetailsApi.getClubPhotos,
+    enabled: !!user,
+    retry: 1,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+  });
+
+  const uploadSingleClubPhoto = useMutation({
+    mutationFn: (data: { file: { uri: string; name?: string; type?: string }; imageInfo: string }) =>
+      userDetailsApi.uploadSingleClubPhoto(data),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['pending-club-photos'] });
       queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
-
-      const successMessage = data?.message || 'Club Owner profile created successfully! 📸';
-
-      // Toast.show({ type: 'success', text1: successMessage });
-
-      router.replace('/Completed');
+      Toast.show({
+        type: 'success',
+        text1: 'Photo Uploaded! 📸',
+        text2: res?.message || 'Club photo uploaded successfully',
+      });
     },
     onError: (error: any) => {
-      console.error('Step 7 Mutation Error:', error);
-      console.log('Backend Error:', error.response?.data);
-
       Toast.show({
         type: 'error',
         text1: 'Upload Failed',
-        text2: error.response?.data?.message || 'Check your photos and try again.',
+        text2: error.response?.data?.message || 'Failed to upload club photo',
+      });
+    },
+  });
+
+  const deleteClubPhoto = useMutation({
+    mutationFn: (documentId: string) => userDetailsApi.deleteClubPhoto(documentId),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['pending-club-photos'] });
+      queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
+      Toast.show({
+        type: 'success',
+        text1: 'Photo Deleted 🗑️',
+        text2: res?.message || 'Club photo deleted successfully',
+      });
+    },
+    onError: (error: any) => {
+      Toast.show({
+        type: 'error',
+        text1: 'Delete Failed',
+        text2: error.response?.data?.message || 'Failed to delete photo',
+      });
+    },
+  });
+
+  const confirmOnboarding = useMutation({
+    mutationFn: userDetailsApi.confirmOnboarding,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
+      const successMessage =
+        data?.message || 'Club Owner onboarding details submitted. Awaiting verification approval.';
+      Toast.show({
+        type: 'success',
+        text1: 'Onboarding Submitted! 🎉',
+        text2: successMessage,
+      });
+      router.replace('/Completed');
+    },
+    onError: (error: any) => {
+      console.error('Confirm Onboarding Error:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Submission Failed',
+        text2: error.response?.data?.message || 'Failed to submit onboarding details.',
       });
     },
   });
@@ -258,11 +313,16 @@ export const useUserDetail = () => {
     uploadDoc,
     verifyGovtDoc,
     confirmDocs,
-    submitStep7,
     updateClubOwner,
     checkVerificationStatus,
     documents,
     isDocsLoading,
     refetchDocs,
+    clubPhotos,
+    isClubPhotosLoading,
+    refetchClubPhotos,
+    uploadSingleClubPhoto,
+    deleteClubPhoto,
+    confirmOnboarding,
   };
 };

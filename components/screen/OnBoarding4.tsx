@@ -10,6 +10,10 @@ import {
   Image,
   ScrollView,
   StyleSheet,
+  Modal,
+  SafeAreaView,
+  StatusBar,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
@@ -21,6 +25,8 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { WebView } from 'react-native-webview';
+import * as WebBrowser from 'expo-web-browser';
 
 export interface OnBoarding4Handle {
   openModal: () => void;
@@ -33,9 +39,15 @@ interface Props {
 }
 
 const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
-  const { onUploadSuccess, onUploadDone } = props;
-  const { uploadDoc, verifyGovtDoc, refetch } = useUserDetail();
+  const { onUploadSuccess, onUploadDone, onBack } = props;
+  const { uploadDoc, verifyGovtDoc, refetch, documents, refetchDocs } = useUserDetail();
   const { user } = useAuthStore();
+
+  const docList = documents?.documents || documents?.data || documents || [];
+
+  useEffect(() => {
+    refetchDocs?.();
+  }, []);
 
   const userKey = user?.id || user?.email || 'guest';
   const STORAGE_KEY_FILES = `@onboarding_verified_files_${userKey}`;
@@ -56,43 +68,112 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
   const cameraRef = useRef<CameraView>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [scannedData, setScannedData] = useState<any>(null);
+  const [previewDoc, setPreviewDoc] = useState<any>(null);
+  const [previewVisible, setPreviewVisible] = useState(false);
+
+  const getCleanDocUrl = (item: any) => {
+    let rawUrl =
+      item?.url ||
+      item?.fileUrl ||
+      item?.documentUrl ||
+      item?.docUrl ||
+      item?.filePath ||
+      item?.file?.url ||
+      item?.file?.fileUrl ||
+      item?.file?.uri ||
+      item?.uri ||
+      '';
+
+    if (
+      rawUrl &&
+      typeof rawUrl === 'string' &&
+      !rawUrl.startsWith('http://') &&
+      !rawUrl.startsWith('https://') &&
+      !rawUrl.startsWith('file://') &&
+      !rawUrl.startsWith('content://') &&
+      !rawUrl.startsWith('data:')
+    ) {
+      const apiBase = process.env.EXPO_PUBLIC_API_URL || '';
+      rawUrl = `${apiBase.replace(/\/+$/, '')}/${rawUrl.replace(/^\/+/, '')}`;
+    }
+    return rawUrl;
+  };
+
+  const getPdfSource = (url?: string) => {
+    if (!url) return { uri: '' };
+    const isPdf =
+      url.toLowerCase().includes('.pdf') ||
+      url.toLowerCase().includes('/pdf') ||
+      previewDoc?.fileType?.includes('pdf');
+
+    if (
+      Platform.OS === 'android' &&
+      isPdf &&
+      !url.includes('docs.google.com/gview') &&
+      url.startsWith('http')
+    ) {
+      return {
+        uri: `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}`,
+      };
+    }
+    return { uri: url };
+  };
+
+  const handleOpenExternalUrl = async (url?: string) => {
+    if (!url) {
+      Toast.show({
+        type: 'info',
+        text1: 'Document Link Unavailable',
+        text2: 'No file URL available for this document.',
+      });
+      return;
+    }
+    try {
+      const isPdf = url.toLowerCase().includes('.pdf');
+      const targetUrl =
+        Platform.OS === 'android' &&
+        isPdf &&
+        !url.includes('docs.google.com') &&
+        url.startsWith('http')
+          ? `https://docs.google.com/viewer?url=${encodeURIComponent(url)}`
+          : url;
+
+      if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
+        await WebBrowser.openBrowserAsync(targetUrl);
+      } else {
+        await Linking.openURL(targetUrl);
+      }
+    } catch (e) {
+      console.log('Error opening external url:', e);
+    }
+  };
+
+  const handleOpenPreview = (item: any) => {
+    setPreviewDoc(item);
+    setPreviewVisible(true);
+  };
 
   useImperativeHandle(ref, () => ({
-    openModal: () => {},
+    openModal: () => { },
   }));
 
-  // Restore saved verified documents from AsyncStorage when app is re-opened
+  // Ensure camera preview starts clean - old photos are NEVER shown in camera view
   useEffect(() => {
-    const loadSavedVerifiedDocs = async () => {
-      try {
-        const savedFilesStr = await AsyncStorage.getItem(STORAGE_KEY_FILES);
-        const savedScannedStr = await AsyncStorage.getItem(STORAGE_KEY_SCANNED);
-        const savedDocName = await AsyncStorage.getItem(STORAGE_KEY_DOCNAME);
-
-        if (savedFilesStr) {
-          const parsedFiles = JSON.parse(savedFilesStr);
-          if (Array.isArray(parsedFiles) && parsedFiles.length > 0) {
-            setSelectedFiles(parsedFiles);
-          }
-        }
-
-        if (savedScannedStr) {
-          const parsedScanned = JSON.parse(savedScannedStr);
-          if (parsedScanned && parsedScanned.uri) {
-            setScannedData(parsedScanned);
-          }
-        }
-
-        if (savedDocName) {
-          setDocName(savedDocName);
-        }
-      } catch (e) {
-        console.log('Error restoring verified documents from AsyncStorage:', e);
-      }
-    };
-
-    loadSavedVerifiedDocs();
+    setScannedData(null);
+    AsyncStorage.removeItem(STORAGE_KEY_SCANNED).catch(() => {});
   }, [userKey]);
+
+  // When already uploaded documents exist on server, keep camera & pending queue fresh
+  useEffect(() => {
+    if (docList.length > 0) {
+      setScannedData(null);
+      setSelectedFiles([]);
+      setDocName('');
+      AsyncStorage.removeItem(STORAGE_KEY_FILES).catch(() => {});
+      AsyncStorage.removeItem(STORAGE_KEY_SCANNED).catch(() => {});
+      AsyncStorage.removeItem(STORAGE_KEY_DOCNAME).catch(() => {});
+    }
+  }, [docList.length]);
 
   // Helper to verify a single document with the backend API
   const verifyFileItem = async (fileData: { uri: string; name?: string; type?: string }) => {
@@ -136,13 +217,9 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
 
             const updatedFiles = [...selectedFiles.filter((f) => f.id !== fileObj.id), fileObj];
             setSelectedFiles(updatedFiles);
+            // Show verified preview in camera container for this freshly taken photo
             setScannedData(fileObj);
             setDocName(detectedName);
-
-            // Persist immediately to AsyncStorage so quitting app doesn't lose verified document
-            await AsyncStorage.setItem(STORAGE_KEY_FILES, JSON.stringify(updatedFiles));
-            await AsyncStorage.setItem(STORAGE_KEY_SCANNED, JSON.stringify(fileObj));
-            await AsyncStorage.setItem(STORAGE_KEY_DOCNAME, detectedName);
 
             Toast.show({
               type: 'success',
@@ -338,21 +415,18 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
       return updated;
     });
     if (scannedData?.id === id) {
-      setScannedData((prev: any) => {
-        const updated = prev ? { ...prev, docName: text } : prev;
-        if (updated) {
-          AsyncStorage.setItem(STORAGE_KEY_SCANNED, JSON.stringify(updated)).catch(console.log);
-        }
-        return updated;
-      });
-      AsyncStorage.setItem(STORAGE_KEY_DOCNAME, text).catch(console.log);
+      setScannedData((prev: any) => (prev ? { ...prev, docName: text } : prev));
     }
   };
 
   // Upload Logic - Only verified documents can be uploaded
   const handleFinalUpload = async () => {
     if (isVerifying) {
-      return Alert.alert('Please Wait', 'Document verification is currently in progress.');
+      return Alert.alert('Please Wait ⏳', 'Document verification is currently in progress. Please wait a moment.');
+    }
+
+    if (uploadingIndex !== null || uploadDoc.isPending) {
+      return Alert.alert('Please Wait ⏳', 'Document upload is currently in progress. Please wait a moment.');
     }
 
     if (selectedFiles.length === 0) {
@@ -395,6 +469,11 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
       }
 
       await refetch();
+      if (refetchDocs) {
+        try {
+          await refetchDocs();
+        } catch (e) {}
+      }
       setScannedData(null);
       setSelectedFiles([]);
       setDocName('');
@@ -404,6 +483,12 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
       await AsyncStorage.removeItem(STORAGE_KEY_FILES);
       await AsyncStorage.removeItem(STORAGE_KEY_SCANNED);
       await AsyncStorage.removeItem(STORAGE_KEY_DOCNAME);
+
+      Toast.show({
+        type: 'success',
+        text1: 'Document Uploaded! 📄',
+        text2: 'Document uploaded successfully.',
+      });
 
       if (onUploadDone) onUploadDone(null);
       if (onUploadSuccess) onUploadSuccess(null);
@@ -425,7 +510,16 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
       showsVerticalScrollIndicator={false}>
       {/* Title Header */}
       <View className="mb-6 flex-row items-center justify-between">
-        <Text className="font-bold text-[24px] text-[#1C1C1C]">Upload Govt Document</Text>
+        <View className="flex-row items-center">
+          {/* {onBack && (
+            <TouchableOpacity
+              onPress={onBack}
+              className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-slate-100 active:bg-slate-200">
+              <Ionicons name="arrow-back" size={20} color="#1C1C1C" />
+            </TouchableOpacity>
+          )} */}
+          <Text className="font-bold text-[24px] text-[#1C1C1C]">Upload Govt Document</Text>
+        </View>
       </View>
 
       {/* Mode Selector Tabs */}
@@ -701,18 +795,94 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
         </View>
       )}
 
-      {/* Submit Button */}
+      {/* Uploaded Documents List ("niche list me woh document ho") */}
+      {docList.length > 0 && (
+        <View className="mt-2 mb-6">
+          <View className="flex-row items-center justify-between mb-3 px-1">
+            <View className="flex-row items-center">
+              <Ionicons name="document-text-outline" size={18} color="#1E293B" />
+              <Text className="ml-2 font-bold text-base text-slate-900">
+                Uploaded Documents ({docList.length})
+              </Text>
+            </View>
+            <View className="flex-row items-center rounded-full bg-emerald-50 px-2.5 py-0.5 border border-emerald-200">
+              <Ionicons name="checkmark-circle" size={12} color="#10B981" />
+              <Text className="ml-1 text-[11px] font-bold text-emerald-700">Saved</Text>
+            </View>
+          </View>
+
+          {docList.map((item: any, index: number) => {
+            const isPdf = item?.fileType?.includes('pdf') || item?.type?.includes('pdf');
+            return (
+              <TouchableOpacity
+                key={item?.id || item?._id || index.toString()}
+                onPress={() => handleOpenPreview(item)}
+                activeOpacity={0.8}
+                className="mb-3 flex-row items-center rounded-[20px] bg-[#F3F4F6] p-4"
+              >
+                <View className="items-center justify-center rounded-xl bg-white p-2 border border-slate-100 shadow-sm">
+                  <Ionicons name={isPdf ? "document-text" : "image"} size={26} color="#6B7280" />
+                  <Text className="mt-[-3px] font-bold text-[8px] uppercase text-gray-500">
+                    {isPdf ? 'PDF' : 'IMG'}
+                  </Text>
+                </View>
+
+                <View className="ml-3.5 flex-1">
+                  <Text className="font-bold text-sm text-[#1F2937]" numberOfLines={1}>
+                    {item?.documentName || item?.name || 'Government Document'}
+                  </Text>
+                  <View className="mt-1 flex-row items-center">
+                    <View className="mr-1.5 rounded-full bg-[#10B981] p-[2px]">
+                      <Ionicons name="checkmark" size={10} color="white" />
+                    </View>
+                    <Text className="text-xs text-gray-500">
+                      Uploaded: {item?.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'Recently'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View className="ml-2 flex-row items-center rounded-xl bg-white px-2.5 py-1.5 border border-slate-200 shadow-sm">
+                  <Ionicons name="eye-outline" size={14} color="#F6163C" />
+                  <Text className="ml-1 text-xs font-bold text-[#F6163C]">View</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
+      {/* Submit / Next Step Button */}
       <View className="mt-auto pb-8">
         <TouchableOpacity
-          onPress={handleFinalUpload}
-          disabled={isUploading || isVerifying || selectedFiles.length === 0}
+          onPress={
+            selectedFiles.length > 0
+              ? handleFinalUpload
+              : () => {
+                  if (onUploadDone) onUploadDone(null);
+                  if (onUploadSuccess) onUploadSuccess(null);
+                }
+          }
+          disabled={
+            isUploading ||
+            isVerifying ||
+            (selectedFiles.length === 0 && docList.length === 0)
+          }
           activeOpacity={0.8}
           className={`h-14 w-full flex-row items-center justify-center rounded-2xl ${
-            isUploading || isVerifying || selectedFiles.length === 0
+            isUploading ||
+            isVerifying ||
+            (selectedFiles.length === 0 && docList.length === 0)
               ? 'bg-slate-300'
               : 'bg-[#F6163C]'
           }`}
-          style={selectedFiles.length > 0 && !isUploading && !isVerifying ? styles.uploadBtnShadow : null}>
+          style={
+            (selectedFiles.length > 0 || docList.length > 0) &&
+            !isUploading &&
+            !isVerifying
+              ? styles.uploadBtnShadow
+              : null
+          }
+        >
           {isUploading ? (
             <View className="flex-row items-center">
               <ActivityIndicator color="white" />
@@ -729,17 +899,26 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
                 Verifying Document...
               </Text>
             </View>
-          ) : (
+          ) : selectedFiles.length > 0 ? (
             <>
               <Ionicons name="shield-checkmark-outline" size={20} color="white" />
               <Text className="ml-2 font-bold text-[16px] text-white">
-                {selectedFiles.length === 0
-                  ? 'Scan Document to Proceed'
-                  : selectedFiles.length === 1
+                {selectedFiles.length === 1
                   ? 'Submit Verified Document'
                   : `Submit ${selectedFiles.length} Verified Documents`}
               </Text>
             </>
+          ) : docList.length > 0 ? (
+            <View className="flex-row items-center">
+              <Text className="font-bold text-[16px] text-white">
+                Next Step (Photos)
+              </Text>
+              <Ionicons name="arrow-forward" size={18} color="white" style={{ marginLeft: 6 }} />
+            </View>
+          ) : (
+            <Text className="font-bold text-[16px] text-white">
+              Scan Document to Proceed
+            </Text>
           )}
         </TouchableOpacity>
 
@@ -789,6 +968,99 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
           />
         </View>
       </View>
+
+      {/* DOCUMENT PREVIEW MODAL */}
+      <Modal
+        visible={previewVisible}
+        transparent={false}
+        animationType="slide"
+        statusBarTranslucent={true}
+        onRequestClose={() => setPreviewVisible(false)}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#0F172A' }}>
+          <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
+          {/* Header Bar */}
+          <View
+            style={{
+              paddingTop: Platform.OS === 'android' ? 14 : 6,
+            }}
+            className="flex-row items-center justify-between pb-3 px-4 border-b border-slate-800">
+            <TouchableOpacity
+              onPress={() => setPreviewVisible(false)}
+              className="h-10 w-10 items-center justify-center rounded-full bg-white/10 active:bg-white/20">
+              <Ionicons name="close" size={22} color="#FFF" />
+            </TouchableOpacity>
+
+            <View className="flex-1 mx-3 items-center">
+              <Text className="font-bold text-base text-white text-center" numberOfLines={1}>
+                {previewDoc?.documentName || previewDoc?.name || 'Document Preview'}
+              </Text>
+              <View className="flex-row items-center mt-0.5">
+                <Ionicons name="shield-checkmark" size={11} color="#10B981" />
+                <Text className="ml-1 text-[11px] text-emerald-400 font-semibold">
+                  Verified Document
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => handleOpenExternalUrl(getCleanDocUrl(previewDoc))}
+              className="h-10 w-10 items-center justify-center rounded-full bg-white/10 active:bg-white/20">
+              <Ionicons name="open-outline" size={20} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Document Content View */}
+          <View className="flex-1 bg-slate-950 p-2">
+            {(() => {
+              const url = getCleanDocUrl(previewDoc);
+              const isPdf =
+                url.toLowerCase().includes('.pdf') ||
+                previewDoc?.fileType?.includes('pdf') ||
+                previewDoc?.type?.includes('pdf');
+
+              if (!url) {
+                return (
+                  <View className="flex-1 items-center justify-center p-6">
+                    <Ionicons name="document-text-outline" size={64} color="#64748B" />
+                    <Text className="text-white font-bold text-lg mt-4 text-center">
+                      {previewDoc?.documentName || previewDoc?.name || 'Document'}
+                    </Text>
+                    <Text className="text-slate-400 text-sm mt-2 text-center">
+                      Direct preview URL not available. Document is verified and safely stored.
+                    </Text>
+                  </View>
+                );
+              }
+
+              if (isPdf) {
+                return (
+                  <WebView
+                    source={getPdfSource(url)}
+                    startInLoadingState={true}
+                    renderLoading={() => (
+                      <View className="absolute inset-0 items-center justify-center bg-slate-950">
+                        <ActivityIndicator size="large" color="#F6163C" />
+                        <Text className="text-slate-400 text-xs mt-2">Loading PDF Document...</Text>
+                      </View>
+                    )}
+                    style={{ flex: 1, backgroundColor: '#020617' }}
+                  />
+                );
+              }
+
+              return (
+                <View className="flex-1 items-center justify-center">
+                  <Image
+                    source={{ uri: url }}
+                    resizeMode="contain"
+                    style={{ width: '100%', height: '100%' }}
+                  />
+                </View>
+              );
+            })()}
+          </View>
+        </SafeAreaView>
+      </Modal>
     </ScrollView>
   );
 });

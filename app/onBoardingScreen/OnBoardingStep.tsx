@@ -75,12 +75,13 @@ export default function OnBoardingStep() {
     submitStep2,
     submitStep3,
     submitStep4,
-    submitStep7,
     uploadDoc,
     confirmDocs,
     profileStatus,
     isFetchingStatus,
     documents,
+    refetchDocs,
+    confirmOnboarding,
   } = useUserDetail();
 
   const isLoading =
@@ -89,9 +90,9 @@ export default function OnBoardingStep() {
     submitStep2.isPending ||
     submitStep3.isPending ||
     submitStep4.isPending ||
-    submitStep7.isPending ||
     uploadDoc.isPending ||
-    confirmDocs.isPending;
+    confirmDocs.isPending ||
+    confirmOnboarding.isPending;
 
   // --- 2. Sync Global State with API Once ---
   useEffect(() => {
@@ -157,7 +158,50 @@ export default function OnBoardingStep() {
         profileStatus?.verification_status === 'approved' ||
         profileStatus?.verification_status === 'in_review';
 
-      if (!isCompleted && step === 1 && subStep === 1) {
+      if (isCompleted) return false;
+
+      if (step === 5) {
+        setStep(4);
+        setSubStep(2);
+        return true;
+      }
+
+      if (step === 4) {
+        if (subStep === 1) {
+          const docList = documents?.documents || documents?.data || documents || [];
+          if (docList.length > 0) {
+            setSubStep(2);
+            return true;
+          } else {
+            setStep(3);
+            setSubStep(1);
+            return true;
+          }
+        } else {
+          setStep(3);
+          setSubStep(1);
+          return true;
+        }
+      }
+
+      if (step === 3) {
+        setStep(2);
+        setSubStep(2);
+        return true;
+      }
+
+      if (step === 2) {
+        if (subStep === 2) {
+          setSubStep(1);
+          return true;
+        } else {
+          setStep(1);
+          setSubStep(1);
+          return true;
+        }
+      }
+
+      if (step === 1 && subStep === 1) {
         useAuthStore.getState().logOut().then(() => {
           router.replace('/welcome');
         });
@@ -290,10 +334,10 @@ export default function OnBoardingStep() {
   };
 
   const getButtonTitle = () => {
-    if (step === 5) return 'Submit Photos';
+    if (step === 5) return 'Submit for Verification';
     if (step === 2 && subStep === 2) return 'Confirm & Proceed';
     if (step === 3) return 'Save & Continue';
-    if (step === 4) return subStep === 1 ? 'Upload Document' : 'Next Step';
+    if (step === 4) return subStep === 1 ? 'Upload Document' : 'Next Step (Club Photos)';
 
     return 'Next';
   };
@@ -319,14 +363,18 @@ export default function OnBoardingStep() {
               onPress={() => {
                 if (item <= maxAllowedFrontendStep) {
                   setStep(item);
-                  setSubStep(1);
+                  if (item === 4) {
+                    const docList = documents?.documents || documents?.data || documents || [];
+                    setSubStep(docList.length > 0 ? 2 : 1);
+                  } else {
+                    setSubStep(1);
+                  }
                 }
               }}
               activeOpacity={0.7}
               disabled={item > maxAllowedFrontendStep && item > step}
               className="mx-1 flex-1 justify-center">
               <View className={`w-full rounded-full ${bgColor}`} />
-
             </TouchableOpacity>
           );
         })}
@@ -378,7 +426,8 @@ export default function OnBoardingStep() {
               initialData={formData}
               onNext={() => {
                 setStep(4);
-                setSubStep(1);
+                const docList = documents?.documents || documents?.data || documents || [];
+                setSubStep(docList.length > 0 ? 2 : 1);
               }}
             />
           )}
@@ -387,11 +436,13 @@ export default function OnBoardingStep() {
             (subStep === 1 ? (
               <OnBoarding4
                 ref={onboarding4Ref}
-                onUploadDone={() => setSubStep(2)}
+                onUploadDone={() => {
+                  refetchDocs();
+                  setSubStep(2);
+                }}
                 onUploadSuccess={() => {
-                  if (subStep === 1) {
-                    setSubStep(2);
-                  }
+                  refetchDocs();
+                  setSubStep(2);
                 }}
                 onBack={() => {
                   const docList = documents?.documents || documents?.data || documents || [];
@@ -404,7 +455,21 @@ export default function OnBoardingStep() {
                 }}
               />
             ) : (
-              <OnBoarding4_List onAddMore={() => setSubStep(1)} />
+              <OnBoarding4_List
+                onAddMore={() => setSubStep(1)}
+                onNext={async () => {
+                  setIsStepSaving(true);
+                  try {
+                    await confirmDocs.mutateAsync(undefined);
+                  } catch (e) {
+                    console.log('confirmDocs note:', e);
+                  } finally {
+                    setIsStepSaving(false);
+                    setStep(5);
+                    setSubStep(1);
+                  }
+                }}
+              />
             ))}
 
           {step === 5 && <OnBoarding5 ref={onboarding5Ref} initialData={formData} />}

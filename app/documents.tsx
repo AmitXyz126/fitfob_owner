@@ -14,10 +14,12 @@ import {
   RefreshControl,
   StatusBar,
   Platform,
+  StyleSheet,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { WebView } from 'react-native-webview';
 import { Container } from '@/components/Container';
 import { useUserDetail } from '@/hooks/useUserDetail';
 import * as DocumentPicker from 'expo-document-picker';
@@ -47,6 +49,7 @@ const DOCUMENT_TYPES = [
 
 export default function DocumentsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { documents, isDocsLoading, refetchDocs, uploadDoc } = useUserDetail();
 
   const [selectedDoc, setSelectedDoc] = useState<DocumentItem | null>(null);
@@ -96,13 +99,33 @@ export default function DocumentsScreen() {
     if (Array.isArray(rawList) && rawList.length > 0) {
       return rawList.map((item: any, idx: number) => {
         const fileObj = item?.file || item;
-        const rawUrl =
+        let rawUrl =
           item?.url ||
           item?.fileUrl ||
+          item?.documentUrl ||
+          item?.docUrl ||
+          item?.filePath ||
           fileObj?.url ||
+          fileObj?.fileUrl ||
           fileObj?.uri ||
+          fileObj?.path ||
           item?.uri ||
+          item?.path ||
           '';
+
+        // Prepend backend API URL if relative URL
+        if (
+          rawUrl &&
+          typeof rawUrl === 'string' &&
+          !rawUrl.startsWith('http://') &&
+          !rawUrl.startsWith('https://') &&
+          !rawUrl.startsWith('file://') &&
+          !rawUrl.startsWith('content://') &&
+          !rawUrl.startsWith('data:')
+        ) {
+          const apiBase = process.env.EXPO_PUBLIC_API_URL || '';
+          rawUrl = `${apiBase.replace(/\/+$/, '')}/${rawUrl.replace(/^\/+/, '')}`;
+        }
 
         const name = getCleanDocName(item, fileObj, idx);
 
@@ -169,32 +192,61 @@ export default function DocumentsScreen() {
     setPreviewVisible(true);
   };
 
+  const getPdfSource = (url?: string) => {
+    if (!url) return { uri: '' };
+
+    const isPdf =
+      url.toLowerCase().includes('.pdf') ||
+      selectedDoc?.type?.toLowerCase().includes('pdf') ||
+      selectedDoc?.name?.toLowerCase().endsWith('.pdf');
+
+    // On Android, WebView cannot display raw remote PDF files directly without Google Docs Viewer embedding
+    if (Platform.OS === 'android' && isPdf && !url.includes('docs.google.com/gview') && url.startsWith('http')) {
+      return {
+        uri: `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}`,
+      };
+    }
+
+    return { uri: url };
+  };
+
   const handleOpenExternalUrl = async () => {
     if (!selectedDoc?.url) {
       Toast.show({
         type: 'info',
         text1: 'Document Link Unavailable',
-        text2: 'No web URL provided for this document.',
+        text2: 'No file URL available for this document.',
       });
       return;
     }
 
     try {
-      if (
-        selectedDoc.url.toLowerCase().endsWith('.pdf') ||
-        selectedDoc.url.toLowerCase().includes('.pdf') ||
-        selectedDoc.url.startsWith('http')
-      ) {
-        await WebBrowser.openBrowserAsync(selectedDoc.url);
+      const url = selectedDoc.url;
+      const isPdf =
+        url.toLowerCase().includes('.pdf') ||
+        selectedDoc?.name?.toLowerCase().endsWith('.pdf');
+
+      // For Android, WebBrowser/Google Viewer opens PDFs reliably
+      const targetUrl =
+        Platform.OS === 'android' && isPdf && !url.includes('docs.google.com') && url.startsWith('http')
+          ? `https://docs.google.com/viewer?url=${encodeURIComponent(url)}`
+          : url;
+
+      if (targetUrl.startsWith('http://') || targetUrl.startsWith('https://')) {
+        await WebBrowser.openBrowserAsync(targetUrl);
       } else {
-        await Linking.openURL(selectedDoc.url);
+        await Linking.openURL(targetUrl);
       }
     } catch {
-      Toast.show({
-        type: 'error',
-        text1: 'Cannot Open Link',
-        text2: 'Unable to open file in browser.',
-      });
+      try {
+        await Linking.openURL(selectedDoc.url);
+      } catch {
+        Toast.show({
+          type: 'error',
+          text1: 'Cannot Open Link',
+          text2: 'Unable to open file.',
+        });
+      }
     }
   };
 
@@ -274,7 +326,7 @@ export default function DocumentsScreen() {
       <View className="mb-3.5 flex-row items-center justify-between rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm mx-0.5">
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => handleOpenOptions(item)}
+          onPress={() => handleViewPreview(item)}
           className="flex-row items-center flex-1 pr-3">
           {/* File Icon Container */}
           <View className="h-12 w-12 items-center justify-center rounded-xl bg-red-50 border border-red-100">
@@ -373,9 +425,15 @@ export default function DocumentsScreen() {
         visible={popupVisible}
         transparent={true}
         animationType="slide"
+        statusBarTranslucent={true}
         onRequestClose={handleClosePopup}>
-        <Pressable onPress={handleClosePopup} className="flex-1 bg-black/50 justify-end">
-          <Pressable className="bg-white rounded-t-[32px] p-6 shadow-2xl">
+        <Pressable style={styles.modalBackdrop} onPress={handleClosePopup}>
+          <Pressable
+            style={[
+              styles.modalCard,
+              { paddingBottom: Math.max(insets.bottom, 16) + 12 },
+            ]}
+            onPress={(e) => e.stopPropagation()}>
             <View className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6" />
 
             <Text className="font-bold text-lg text-slate-900" numberOfLines={1}>
@@ -417,60 +475,115 @@ export default function DocumentsScreen() {
         visible={previewVisible}
         transparent={false}
         animationType="fade"
+        statusBarTranslucent={true}
         onRequestClose={() => setPreviewVisible(false)}>
         <SafeAreaView style={{ flex: 1, backgroundColor: '#0F172A' }}>
           <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
           {/* Header Bar */}
           <View
             style={{
-              marginTop: 24,
-              paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 16,
+              paddingTop: Platform.OS === 'android' ? 8 : 4,
             }}
-            className="flex-row items-center justify-between pb-3 px-4">
+            className="flex-row items-center justify-between pb-3 px-4 border-b border-slate-800">
             <TouchableOpacity
               onPress={() => setPreviewVisible(false)}
-              className="h-10 w-10 items-center justify-center rounded-full bg-white/20">
+              className="h-10 w-10 items-center justify-center rounded-full bg-white/10 active:bg-white/20">
               <Ionicons name="close" size={22} color="#FFF" />
             </TouchableOpacity>
 
-            <Text className="font-bold text-base text-white flex-1 text-center mx-3" numberOfLines={1}>
-              {selectedDoc?.name}
-            </Text>
+            <View className="flex-1 mx-3 items-center">
+              <Text className="font-bold text-base text-white text-center" numberOfLines={1}>
+                {selectedDoc?.name}
+              </Text>
+              {selectedDoc?.size && (
+                <Text className="text-[11px] text-slate-400 font-medium">
+                  {selectedDoc.size}
+                </Text>
+              )}
+            </View>
 
             <TouchableOpacity
               onPress={handleOpenExternalUrl}
-              className="h-10 w-10 items-center justify-center rounded-full bg-white/20">
+              className="h-10 w-10 items-center justify-center rounded-full bg-white/10 active:bg-white/20">
               <Ionicons name="open-outline" size={20} color="#FFF" />
             </TouchableOpacity>
           </View>
 
-          {/* Preview Image or File Link */}
-          <View className="flex-1 items-center justify-center p-4">
-            {selectedDoc?.url &&
-              (selectedDoc.url.toLowerCase().match(/\.(jpg|jpeg|png|webp)/) ||
-                selectedDoc.url.startsWith('data:image')) ? (
-              <Image
-                source={{ uri: selectedDoc.url }}
-                className="h-full w-full rounded-2xl"
-                resizeMode="contain"
-              />
+          {/* Preview Image, PDF (via WebView), or File Link */}
+          <View className="flex-1 p-2 bg-slate-900">
+            {selectedDoc?.url ? (
+              selectedDoc.url.toLowerCase().match(/\.(jpg|jpeg|png|webp)/) ||
+              selectedDoc.url.startsWith('data:image') ? (
+                <View className="flex-1 items-center justify-center p-2">
+                  <Image
+                    source={{ uri: selectedDoc.url }}
+                    className="h-full w-full rounded-2xl"
+                    resizeMode="contain"
+                  />
+                </View>
+              ) : (
+                <View style={{ flex: 1, borderRadius: 16, overflow: 'hidden', backgroundColor: '#FFFFFF' }}>
+                  <WebView
+                    source={getPdfSource(selectedDoc.url)}
+                    style={{ flex: 1 }}
+                    startInLoadingState={true}
+                    javaScriptEnabled={true}
+                    domStorageEnabled={true}
+                    scalesPageToFit={true}
+                    originWhitelist={['*']}
+                    mixedContentMode="always"
+                    renderLoading={() => (
+                      <View style={StyleSheet.absoluteFill} className="items-center justify-center bg-slate-900">
+                        <ActivityIndicator size="large" color="#F6163C" />
+                        <Text className="mt-3 font-semibold text-sm text-slate-300">
+                          Opening PDF Document...
+                        </Text>
+                      </View>
+                    )}
+                    renderError={() => (
+                      <View style={StyleSheet.absoluteFill} className="items-center justify-center bg-slate-900 p-6">
+                        <Ionicons name="alert-circle-outline" size={56} color="#F6163C" />
+                        <Text className="mt-3 font-bold text-base text-white text-center">
+                          Unable to load in-app preview
+                        </Text>
+                        <Text className="mt-1 text-xs text-slate-400 text-center mb-5">
+                          Tap below to open or download this document directly.
+                        </Text>
+                        <TouchableOpacity
+                          onPress={handleOpenExternalUrl}
+                          className="flex-row items-center rounded-xl bg-[#F6163C] px-5 py-3">
+                          <Ionicons name="open-outline" size={18} color="#FFF" />
+                          <Text className="ml-2 font-bold text-sm text-white">Open in Browser / Viewer</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  />
+                </View>
+              )
             ) : (
-              <View className="items-center justify-center p-8 rounded-3xl bg-slate-800/80 border border-slate-700 w-full max-w-[320px]">
-                <Ionicons name="document-text-outline" size={72} color="#F6163C" />
-                <Text className="mt-4 font-bold text-lg text-white text-center">
-                  {selectedDoc?.name}
-                </Text>
-                <Text className="mt-2 text-xs font-semibold text-slate-400 text-center">
-                  {selectedDoc?.date}  •  {selectedDoc?.size}
-                </Text>
+              <View className="flex-1 items-center justify-center p-6">
+                <View className="items-center justify-center p-8 rounded-3xl bg-slate-800/90 border border-slate-700 w-full max-w-[320px]">
+                  <View className="h-20 w-20 items-center justify-center rounded-full bg-red-500/10 mb-4">
+                    <Ionicons name="document-text-outline" size={44} color="#F6163C" />
+                  </View>
+                  <Text className="font-bold text-lg text-white text-center" numberOfLines={2}>
+                    {selectedDoc?.name}
+                  </Text>
+                  <Text className="mt-2 text-xs font-semibold text-slate-400 text-center leading-5">
+                    This is a sample document placeholder. Upload your real document to view the full PDF.
+                  </Text>
 
-                <TouchableOpacity
-                  onPress={handleOpenExternalUrl}
-                  activeOpacity={0.8}
-                  className="mt-6 flex-row items-center rounded-xl bg-[#F6163C] px-5 py-3">
-                  <Ionicons name="open-outline" size={18} color="#FFF" />
-                  <Text className="ml-2 font-bold text-sm text-white">Open Document</Text>
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setPreviewVisible(false);
+                      setUploadModalVisible(true);
+                    }}
+                    activeOpacity={0.8}
+                    className="mt-6 flex-row items-center rounded-xl bg-[#F6163C] px-5 py-3">
+                    <Ionicons name="cloud-upload-outline" size={18} color="#FFF" />
+                    <Text className="ml-2 font-bold text-sm text-white">Upload Real Document</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
           </View>
@@ -482,11 +595,17 @@ export default function DocumentsScreen() {
         visible={uploadModalVisible}
         transparent={true}
         animationType="slide"
+        statusBarTranslucent={true}
         onRequestClose={() => setUploadModalVisible(false)}>
         <Pressable
-          onPress={() => setUploadModalVisible(false)}
-          className="flex-1 bg-black/50 justify-end">
-          <Pressable className="bg-white rounded-t-[32px] p-6 shadow-2xl">
+          style={styles.modalBackdrop}
+          onPress={() => setUploadModalVisible(false)}>
+          <Pressable
+            style={[
+              styles.modalCard,
+              { paddingBottom: Math.max(insets.bottom, 16) + 12 },
+            ]}
+            onPress={(e) => e.stopPropagation()}>
             <View className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-4" />
 
             <Text className="font-bold text-xl text-slate-900 mb-1">Upload New Document</Text>
@@ -572,3 +691,25 @@ export default function DocumentsScreen() {
     </Container>
   );
 }
+
+const styles = StyleSheet.create({
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 24,
+  },
+});
+
