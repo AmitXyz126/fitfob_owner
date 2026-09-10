@@ -3,6 +3,7 @@ import { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Platform, Modal, Alert, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import CustomTimePickerModal from '@/components/CustomTimePickerModal';
+import ClubCategoryInfoModal from '@/components/ClubCategoryInfoModal';
 import LineGradient from '../lineGradient/LineGradient';
 import { useUserDetail } from '@/hooks/useUserDetail';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -95,6 +96,7 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
   // --- CLUB CATEGORY ---
   const [clubCategory, setClubCategory] = useState('Luxury');
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showCategoryInfoModal, setShowCategoryInfoModal] = useState(true);
   const categoryOptions = ['Luxury', 'Premium'];
 
   const [fitnessTypes, setFitnessTypes] = useState(['Gym']);
@@ -530,7 +532,16 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
 
         {/* --- CLUB CATEGORY DROPDOWN --- */}
         <View className="mb-6">
-          <Text className="mb-2 ml-1 font-sans text-sm font-normal text-[#697281]">Club Category</Text>
+          <View className="mb-2 ml-1 flex-row items-center justify-between">
+            <Text className="font-sans text-sm font-normal text-[#697281]">Club Category</Text>
+            <TouchableOpacity
+              onPress={() => setShowCategoryInfoModal(true)}
+              activeOpacity={0.7}
+              className="flex-row items-center px-2 py-0.5 rounded-full bg-rose-50 border border-rose-100">
+              <Ionicons name="information-circle" size={14} color="#F6163C" />
+              <Text className="text-[12px] font-semibold text-[#F6163C] ml-1">Info</Text>
+            </TouchableOpacity>
+          </View>
           <TouchableOpacity
             onPress={() => setShowCategoryModal(true)}
             activeOpacity={0.7}
@@ -888,9 +899,31 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
                 {clubCategory === option && <Ionicons name="checkmark-circle" size={24} color="#F6163C" />}
               </TouchableOpacity>
             ))}
+
+            {/* View Guidelines Link */}
+            <TouchableOpacity
+              onPress={() => {
+                setShowCategoryModal(false);
+                setTimeout(() => setShowCategoryInfoModal(true), 250);
+              }}
+              activeOpacity={0.7}
+              className="mt-4 flex-row items-center justify-center rounded-2xl border border-rose-100 bg-rose-50/50 py-3">
+              <Ionicons name="information-circle" size={16} color="#F6163C" />
+              <Text className="ml-1.5 text-xs font-semibold text-[#F6163C]">
+                Need help? View Luxury vs Premium criteria
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
+
+      {/* --- CLUB CATEGORY INFO BOTTOM SHEET MODAL --- */}
+      <ClubCategoryInfoModal
+        visible={showCategoryInfoModal}
+        selectedCategory={clubCategory}
+        onSelectCategory={(cat) => setClubCategory(cat)}
+        onClose={() => setShowCategoryInfoModal(false)}
+      />
 
       {/* --- FITFOB BRANDED RED TIME PICKER MODAL --- */}
       <CustomTimePickerModal

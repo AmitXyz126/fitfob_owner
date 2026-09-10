@@ -17,6 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useUserDetail } from '@/hooks/useUserDetail';
 import Toast from 'react-native-toast-message';
 import { LinearGradient } from 'expo-linear-gradient';
+import GymLoader from '@/components/GymLoader';
 
 interface Props {
   initialData?: any;
@@ -58,6 +59,7 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
   );
   const [photoCaption, setPhotoCaption] = useState('');
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
+  const [isSubmittingVerification, setIsSubmittingVerification] = useState(false);
 
   // Fetch photos on screen mount
   useEffect(() => {
@@ -326,7 +328,18 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
 
   // Final Onboarding Submit (POST /api/pending-club-owner/confirm)
   const handleFinalConfirm = async () => {
-    // Check if any photo is currently being uploaded/saved
+    // 1. If no photo is uploaded, show toast immediately and do not start loader
+    if (!localPhotos || localPhotos.length === 0) {
+      Toast.show({
+        type: 'error',
+        text1: 'Photo Required 📷',
+        text2: 'Please upload at least 1 club photo before submitting.',
+        visibilityTime: 4000,
+      });
+      return false;
+    }
+
+    // 2. Check if any photo is currently being uploaded/saved
     const isAnyPhotoUploading =
       localPhotos.some((p) => p.isUploading) || uploadSingleClubPhoto.isPending;
 
@@ -334,34 +347,26 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
       Toast.show({
         type: 'info',
         text1: 'Photo Uploading ⏳',
-        text2: 'Please wait for your photo to finish uploading.',
+        text2: 'Your photo is currently uploading. Please wait a moment.',
+        visibilityTime: 4000,
       });
-      Alert.alert(
-        'Please Wait ⏳',
-        'Your photo is currently uploading. Please wait a few seconds for it to finish before submitting for verification.'
-      );
       return false;
     }
 
-    if (localPhotos.length === 0) {
-      Alert.alert(
-        'Club Photo Required',
-        'Please upload at least 1 club photo with description before submitting your registration.'
-      );
-      return false;
-    }
-
+    setIsSubmittingVerification(true);
     try {
       await confirmOnboarding.mutateAsync();
       return true;
     } catch (e: any) {
       console.log('Confirm onboarding error:', e);
       return false;
+    } finally {
+      setIsSubmittingVerification(false);
     }
   };
 
   const isUploading = uploadSingleClubPhoto.isPending;
-  const isConfirming = confirmOnboarding.isPending;
+  const isConfirming = confirmOnboarding.isPending || isSubmittingVerification;
 
   // Compute visible slots: 3 initially, expands to 10 on showMore
   const visibleSlotsCount = showMore ? MAX_PHOTOS : INITIAL_SLOTS_COUNT;
@@ -371,17 +376,17 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
     <View className="flex-1 bg-white">
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 36 }}>
+        contentContainerStyle={{ paddingBottom: 36, paddingHorizontal: 2 }}>
         {/* Title Header */}
         <View className="mt-2 mb-5">
           <View className="flex-row items-center justify-between">
             <Text className="font-bold text-[26px] text-slate-900">Upload Club Photos</Text>
-            <View className="flex-row items-center rounded-full bg-emerald-50 px-3 py-1 border border-emerald-200">
+            {/* <View className="flex-row items-center rounded-full bg-emerald-50 px-3 py-1 border border-emerald-200">
               <Ionicons name="images" size={13} color="#10B981" />
               <Text className="ml-1.5 text-xs font-bold text-emerald-700">
                 {localPhotos.length} / {MAX_PHOTOS} Uploaded
               </Text>
-            </View>
+            </View> */}
           </View>
           <Text className="mt-1.5 text-sm text-slate-500 font-medium">
             Upload clear photos with captions so members know what equipment and facilities to expect.
@@ -413,12 +418,12 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
                   key={photo.documentId || index}
                   className={`mb-4 ${
                     isHero ? 'w-full' : 'w-[48%]'
-                  } rounded-[20px] border border-slate-100 bg-[#F8FAFC] p-2.5 shadow-sm`}>
+                  } overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm`}>
                   {/* Image Box */}
                   <View
                     className={`${
-                      isHero ? 'h-44' : 'h-32'
-                    } w-full overflow-hidden rounded-[15px] bg-slate-200 relative`}>
+                      isHero ? 'h-52' : 'h-36'
+                    } w-full overflow-hidden bg-slate-100 relative`}>
                     {photo.url ? (
                       <Image
                         source={{ uri: photo.url }}
@@ -433,7 +438,7 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
 
                     {/* Top Right Status / Delete Button */}
                     {photo.isUploading ? (
-                      <View className="absolute right-2 top-2 flex-row items-center rounded-full bg-black/65 px-2 py-1 shadow-sm">
+                      <View className="absolute right-2.5 top-2.5 flex-row items-center rounded-full bg-black/70 px-2.5 py-1 shadow-sm">
                         <ActivityIndicator
                           size="small"
                           color="#FFF"
@@ -446,7 +451,7 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
                         onPress={() => handleDeletePhoto(photo)}
                         disabled={isDeletingThis || isConfirming}
                         activeOpacity={0.8}
-                        className="absolute right-2 top-2 h-7 w-7 items-center justify-center rounded-full bg-rose-600/90 shadow-sm">
+                        className="absolute right-2.5 top-2.5 h-7 w-7 items-center justify-center rounded-full bg-rose-600/90 shadow-sm">
                         {isDeletingThis ? (
                           <ActivityIndicator size="small" color="white" />
                         ) : (
@@ -456,7 +461,7 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
                     )}
 
                     {/* Photo Index Tag */}
-                    <View className="absolute bottom-1.5 left-2 rounded-full bg-black/50 px-2 py-0.5">
+                    <View className="absolute bottom-2 left-2.5 rounded-full bg-black/60 px-2.5 py-0.5">
                       <Text className="text-[10px] font-semibold text-white">
                         {isHero ? '#1 Main Photo' : `#${index + 1}`}
                       </Text>
@@ -464,10 +469,10 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
                   </View>
 
                   {/* Caption / Description Display */}
-                  <View className="mt-2.5 flex-row items-center rounded-xl bg-white border border-slate-200/80 px-2.5 py-1.5">
-                    <Ionicons name="chatbox-ellipses-outline" size={13} color="#F6163C" />
+                  <View className="flex-row items-center border-t border-slate-100 bg-white px-3 py-2.5">
+                    <Ionicons name="chatbox-ellipses-outline" size={14} color="#F6163C" />
                     <Text
-                      className="ml-1.5 flex-1 text-[11px] font-bold text-slate-800"
+                      className="ml-2 flex-1 text-xs font-semibold text-slate-800"
                       numberOfLines={1}>
                       {photo.imageInfo || 'Gym Facility'}
                     </Text>
@@ -484,8 +489,8 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
                 disabled={isUploading || isConfirming}
                 activeOpacity={0.7}
                 className={`mb-4 ${
-                  isHero ? 'w-full h-44' : 'w-[48%] h-44'
-                } items-center justify-center rounded-[20px] border-2 border-dashed border-rose-200 bg-rose-50/40 p-3`}>
+                  isHero ? 'w-full h-52' : 'w-[48%] h-44'
+                } items-center justify-center rounded-2xl border-2 border-dashed border-rose-200 bg-rose-50/40 p-3`}>
                 <View className="h-11 w-11 items-center justify-center rounded-full bg-rose-100 mb-1.5">
                   <Ionicons name="camera" size={22} color="#F6163C" />
                 </View>
@@ -749,6 +754,9 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Motivational GymLoader while submitting for verification */}
+      <GymLoader visible={isConfirming} />
     </View>
   );
 });

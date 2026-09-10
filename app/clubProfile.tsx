@@ -894,12 +894,41 @@ const ClubProfileScreen = () => {
       <View className="bg-white py-5 border-t border-slate-50">
         <TouchableOpacity
           onPress={async () => {
-            await useAuthStore.getState().logOut();
-            await AsyncStorage.clear();
-            if (router.canGoBack()) {
-              router.dismissAll();
+            console.log('🚪 [LOGOUT] === LOGOUT PROCESS INITIATED ===');
+            try {
+              const currentUser = useAuthStore.getState().user;
+              console.log('👤 [LOGOUT] Current user before logout:', {
+                id: currentUser?.id,
+                email: currentUser?.email,
+                username: currentUser?.username,
+                role: currentUser?.role,
+              });
+
+              const existingKeys = await AsyncStorage.getAllKeys();
+              console.log('🔑 [LOGOUT] Existing AsyncStorage keys before clear:', existingKeys);
+
+              console.log('⏳ [LOGOUT] Calling useAuthStore.getState().logOut()...');
+              await useAuthStore.getState().logOut();
+              console.log('✅ [LOGOUT] useAuthStore logOut completed. User in store:', useAuthStore.getState().user);
+
+              console.log('🧹 [LOGOUT] Clearing AsyncStorage completely...');
+              await AsyncStorage.clear();
+              const remainingKeys = await AsyncStorage.getAllKeys();
+              console.log('✅ [LOGOUT] AsyncStorage.clear() completed. Remaining keys:', remainingKeys);
+
+              const canGoBack = router.canGoBack();
+              console.log('🔙 [LOGOUT] router.canGoBack():', canGoBack);
+              if (canGoBack) {
+                console.log('🔙 [LOGOUT] Dismissing all routes via router.dismissAll()...');
+                router.dismissAll();
+              }
+
+              console.log('🚀 [LOGOUT] Redirecting to /welcome...');
+              router.replace('/welcome');
+              console.log('🏁 [LOGOUT] === LOGOUT PROCESS FINISHED ===');
+            } catch (error) {
+              console.error('❌ [LOGOUT ERROR] Exception during logout:', error);
             }
-            router.replace('/welcome');
           }}
           className="flex-row items-center justify-center rounded-[8px] bg-[#E23744] py-4">
           <LogOut size={20} color="white" />

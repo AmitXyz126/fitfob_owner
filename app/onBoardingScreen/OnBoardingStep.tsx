@@ -22,10 +22,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 export default function OnBoardingStep() {
   const [step, setStep] = useState(1);
   const [subStep, setSubStep] = useState(1);
-  const [hasCheckedDocuments, setHasCheckedDocuments] = useState(false);
   const [isStepSaving, setIsStepSaving] = useState(false);
   const [isStep1Valid, setIsStep1Valid] = useState(false);
-  const totalSteps = 5;
   const { user } = useAuthStore();
 
   // --- Step Mapping Helpers (Backend vs Frontend) ---

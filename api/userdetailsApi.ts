@@ -263,16 +263,66 @@ export const userDetailsApi = {
   },
 
   getDocuments: async (isApprovedOwner: boolean = false) => {
+    let result = null;
+
     if (isApprovedOwner) {
       try {
         const response = await api.get(ENDPOINTS.MY_DOCUMENTS);
-        if (response.data) return response.data;
+        if (response.data) {
+          const list = response.data?.documents || response.data?.data || (Array.isArray(response.data) ? response.data : []);
+          if (Array.isArray(list) && list.length > 0) {
+            return response.data;
+          }
+          result = response.data;
+        }
       } catch (e) {
         console.log('MY_DOCUMENTS endpoint error, using pending-club-owner fallback:', e);
       }
     }
-    const response = await api.get(ENDPOINTS.Get);
-    return response.data;
+
+    // Try pending-club-owner documents endpoint
+    try {
+      const response = await api.get(ENDPOINTS.Get);
+      if (response.data) {
+        const list = response.data?.documents || response.data?.data || (Array.isArray(response.data) ? response.data : []);
+        if (Array.isArray(list) && list.length > 0) {
+          return response.data;
+        }
+        if (!result) result = response.data;
+      }
+    } catch (e) {
+      console.log('ENDPOINTS.Get (/api/pending-club-owner/documents) error:', e);
+    }
+
+    // Fallback: check /api/my-documents if not tried yet
+    if (!isApprovedOwner) {
+      try {
+        const response = await api.get(ENDPOINTS.MY_DOCUMENTS);
+        if (response.data) {
+          const list = response.data?.documents || response.data?.data || (Array.isArray(response.data) ? response.data : []);
+          if (Array.isArray(list) && list.length > 0) {
+            return response.data;
+          }
+        }
+      } catch (e) {}
+    }
+
+    // Fallback: check if GET_ONBOARDING_STATUS has documents embedded
+    try {
+      const meRes = await api.get(ENDPOINTS.GET_ONBOARDING_STATUS);
+      const meData = meRes.data?.details || meRes.data?.data || meRes.data || {};
+      const embeddedDocs =
+        meData?.documents ||
+        meData?.governmentDocuments ||
+        meData?.govtDocs ||
+        meData?.docs ||
+        [];
+      if (Array.isArray(embeddedDocs) && embeddedDocs.length > 0) {
+        return { documents: embeddedDocs };
+      }
+    } catch (e) {}
+
+    return result || [];
   },
 
   uploadSingleClubPhoto: async (data: { file: { uri: string; name?: string; type?: string }; imageInfo: string }) => {
@@ -403,6 +453,21 @@ export const userDetailsApi = {
         } catch (e) {
           console.log('Error caching club_owner_me in AsyncStorage:', e);
         }
+
+        // Sync ownerData directly to useAuthStore so user.clubOwnerDetail is instantly available without logout/login!
+        try {
+          const currentUser = useAuthStore.getState().user;
+          if (currentUser) {
+            useAuthStore.getState().setUser({
+              ...currentUser,
+              clubOwnerDetail: {
+                ...(currentUser.clubOwnerDetail || {}),
+                ...ownerData,
+              },
+            }, true).catch(() => {});
+          }
+        } catch (e) {}
+
         return ownerData;
       }
     } catch (e: any) {

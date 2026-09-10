@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useUserDetail } from '@/hooks/useUserDetail';
+import { useAuthStore } from '@/store/useAuthStore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { WebView } from 'react-native-webview';
 import * as WebBrowser from 'expo-web-browser';
 import Toast from 'react-native-toast-message';
@@ -24,16 +26,46 @@ interface Props {
 }
 
 export default function OnBoarding4_List({ onAddMore, onNext }: Props) {
-  const { documents, isDocsLoading, refetchDocs } = useUserDetail();
+  const { documents, isDocsLoading, isDocsFetching, refetchDocs } = useUserDetail();
+  const { user } = useAuthStore();
+  const userKey = user?.id || user?.email || 'guest';
+  const STORAGE_KEY = `@onboarding_documents_cache_${userKey}`;
+
+  const [cachedDocs, setCachedDocs] = useState<any>(null);
   const [previewDoc, setPreviewDoc] = useState<any>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
 
-  // Auto-refresh when the screen mounts
+  // Load from local storage immediately on mount for 0ms instant display
   useEffect(() => {
-    refetchDocs();
+    AsyncStorage.getItem(STORAGE_KEY).then((saved) => {
+      if (saved) {
+        try {
+          setCachedDocs(JSON.parse(saved));
+        } catch (e) {}
+      }
+    });
+  }, [STORAGE_KEY]);
+
+  // Keep local storage synced with TanStack query data
+  useEffect(() => {
+    if (documents) {
+      setCachedDocs(documents);
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(documents)).catch(console.log);
+    }
+  }, [documents, STORAGE_KEY]);
+
+  // Only refetch if neither TanStack query nor local storage has documents
+  useEffect(() => {
+    if (!documents && !cachedDocs) {
+      refetchDocs();
+    }
   }, []);
 
-  const docList = documents?.documents || documents?.data || documents || [];
+  const activeDocs = documents || cachedDocs;
+  const docList =
+    activeDocs?.documents ||
+    activeDocs?.data ||
+    (Array.isArray(activeDocs) ? activeDocs : []);
 
   const getCleanDocUrl = (item: any) => {
     let rawUrl =
@@ -117,7 +149,7 @@ export default function OnBoarding4_List({ onAddMore, onNext }: Props) {
     setPreviewVisible(true);
   };
 
-  if (isDocsLoading && !documents) {
+  if (isDocsLoading && docList.length === 0) {
     return (
       <View className="flex-1 items-center justify-center bg-white py-16">
         <ActivityIndicator size="large" color="#F6163C" />
@@ -127,7 +159,7 @@ export default function OnBoarding4_List({ onAddMore, onNext }: Props) {
   }
 
   return (
-    <View className="flex-1 bg-white">
+    <View className="flex-1 bg-white px-0.5">
       {/* Header */}
       <View className="mb-5">
         <View className="flex-row items-center justify-between">
@@ -137,6 +169,13 @@ export default function OnBoarding4_List({ onAddMore, onNext }: Props) {
             <Text className="ml-1 text-xs font-bold text-emerald-700">
               {docList.length} Verified
             </Text>
+            {isDocsFetching && (
+              <ActivityIndicator
+                size="small"
+                color="#10B981"
+                style={{ marginLeft: 6, transform: [{ scale: 0.65 }] }}
+              />
+            )}
           </View>
         </View>
         <Text className="mt-1 text-sm text-slate-500 font-medium">
@@ -147,7 +186,7 @@ export default function OnBoarding4_List({ onAddMore, onNext }: Props) {
       {/* Document List */}
       <View className="pb-4">
         {docList.length === 0 ? (
-          <View className="items-center py-12 rounded-2xl bg-slate-50 border border-slate-100 mb-4">
+          <View className="items-center py-12 rounded-2xl bg-slate-50 border border-slate-200 mb-4">
             <Ionicons name="document-text-outline" size={48} color="#94A3B8" />
             <Text className="mt-3 font-semibold text-slate-600">No documents uploaded yet.</Text>
             <Text className="text-xs text-slate-400 mt-1">
@@ -162,11 +201,11 @@ export default function OnBoarding4_List({ onAddMore, onNext }: Props) {
                 key={item?.id || item?._id || index.toString()}
                 onPress={() => handleOpenPreview(item)}
                 activeOpacity={0.8}
-                className="mb-3.5 flex-row items-center rounded-2xl bg-[#F8FAFC] border border-slate-100 p-4 shadow-sm">
-                <View className="items-center justify-center rounded-xl bg-white p-2.5 border border-slate-100 shadow-sm">
+                className="mb-3.5 flex-row items-center rounded-2xl bg-white border border-slate-200 p-3.5 shadow-sm">
+                <View className="items-center justify-center rounded-xl bg-slate-50 p-2.5 border border-slate-100">
                   <Ionicons
                     name={isPdf ? 'document-text' : 'image'}
-                    size={26}
+                    size={24}
                     color="#F6163C"
                   />
                   <Text className="mt-[-2px] font-bold text-[8px] uppercase text-slate-500">
@@ -174,7 +213,7 @@ export default function OnBoarding4_List({ onAddMore, onNext }: Props) {
                   </Text>
                 </View>
 
-                <View className="ml-3.5 flex-1">
+                <View className="ml-3 flex-1">
                   <View className="flex-row items-center gap-1.5 flex-wrap">
                     <Text className="font-bold text-sm text-slate-800" numberOfLines={1}>
                       {item?.documentName || item?.name || 'Government Document'}

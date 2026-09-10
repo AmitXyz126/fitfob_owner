@@ -14,7 +14,7 @@ import { userDetailsApi } from '@/api/userdetailsApi';
 
 export default function Splash() {
   const router = useRouter();
-  const { initializeAuth } = useAuthStore();
+  const { initializeAuth, logOut } = useAuthStore();
 
   // Logo animation values
   const translateY = useSharedValue(40);
@@ -67,7 +67,7 @@ export default function Splash() {
           }
 
           try {
-            const statusData = await userDetailsApi.getMe();
+            const statusData = await userDetailsApi.getMyClubOwner();
             const verificationStatus =
               statusData?.verification_status ||
               statusData?.verificationStatus ||
@@ -99,8 +99,13 @@ export default function Splash() {
               router.replace('/ReviewStatusScreen');
               return;
             }
+            if ( verificationStatus === 'pending'||  status === 'pending') {
+              router.replace('/onBoardingScreen/OnBoardingStep');
+              return;
+            }
 
-            router.replace('/onBoardingScreen/OnBoardingStep');
+            logOut();
+            router.replace('/welcome');
           } catch (e) {
             console.log('Error checking status in splash, defaulting to tabs:', e);
             router.replace('/(tabs)');

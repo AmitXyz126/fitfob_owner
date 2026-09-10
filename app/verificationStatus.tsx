@@ -4,7 +4,8 @@ import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Container } from '@/components/Container';
 import { useAuthStore } from '@/store/useAuthStore';
-import { useUserDetail } from '@/hooks/useUserDetail';
+import { useUserDetail, useClubOwnerMe } from '@/hooks/useUserDetail';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const CONFETTI_COUNT = 36;
 const GYM_ICONS = [
@@ -53,6 +54,21 @@ export default function VerificationStatusScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
   const { profileStatus } = useUserDetail();
+  const { data: myOwnerData, refetch: refetchOwner } = useClubOwnerMe();
+  const [cachedOwnerId, setCachedOwnerId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    refetchOwner?.();
+    AsyncStorage.getItem('club_owner_me').then((raw) => {
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          const cid = parsed?.clubId || parsed?.club_id || parsed?.id;
+          if (cid) setCachedOwnerId(String(cid));
+        } catch (e) {}
+      }
+    });
+  }, []);
 
   // Animation values for check and shield
   const shieldScale = React.useRef(new Animated.Value(0)).current;
@@ -166,10 +182,28 @@ export default function VerificationStatusScreen() {
     outputRange: [0.6, 0.2, 0],
   });
 
-  // Format ID or use a default one
-  const ownerId = user?.clubOwnerDetail?.clubId
-  console.log(user, "hey user")
-  const ownerEmail = user?.email || profileStatus?.email || 'owner@fitfob.com';
+  // Resolve Verified ID from all dynamic sources
+  const rawOwnerId =
+    user?.clubOwnerDetail?.clubId ||
+    myOwnerData?.clubId ||
+    myOwnerData?.club_id ||
+    cachedOwnerId ||
+    user?.clubOwnerDetail?.id ||
+    myOwnerData?.id ||
+    profileStatus?.clubOwnerDetail?.clubId ||
+    profileStatus?.clubId ||
+    profileStatus?.pendingClubOwnerId ||
+    profileStatus?.id;
+
+  const ownerId = rawOwnerId
+    ? String(rawOwnerId)
+    : (user?.id ? `FIT-${String(user.id).padStart(4, '0')}` : 'FIT-0001');
+
+  const ownerEmail =
+    user?.email ||
+    myOwnerData?.email ||
+    profileStatus?.email ||
+    'owner@fitfob.com';
 
   return (
     <Container>

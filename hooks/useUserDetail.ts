@@ -37,19 +37,61 @@ export const useUserDetail = () => {
     enabled: !!user && (user.clubOwnerDetail === null || user.clubOwnerDetail === undefined),
   });
 
-  const isApprovedOwner = Boolean(user?.clubOwnerDetail?.id || user?.clubOwnerDetail?.clubName);
+  const isApprovedOwner = Boolean(
+    user?.clubOwnerDetail?.id ||
+    user?.clubOwnerDetail?.clubName ||
+    profileStatus?.isApprovedOwner ||
+    profileStatus?.verification_status === 'approved' ||
+    profileStatus?.status === 'approved'
+  );
 
   const {
     data: documents,
     isLoading: isDocsLoading,
+    isFetching: isDocsFetching,
     refetch: refetchDocs,
   } = useQuery({
     queryKey: ['club-owner-docs', userKey, isApprovedOwner],
-    queryFn: () => userDetailsApi.getDocuments(isApprovedOwner),
+    queryFn: async () => {
+      // 1. Check local persistent storage for this user first
+      let localDocs: any = null;
+      try {
+        const saved =
+          (await AsyncStorage.getItem(`@club_owner_user_documents_${userKey}`)) ||
+          (await AsyncStorage.getItem(`@onboarding_documents_cache_${userKey}`));
+        if (saved) {
+          localDocs = JSON.parse(saved);
+        }
+      } catch (e) {}
+
+      // 2. Fetch from backend API
+      try {
+        const res = await userDetailsApi.getDocuments(isApprovedOwner);
+        const list =
+          res?.documents ||
+          res?.data ||
+          res?.docs ||
+          (Array.isArray(res) ? res : []);
+
+        if (Array.isArray(list) && list.length > 0) {
+          AsyncStorage.setItem(`@club_owner_user_documents_${userKey}`, JSON.stringify(res)).catch(console.log);
+          AsyncStorage.setItem(`@onboarding_documents_cache_${userKey}`, JSON.stringify(res)).catch(console.log);
+          return res;
+        }
+      } catch (err) {
+        console.log('Error fetching documents in useQuery:', err);
+      }
+
+      // If backend returned empty or errored, fallback to locally stored documents for this user
+      if (localDocs) {
+        return localDocs;
+      }
+      return [];
+    },
     enabled: !!user,
     retry: 1,
-    staleTime: 10 * 60 * 1000,
-    gcTime: 20 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 
   const submitStep1 = useMutation({
@@ -132,10 +174,55 @@ export const useUserDetail = () => {
   const uploadDoc = useMutation({
     mutationFn: ({ name, file }: { name: string; file: any }) =>
       userDetailsApi.uploadGovtDoc(name, file),
-    onSuccess: () => {
+    onSuccess: (res: any, variables: any) => {
       queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
-      queryClient.invalidateQueries({ queryKey: ['club-owner-docs'] });
-      // Toast.show({ type: 'success', text1: 'Document Uploaded! 📄' });
+
+      // Directly update TanStack Query cache with the uploaded document
+      const docsKey = ['club-owner-docs', userKey, isApprovedOwner];
+      const newDoc = res?.data || res?.document || {
+        id: res?.id || `doc_${Date.now()}`,
+        documentName: variables?.name,
+        name: variables?.name,
+        fileUrl: variables?.file?.uri,
+        url: variables?.file?.uri,
+        createdAt: new Date().toISOString(),
+      };
+
+      queryClient.setQueryData(docsKey, (old: any) => {
+        if (!old) return [newDoc];
+        if (Array.isArray(old)) return [newDoc, ...old];
+        if (old?.documents && Array.isArray(old.documents)) {
+          return { ...old, documents: [newDoc, ...old.documents] };
+        }
+        if (old?.data && Array.isArray(old.data)) {
+          return { ...old, data: [newDoc, ...old.data] };
+        }
+        return [newDoc];
+      });
+
+      // Also persist to AsyncStorage for instant local retrieval across logout/login
+      const persistDocToStorage = (storageKey: string) => {
+        AsyncStorage.getItem(storageKey)
+          .then((saved) => {
+            let list = [];
+            if (saved) {
+              try {
+                const parsed = JSON.parse(saved);
+                list = Array.isArray(parsed)
+                  ? parsed
+                  : parsed?.documents || parsed?.data || [];
+              } catch (e) {}
+            }
+            AsyncStorage.setItem(
+              storageKey,
+              JSON.stringify([newDoc, ...list])
+            ).catch(console.log);
+          })
+          .catch(console.log);
+      };
+
+      persistDocToStorage(`@club_owner_user_documents_${userKey}`);
+      persistDocToStorage(`@onboarding_documents_cache_${userKey}`);
     },
     onError: (error: any) => {
       Toast.show({ type: 'error', text1: 'Upload Failed', text2: error.response?.data?.message });
@@ -150,8 +237,7 @@ export const useUserDetail = () => {
     mutationFn: userDetailsApi.confirmGovtDocs,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
-      queryClient.invalidateQueries({ queryKey: ['club-owner-docs'] });
-      // Toast.show({ type: 'success', text1: 'All documents confirmed! ✅' });
+      // Keep club-owner-docs cache intact so back navigation from step 5 is instant
     },
   });
 
@@ -317,6 +403,7 @@ export const useUserDetail = () => {
     checkVerificationStatus,
     documents,
     isDocsLoading,
+    isDocsFetching,
     refetchDocs,
     clubPhotos,
     isClubPhotosLoading,

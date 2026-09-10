@@ -26,7 +26,7 @@ const clearUserDrafts = async () => {
     const keys = await AsyncStorage.getAllKeys();
     const draftKeys = keys.filter(
       (k) =>
-        k.includes('onboarding') ||
+        (k.includes('onboarding') && !k.includes('documents')) ||
         k.includes('club_profile') ||
         k.includes('authUser')
     );

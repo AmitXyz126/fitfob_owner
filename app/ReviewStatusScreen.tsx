@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, Image, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, Image, ActivityIndicator, Dimensions, ScrollView } from 'react-native';
 import { Container } from '@/components/Container';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -134,34 +134,46 @@ export default function ReviewStatusScreen() {
           activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={24} color="#64748B" />
         </TouchableOpacity>
-
       </View>
 
-      {/* --- PENDING / UNDER REVIEW VIEW --- */}
-      <View className="flex-1  px-2 pb-3">
-        {/* Top: Heading & Subtitle */}
-        <View className="items-center px-4 pt-4">
-          <Text className="text-center font-sans text-[24px] font-bold leading-8 text-[#1C1C1C]">
-            We’re reviewing your submission
-          </Text>
+      {/* Main Content */}
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between', paddingBottom: 24 }}
+        showsVerticalScrollIndicator={false}>
+        <View className="px-2">
+          {/* Top: Heading & Subtitle */}
+          <View className="items-center px-4 pt-2">
+            <Text className="text-center font-sans text-[24px] font-bold leading-8 text-[#1C1C1C]">
+              We’re reviewing your submission
+            </Text>
 
-          <Text className="mt-2 text-center font-sans text-[12px] font-normal leading-5 text-slate-500 max-w-[340px]">
-            We need more time to verify your identity. This may be due to your document requiring
-            manual review or delays with our third-party partner. We’ll update you once the review is
-            complete.
-          </Text>
+            <Text className="mt-2 text-center font-sans text-[12px] font-normal leading-5 text-slate-500 max-w-[340px]">
+              We need more time to verify your identity. This may be due to your document requiring
+              manual review or delays with our third-party partner. We’ll update you once the review is
+              complete.
+            </Text>
+          </View>
+
+          {/* Center: Crystal Clear HD Illustration */}
+          <View className="items-center justify-center w-full my-2">
+            <Image
+              source={require('../assets/images/review_status.png')}
+              style={{ width: SCREEN_WIDTH - 24, height: 400 }}
+              resizeMode="contain"
+            />
+          </View>
+
+          {/* Review Window Notice */}
+          <View className="mt-1 mx-2 flex-row items-center rounded-xl border border-blue-100 bg-blue-50/70 p-3">
+            <Ionicons name="information-circle-outline" size={18} color="#2563EB" style={{ marginRight: 8 }} />
+            <Text className="flex-1 text-[11px] leading-4 text-blue-900">
+              Reviews usually complete within <Text className="font-bold">24-48 hours</Text>. You can check your status anytime below.
+            </Text>
+          </View>
         </View>
 
-        {/* Center: Large HD Illustration */}
-        <View className="flex-1 items-center justify-center w-full" style={{ marginTop: -24, marginBottom: 8 }}>
-          <Image
-            source={require('../assets/images/review_status.png')}
-            style={{ width: SCREEN_WIDTH - 16, height: 440 }}
-            resizeMode="contain"
-          />
-        </View>
-
-        <View className="px-2 mb-2">
+        {/* Bottom Button */}
+        <View className="px-4 mt-4">
           <TouchableOpacity
             onPress={() => checkStatusFlow(true)}
             disabled={isChecking || isFetchingStatus}
@@ -174,7 +186,7 @@ export default function ReviewStatusScreen() {
             )}
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
     </Container>
   );
 }

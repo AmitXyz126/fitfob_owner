@@ -150,23 +150,8 @@ export default function DocumentsScreen() {
       });
     }
 
-    // Default mock list if no documents uploaded yet
-    return [
-      {
-        id: 'm1',
-        name: 'GST Certificate.pdf',
-        url: '',
-        date: 'March 5, 2024',
-        size: '1.2MB',
-      },
-      {
-        id: 'm2',
-        name: 'Business Registration.pdf',
-        url: '',
-        date: 'February 15, 2024',
-        size: '850KB',
-      },
-    ];
+    // Return empty list if no documents uploaded yet
+    return [];
   }, [documents]);
 
   const onRefresh = async () => {
@@ -400,9 +385,22 @@ export default function DocumentsScreen() {
           renderItem={renderDocumentItem}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 10 }}
+          contentContainerStyle={{ paddingBottom: 100, flexGrow: 1 }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#F6163C']} />
+          }
+          ListEmptyComponent={
+            <View className="flex-1 items-center justify-center py-20 px-6">
+              <View className="h-20 w-20 items-center justify-center rounded-3xl bg-red-50 border border-red-100 mb-4">
+                <Ionicons name="document-text-outline" size={38} color="#F6163C" />
+              </View>
+              <Text className="text-base font-bold text-slate-800 text-center">
+                No Documents Uploaded Yet
+              </Text>
+              <Text className="mt-2 text-xs text-slate-400 text-center leading-5 max-w-[280px]">
+                Upload your government certificates, business registration, or ID proofs to complete your profile verification.
+              </Text>
+            </View>
           }
         />
       )}
