@@ -21,37 +21,20 @@ interface AuthStore {
 
 const STORAGE_KEY = 'authUser';
 
+// Keep user-filled club profile, onboarding data, photos, and documents intact across logout and login.
+// Only session tokens are removed on logout.
 const clearUserDrafts = async () => {
-  try {
-    const keys = await AsyncStorage.getAllKeys();
-    const draftKeys = keys.filter(
-      (k) =>
-        (k.includes('onboarding') && !k.includes('documents')) ||
-        k.includes('club_profile') ||
-        k.includes('authUser')
-    );
-    if (draftKeys.length > 0) {
-      await AsyncStorage.multiRemove(draftKeys);
-    }
-  } catch (e) {
-    console.error('Error clearing user drafts:', e);
-  }
+  // Deliberately no-op: Preserve user data so it persists across logout/login
 };
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
   user: null,
 
   setUser: async (user, rememberMe = false) => {
-    const currentUser = get().user;
     if (!user) {
       set({ user: null });
       await storageAPI.removeItem(STORAGE_KEY);
-      await clearUserDrafts();
       return;
-    }
-
-    if (currentUser && (currentUser.id !== user.id || currentUser.email !== user.email)) {
-      await clearUserDrafts();
     }
 
     set({ user });
@@ -68,7 +51,6 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     try {
       set({ user: null });
       await storageAPI.removeItem(STORAGE_KEY);
-      await clearUserDrafts();
     } catch (error) {
       console.error('Logout failed', error);
       set({ user: null });

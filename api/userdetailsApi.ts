@@ -345,12 +345,143 @@ export const userDetailsApi = {
   },
 
   getClubPhotos: async () => {
-    const response = await api.get(ENDPOINTS.GET_CLUB_PHOTOS);
-    return response.data;
+    let result: any = null;
+
+    // 1. Try primary endpoint: GET /api/pending-club-owner/club-photos
+    try {
+      const response = await api.get(ENDPOINTS.GET_CLUB_PHOTOS);
+      if (response?.data) {
+        const d = response.data;
+        const list =
+          d?.photos ||
+          d?.clubPhotos ||
+          d?.data?.photos ||
+          d?.data?.clubPhotos ||
+          d?.details?.photos ||
+          d?.details?.clubPhotos ||
+          (Array.isArray(d?.data) ? d.data : null) ||
+          (Array.isArray(d) ? d : []);
+
+        if (Array.isArray(list) && list.length > 0) {
+          return { ...response.data, photos: list };
+        }
+        result = response.data;
+      }
+    } catch (e: any) {
+      console.log('GET_CLUB_PHOTOS endpoint error, trying fallbacks:', e?.response?.status || e?.message);
+    }
+
+    // 2. Fallback: try MY_CLUB_OWNER (/api/club-owner/me) for approved / verified owners
+    try {
+      const meRes = await api.get(ENDPOINTS.MY_CLUB_OWNER);
+      const meData = meRes.data?.data || meRes.data || {};
+      const ownerPhotos =
+        meData?.clubPhotos ||
+        meData?.photos ||
+        meData?.clubPhotoDetails ||
+        meData?.photosWithDescription ||
+        meData?.images ||
+        meData?.clubOwnerDetail?.clubPhotos ||
+        meData?.clubOwnerDetail?.photos ||
+        [];
+
+      if (Array.isArray(ownerPhotos) && ownerPhotos.length > 0) {
+        return { photos: ownerPhotos, data: ownerPhotos };
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    // 3. Fallback: try GET_ONBOARDING_STATUS (/api/pending-club-owner/me)
+    try {
+      const statusRes = await api.get(ENDPOINTS.GET_ONBOARDING_STATUS);
+      const statusData = statusRes.data?.details || statusRes.data?.data || statusRes.data || {};
+      const pendingPhotos =
+        statusData?.clubPhotos ||
+        statusData?.photos ||
+        statusData?.clubPhotoDetails ||
+        statusData?.photosWithDescription ||
+        statusData?.images ||
+        [];
+
+      if (Array.isArray(pendingPhotos) && pendingPhotos.length > 0) {
+        return { photos: pendingPhotos, data: pendingPhotos };
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    // 4. Fallback: try CLUB_OWNERS list if current user has an owner profile
+    try {
+      const currentUserId = useAuthStore.getState().user?.id;
+      const currentUserEmail = useAuthStore.getState().user?.email;
+      const ownerListRes = await api.get(ENDPOINTS.CLUB_OWNERS);
+      const owners = ownerListRes.data?.data || ownerListRes.data || [];
+      if (Array.isArray(owners) && owners.length > 0) {
+        const match = owners.find((o: any) => {
+          const uId = o?.user?.id || o?.userId || o?.user_id;
+          const uEmail = o?.email || o?.user?.email;
+          if (currentUserId && uId && String(uId) === String(currentUserId)) return true;
+          if (currentUserEmail && uEmail && String(uEmail).toLowerCase() === String(currentUserEmail).toLowerCase()) return true;
+          return false;
+        });
+
+        if (match) {
+          const matchPhotos = match?.clubPhotos || match?.photos || match?.clubPhotoDetails || [];
+          if (Array.isArray(matchPhotos) && matchPhotos.length > 0) {
+            return { photos: matchPhotos, data: matchPhotos };
+          }
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    return result || { photos: [] };
   },
 
   deleteClubPhoto: async (documentId: string) => {
-    const response = await api.delete(ENDPOINTS.DELETE_CLUB_PHOTO(documentId));
+    try {
+      const response = await api.delete(ENDPOINTS.DELETE_CLUB_PHOTO(documentId));
+      return response.data;
+    } catch (error: any) {
+      console.warn('deleteClubPhoto primary error:', error?.response?.status || error?.message);
+      // Fallback: if documentId is numeric ID, some backends accept without prefix
+      throw error;
+    }
+  },
+
+  // --- Club Photos (Approved Club Owner - /api/club-photos) ---
+
+  /** GET /api/club-photos/me → { data: [ { id, documentId, imageInfo, fileUrl, createdAt } ] } */
+  getMyClubPhotos: async () => {
+    const response = await api.get(ENDPOINTS.CLUB_PHOTOS_GET_ME);
+    return response.data;
+  },
+
+  /** POST /api/club-photos (multipart) → { message, data: { id, documentId, imageInfo, fileUrl } } */
+  uploadClubPhoto: async (data: { file: { uri: string; name?: string; type?: string }; imageInfo: string }) => {
+    const formData = new FormData();
+    formData.append('image', {
+      uri: data.file.uri,
+      name: data.file.name || `club_photo_${Date.now()}.jpg`,
+      type: data.file.type || 'image/jpeg',
+    } as any);
+    formData.append('imageInfo', data.imageInfo || '');
+
+    const response = await api.post(ENDPOINTS.CLUB_PHOTOS_UPLOAD, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        Accept: 'application/json',
+      },
+      transformRequest: (d) => d,
+    });
+    return response.data;
+  },
+
+  /** DELETE /api/club-photos/:documentId → { message, deleted: { id, documentId, imageInfo, club_owner } } */
+  deleteMyClubPhoto: async (documentId: string) => {
+    const response = await api.delete(ENDPOINTS.CLUB_PHOTOS_DELETE(documentId));
     return response.data;
   },
 
@@ -474,5 +605,45 @@ export const userDetailsApi = {
       console.log('Error fetching MY_CLUB_OWNER (/api/club-owner/me):', e?.response?.status || e?.message);
     }
     return null;
+  },
+
+  getClubServices: async (): Promise<string[]> => {
+    try {
+      const response = await api.get(ENDPOINTS.GET_CLUB_SERVICES);
+      const raw = response.data;
+      const list = Array.isArray(raw)
+        ? raw
+        : Array.isArray(raw?.services)
+        ? raw.services
+        : Array.isArray(raw?.data)
+        ? raw.data
+        : [];
+      return list.map((item: any) =>
+        typeof item === 'string' ? item : item?.name || item?.title || item?.label || String(item)
+      );
+    } catch (e: any) {
+      console.warn('Error fetching club services:', e?.response?.status || e?.message);
+      return [];
+    }
+  },
+
+  getClubFacilities: async (): Promise<string[]> => {
+    try {
+      const response = await api.get(ENDPOINTS.GET_CLUB_FACILITIES);
+      const raw = response.data;
+      const list = Array.isArray(raw)
+        ? raw
+        : Array.isArray(raw?.facilities)
+        ? raw.facilities
+        : Array.isArray(raw?.data)
+        ? raw.data
+        : [];
+      return list.map((item: any) =>
+        typeof item === 'string' ? item : item?.name || item?.title || item?.label || String(item)
+      );
+    } catch (e: any) {
+      console.warn('Error fetching club facilities:', e?.response?.status || e?.message);
+      return [];
+    }
   },
 };

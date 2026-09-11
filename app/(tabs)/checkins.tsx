@@ -45,6 +45,7 @@ export default function CheckinsScreen() {
     userImage?: string;
     time?: string;
     message?: string;
+    clientType?: string;
   } | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
@@ -55,7 +56,7 @@ export default function CheckinsScreen() {
   // Scanning laser animation
   const scanAnim = useRef(new RNAnimated.Value(0)).current;
 
-  const snapPoints = useMemo(() => ['50%'], []);
+  const snapPoints = useMemo(() => ['56%'], []);
 
   // Reanimated Shared Values for High-Level Background Animations
   const orb1X = useSharedValue(0);
@@ -443,19 +444,54 @@ export default function CheckinsScreen() {
       const dataObj = resData?.data || resData;
       const userObj = dataObj?.user || dataObj?.client || dataObj?.customer || dataObj;
 
-      const userName = userObj?.name || userObj?.fullName || userObj?.userName || userObj?.ownerName || 'Customer';
-      const userImage = userObj?.profileImage || userObj?.avatar || userObj?.image || userObj?.logo;
+      // Prioritize clientName & selfieUrl from API response
+      const userName =
+        resData?.clientName ||
+        dataObj?.clientName ||
+        userObj?.clientName ||
+        resData?.name ||
+        dataObj?.name ||
+        userObj?.name ||
+        userObj?.fullName ||
+        userObj?.userName ||
+        userObj?.ownerName ||
+        'Customer';
+
+      const userImage =
+        resData?.selfieUrl ||
+        dataObj?.selfieUrl ||
+        userObj?.selfieUrl ||
+        resData?.selfie_url ||
+        dataObj?.selfie_url ||
+        userObj?.selfie_url ||
+        resData?.clientImage ||
+        dataObj?.clientImage ||
+        userObj?.clientImage ||
+        userObj?.profileImage ||
+        userObj?.avatar ||
+        userObj?.image ||
+        userObj?.photo ||
+        userObj?.logo ||
+        '';
+
+      const clientType = resData?.type || dataObj?.type || userObj?.type || '';
+
       const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const msgStr = typeof resData?.message === 'string' ? resData.message : (typeof dataObj?.message === 'string' ? dataObj.message : `${userName} checked in successfully.`);
+      const msgStr = typeof resData?.message === 'string'
+        ? resData.message
+        : (typeof dataObj?.message === 'string'
+          ? dataObj.message
+          : `${userName} checked in successfully.`);
 
       setCheckinDetails({
         userName,
         userImage,
         time: timeStr,
         message: msgStr,
+        clientType,
       });
 
-      console.log('🎉 CHECKIN SUCCESS FOR:', userName);
+      console.log('🎉 CHECKIN SUCCESS FOR:', userName, '| IMAGE:', userImage, '| TYPE:', clientType);
       setStatus('success');
       setScanned(true);
       bottomSheetRef.current?.expand();
@@ -714,25 +750,43 @@ export default function CheckinsScreen() {
             {status === 'success' ? (
               <View className="w-full items-center">
                 {/* Pulsing Avatar Frame */}
-                <View style={styles.successAvatarBorder} className="mb-4 rounded-full p-1 bg-emerald-50 border-2 border-emerald-400">
-                  <Image
-                    source={{ uri: checkinDetails?.userImage || 'https://i.pravatar.cc/150?u=tina' }}
-                    className="h-20 w-20 rounded-full"
-                    resizeMode="cover"
-                  />
+                <View style={styles.successAvatarBorder} className="mb-3 rounded-full p-1 bg-emerald-50 border-2 border-emerald-400">
+                  {checkinDetails?.userImage ? (
+                    <Image
+                      source={{ uri: checkinDetails.userImage }}
+                      className="h-24 w-24 rounded-full bg-slate-100"
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View className="h-24 w-24 rounded-full bg-rose-50 items-center justify-center border border-rose-100">
+                      <Ionicons name="person" size={40} color="#F6163C" />
+                    </View>
+                  )}
                 </View>
+
                 {/* User info */}
                 <View className="flex-row justify-center items-center gap-1.5">
-                  <Text className="font-bold text-xl text-slate-900">{checkinDetails?.userName || 'Customer'}</Text>
+                  <Text className="font-bold text-2xl text-slate-900 capitalize">
+                    {checkinDetails?.userName || 'Customer'}
+                  </Text>
                   <Image
                     source={require('../../assets/images/tick.png')}
-                    style={{ width: 18, height: 18 }}
+                    style={{ width: 20, height: 20 }}
                     resizeMode="contain"
                   />
                 </View>
 
+                {/* Client Type Tag */}
+                {checkinDetails?.clientType ? (
+                  <View className="mt-1.5 rounded-full bg-emerald-50 px-3 py-0.5 border border-emerald-200">
+                    <Text className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">
+                      {checkinDetails.clientType} Check-in
+                    </Text>
+                  </View>
+                ) : null}
+
                 {/* Success Message */}
-                <Text className="mt-5 text-center font-bold text-2xl text-emerald-500">
+                <Text className="mt-3 text-center font-bold text-2xl text-emerald-500">
                   Check-in Successful!
                 </Text>
 
@@ -747,7 +801,7 @@ export default function CheckinsScreen() {
                     router.replace('/(tabs)');
                   }}
                   activeOpacity={0.8}
-                  className="mt-8 w-full items-center justify-center rounded-2xl bg-[#F6163C] py-4">
+                  className="mt-6 w-full items-center justify-center rounded-2xl bg-[#F6163C] py-4">
                   <Text className="font-bold text-base text-white">Done</Text>
                 </TouchableOpacity>
               </View>

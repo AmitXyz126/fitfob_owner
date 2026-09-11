@@ -1,6 +1,6 @@
 import { View, Text, ImageBackground, Image } from 'react-native';
 import { useEffect } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, SplashScreen } from 'expo-router';
 import Entypo from '@expo/vector-icons/Entypo';
 import Animated, {
   Easing,
@@ -33,6 +33,9 @@ export default function Splash() {
   }));
 
   useEffect(() => {
+    // Hide native splash screen as soon as in-app splash is mounted
+    SplashScreen.hideAsync().catch(() => {});
+
     // Logo comes up
     translateY.value = withTiming(0, {
       duration: 500,

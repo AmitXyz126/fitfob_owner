@@ -909,12 +909,7 @@ const ClubProfileScreen = () => {
 
               console.log('⏳ [LOGOUT] Calling useAuthStore.getState().logOut()...');
               await useAuthStore.getState().logOut();
-              console.log('✅ [LOGOUT] useAuthStore logOut completed. User in store:', useAuthStore.getState().user);
-
-              console.log('🧹 [LOGOUT] Clearing AsyncStorage completely...');
-              await AsyncStorage.clear();
-              const remainingKeys = await AsyncStorage.getAllKeys();
-              console.log('✅ [LOGOUT] AsyncStorage.clear() completed. Remaining keys:', remainingKeys);
+              console.log('✅ [LOGOUT] useAuthStore logOut completed. User data preserved for next login.');
 
               const canGoBack = router.canGoBack();
               console.log('🔙 [LOGOUT] router.canGoBack():', canGoBack);

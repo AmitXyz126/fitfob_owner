@@ -8,6 +8,10 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
 const queryClient = new QueryClient();
+
+// Keep the splash screen visible while loading fonts and assets to avoid white screen flash
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
 export default function Layout() {
 
   const [loaded] = useFonts({
@@ -18,7 +22,9 @@ export default function Layout() {
   });
 
   useEffect(() => {
-    if (loaded) SplashScreen.hideAsync();
+    if (loaded) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
   }, [loaded]);
 
   if (!loaded) return null;

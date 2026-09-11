@@ -14,11 +14,16 @@ import {
   SafeAreaView,
   StatusBar,
   Linking,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+
 import { useUserDetail } from '@/hooks/useUserDetail';
 import { useAuthStore } from '@/store/useAuthStore';
 import { router } from 'expo-router';
@@ -42,6 +47,7 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
   const { onUploadSuccess, onUploadDone, onBack } = props;
   const { uploadDoc, verifyGovtDoc, refetch, documents, refetchDocs } = useUserDetail();
   const { user } = useAuthStore();
+  const insets = useSafeAreaInsets();
 
   const docList = documents?.documents || documents?.data || documents || [];
 
@@ -70,6 +76,57 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
   const [scannedData, setScannedData] = useState<any>(null);
   const [previewDoc, setPreviewDoc] = useState<any>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
+
+  // Hands-Free Auto Document Scanner State
+  const [documentDetected, setDocumentDetected] = useState<boolean>(false);
+  const [containerLayout, setContainerLayout] = useState<{ width: number; height: number }>({
+    width: 340,
+    height: 288,
+  });
+  const isAutoCapturingRef = useRef<boolean>(false);
+
+  // Document Edge Detection & Corner Indicator Animations
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const scanLineAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.35,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+
+    const scan = Animated.loop(
+      Animated.sequence([
+        Animated.timing(scanLineAnim, {
+          toValue: 1,
+          duration: 2200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scanLineAnim, {
+          toValue: 0,
+          duration: 2200,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    scan.start();
+
+    return () => {
+      pulse.stop();
+      scan.stop();
+    };
+  }, [pulseAnim, scanLineAnim]);
 
   const getCleanDocUrl = (item: any) => {
     let rawUrl =
@@ -182,72 +239,216 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
     return data;
   };
 
-  // Capture Photo with Camera and Verify Immediately
-  const takePicture = async () => {
-    if (!cameraRef.current || isCapturing || isVerifying) return;
-    try {
-      setIsCapturing(true);
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
-      if (photo) {
-        setIsVerifying(true);
-        setVerifyingMessage('Scanning & Verifying Document...');
+  // Helper to extract clean, human-readable error text (prevents status code strings like "Request failed with status code 400")
+  const getReadableErrorMessage = (err: any, fallback: string = 'Document is not properly aligned or readable'): string => {
+    if (!err) return fallback;
 
-        const fileData = {
-          uri: photo.uri,
-          name: `camera_${Date.now()}.jpg`,
-          type: 'image/jpeg',
-        };
+    const resData = err?.response?.data;
+    if (typeof resData === 'string' && resData.trim() && !resData.startsWith('<')) {
+      return resData.trim();
+    }
 
-        try {
-          const data = await verifyFileItem(fileData);
-
-          if (data?.valid === true) {
-            const detectedName = data.displayName || data.documentType || 'Government Document';
-            const fileObj = {
-              id: `${Date.now()}_${Math.random()}`,
-              uri: photo.uri,
-              name: fileData.name,
-              type: fileData.type,
-              docName: detectedName,
-              verified: true,
-              documentType: data.documentType,
-              displayName: data.displayName,
-              verificationMessage: data.message,
-            };
-
-            const updatedFiles = [...selectedFiles.filter((f) => f.id !== fileObj.id), fileObj];
-            setSelectedFiles(updatedFiles);
-            // Show verified preview in camera container for this freshly taken photo
-            setScannedData(fileObj);
-            setDocName(detectedName);
-
-            Toast.show({
-              type: 'success',
-              text1: 'Document Verified! ✅',
-              text2: data.message || `${detectedName} verified successfully.`,
-            });
-          } else {
-            Alert.alert(
-              'Document Verification Failed ❌',
-              data?.message || 'Invalid government document. Please scan a genuine government document (e.g. GST, PAN, etc.).'
-            );
-          }
-        } catch (err: any) {
-          console.error('Verification error:', err);
-          Alert.alert(
-            'Verification Failed ❌',
-            err?.response?.data?.message || err?.message || 'Failed to verify government document. Please try again with a clear photo.'
-          );
-        } finally {
-          setIsVerifying(false);
+    if (resData && typeof resData === 'object') {
+      if (typeof resData.message === 'string' && resData.message.trim()) {
+        return resData.message.trim();
+      }
+      if (Array.isArray(resData.message) && resData.message.length > 0) {
+        return resData.message.map((m: any) => (typeof m === 'string' ? m : m?.message || JSON.stringify(m))).join(', ');
+      }
+      if (typeof resData.error === 'string' && resData.error.trim()) {
+        return resData.error.trim();
+      }
+      if (typeof resData.msg === 'string' && resData.msg.trim()) {
+        return resData.msg.trim();
+      }
+      if (typeof resData.detail === 'string' && resData.detail.trim()) {
+        return resData.detail.trim();
+      }
+      if (Array.isArray(resData.errors) && resData.errors.length > 0) {
+        const first = resData.errors[0];
+        if (typeof first === 'string') return first;
+        if (first?.message) return first.message;
+        if (first?.msg) return first.msg;
+      } else if (resData.errors && typeof resData.errors === 'object') {
+        const keys = Object.keys(resData.errors);
+        if (keys.length > 0) {
+          const val = resData.errors[keys[0]];
+          if (Array.isArray(val) && val.length > 0) return String(val[0]);
+          if (typeof val === 'string') return val;
         }
       }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to capture photo. Please try again.');
+    }
+
+    const msg = typeof err === 'string' ? err : err?.message;
+    if (msg && typeof msg === 'string') {
+      const isHttpCodeMsg =
+        /request failed with status code/i.test(msg) ||
+        /status code \d+/i.test(msg) ||
+        /network error/i.test(msg) ||
+        /axios/i.test(msg);
+
+      if (!isHttpCodeMsg && msg.trim()) {
+        return msg.trim();
+      }
+
+      if (/network error/i.test(msg)) {
+        return 'Please check your internet connection and try again.';
+      }
+
+      const statusCode = err?.response?.status;
+      if (statusCode === 400 || statusCode === 422) {
+        return 'Document is not properly aligned or valid. Please place a clear government document inside the red frame.';
+      }
+      if (statusCode === 413) {
+        return 'Document file size is too large. Please scan again with a smaller size.';
+      }
+      if (statusCode === 500) {
+        return 'Document verification service is temporarily unavailable. Please try again later.';
+      }
+    }
+
+    return fallback;
+  };
+
+  // Hands-Free Automatic Document Capture, Background Cropping & Verification
+  const autoCaptureAndCrop = async () => {
+    if (!cameraRef.current || isCapturing || isVerifying || isAutoCapturingRef.current) return;
+
+    try {
+      isAutoCapturingRef.current = true;
+      setIsCapturing(true);
+
+      const photo = await cameraRef.current.takePictureAsync({ quality: 1 });
+      if (!photo || !photo.uri) {
+        throw new Error('Camera capture returned empty result');
+      }
+
+      setIsVerifying(true);
+      setVerifyingMessage('Scanning & Cropping Document...');
+
+      // Calculate document boundary relative to viewfinder to eliminate desk/table/background
+      const cW = containerLayout.width || 340;
+      const cH = containerLayout.height || 288;
+      const fW = Math.round(cW * 0.78);
+      const fH = Math.round(cH * 0.70);
+
+      const pW = photo.width || 1080;
+      const pH = photo.height || 1920;
+
+      const scale = Math.max(pW / cW, pH / cH);
+      const visiblePW = cW * scale;
+      const visiblePH = cH * scale;
+      const offsetX = (visiblePW - pW) / 2;
+      const offsetY = (visiblePH - pH) / 2;
+
+      const frameXInContainer = (cW - fW) / 2;
+      const frameYInContainer = (cH - fH) / 2;
+
+      const originX = Math.max(0, Math.round(frameXInContainer * scale - offsetX));
+      const originY = Math.max(0, Math.round(frameYInContainer * scale - offsetY));
+      const cropWidth = Math.min(pW - originX, Math.round(fW * scale));
+      const cropHeight = Math.min(pH - originY, Math.round(fH * scale));
+
+      // Losslessly crop out the table/background so ONLY the document remains
+      const croppedImage = await manipulateAsync(
+        photo.uri,
+        [
+          {
+            crop: {
+              originX,
+              originY,
+              width: Math.max(10, cropWidth),
+              height: Math.max(10, cropHeight),
+            },
+          },
+        ],
+        { compress: 0.95, format: SaveFormat.JPEG }
+      );
+
+      const fileData = {
+        uri: croppedImage.uri,
+        name: `scanned_doc_${Date.now()}.jpg`,
+        type: 'image/jpeg',
+      };
+
+      try {
+        const data = await verifyFileItem(fileData);
+
+        if (data?.valid === true) {
+          const detectedName = data.displayName || data.documentType || 'Government Document';
+          const fileObj = {
+            id: `${Date.now()}_${Math.random()}`,
+            uri: croppedImage.uri,
+            name: fileData.name,
+            type: fileData.type,
+            docName: detectedName,
+            verified: true,
+            documentType: data.documentType,
+            displayName: data.displayName,
+            verificationMessage: data.message,
+          };
+
+          const updatedFiles = [...selectedFiles.filter((f) => f.id !== fileObj.id), fileObj];
+          setSelectedFiles(updatedFiles);
+          setScannedData(fileObj);
+          setDocName(detectedName);
+
+          Toast.show({
+            type: 'success',
+            text1: 'Document Auto-Scanned! ✅',
+            text2: data.message || `${detectedName} verified successfully.`,
+          });
+        } else {
+          setDocumentDetected(false);
+          const errorMsg =
+            (typeof data?.message === 'string' && data.message.trim()) ||
+            (typeof data?.error === 'string' && data.error.trim()) ||
+            'Document is not properly aligned. Please place the document straight inside the red frame.';
+          Toast.show({
+            type: 'error',
+            text1: 'Document Not Aligned ❌',
+            text2: errorMsg,
+            visibilityTime: 4000,
+            position: 'top',
+          });
+        }
+      } catch (err: any) {
+        console.error('Verification error:', err);
+        setDocumentDetected(false);
+        const errorMsg = getReadableErrorMessage(
+          err,
+          'Document is not aligned or clearly visible. Please ensure good lighting and place it inside the red frame.'
+        );
+        Toast.show({
+          type: 'error',
+          text1: 'Alignment / Verification Error ⚠️',
+          text2: errorMsg,
+          visibilityTime: 4500,
+          position: 'top',
+        });
+      } finally {
+        setIsVerifying(false);
+      }
+    } catch (error: any) {
+      console.error('Auto capture error:', error);
+      setDocumentDetected(false);
+      const errorMsg = getReadableErrorMessage(
+        error,
+        'Document was not detected properly. Please hold the document straight in front of the camera.'
+      );
+      Toast.show({
+        type: 'error',
+        text1: 'Scan Error ⚠️',
+        text2: errorMsg,
+        visibilityTime: 4000,
+        position: 'top',
+      });
     } finally {
       setIsCapturing(false);
+      isAutoCapturingRef.current = false;
     }
   };
+
 
   const resetCameraCapture = async () => {
     if (scannedData) {
@@ -256,6 +457,7 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
       await AsyncStorage.setItem(STORAGE_KEY_FILES, JSON.stringify(updated));
     }
     setScannedData(null);
+    setDocumentDetected(false);
     await AsyncStorage.removeItem(STORAGE_KEY_SCANNED);
     await AsyncStorage.removeItem(STORAGE_KEY_DOCNAME);
   };
@@ -304,14 +506,15 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
           newVerifiedList.push(fileObj);
           verifiedCount++;
         } else {
-          failedMessages.push(
-            `${f.name || `Document ${i + 1}`}: ${data?.message || 'Not a valid government document.'}`
-          );
+          const msg =
+            (typeof data?.message === 'string' && data.message.trim()) ||
+            (typeof data?.error === 'string' && data.error.trim()) ||
+            'Document is not a valid government document or not properly aligned.';
+          failedMessages.push(`${f.name || `Document ${i + 1}`}: ${msg}`);
         }
       } catch (err: any) {
-        failedMessages.push(
-          `${f.name || `Document ${i + 1}`}: ${err?.response?.data?.message || err?.message || 'Verification failed'}`
-        );
+        const readableErr = getReadableErrorMessage(err, 'Verification failed. Document is not valid or readable.');
+        failedMessages.push(`${f.name || `Document ${i + 1}`}: ${readableErr}`);
       }
     }
 
@@ -334,10 +537,13 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
     }
 
     if (failedMessages.length > 0) {
-      Alert.alert(
-        'Document Verification Failed ❌',
-        failedMessages.join('\n') || 'Only genuine government documents can be accepted.'
-      );
+      Toast.show({
+        type: 'error',
+        text1: 'Document Verification Failed ❌',
+        text2: failedMessages[0] || 'Only genuine government documents can be accepted.',
+        visibilityTime: 4000,
+        position: 'top',
+      });
     }
   };
 
@@ -390,8 +596,9 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
 
   const handleSelectSource = () => {
     Alert.alert('Select File Source', 'Choose how you would like to select your files:', [
-      { text: 'Photo Gallery', onPress: pickImage },
-      { text: 'Files / PDF', onPress: pickDocument },
+      { text: 'Auto Document Scanner 📷', onPress: () => setActiveTab('camera') },
+      { text: 'Photo Gallery 🖼️', onPress: pickImage },
+      { text: 'Files / PDF 📄', onPress: pickDocument },
       { text: 'Cancel', style: 'cancel' },
     ]);
   };
@@ -494,10 +701,14 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
       if (onUploadSuccess) onUploadSuccess(null);
     } catch (error: any) {
       setUploadingIndex(null);
-      Alert.alert(
-        'Upload Error',
-        error.response?.data?.message || error.message || 'Failed to upload document(s)'
-      );
+      const readable = getReadableErrorMessage(error, 'Failed to upload document(s). Please try again.');
+      Toast.show({
+        type: 'error',
+        text1: 'Upload Error ❌',
+        text2: readable,
+        visibilityTime: 4000,
+        position: 'top',
+      });
     }
   };
 
@@ -575,50 +786,57 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
       <View className="mb-6">
         {activeTab === 'camera' ? (
           // Camera Tab
-          <View className="relative h-80 w-full overflow-hidden rounded-[30px] border border-slate-100 bg-slate-900">
+          <View
+            className="relative h-72 w-full overflow-hidden rounded-[26px] border border-slate-800 bg-black"
+            onLayout={(e) => {
+              const { width, height } = e.nativeEvent.layout;
+              if (width > 0 && height > 0) {
+                setContainerLayout({ width, height });
+              }
+            }}>
             {/* Scanning / Verification Overlay */}
             {isVerifying && (
               <View
                 className="absolute inset-0 z-30 items-center justify-center p-6"
                 style={styles.verifyingOverlay}>
                 <View
-                  className="h-16 w-16 items-center justify-center rounded-2xl border mb-3"
+                  className="h-14 w-14 items-center justify-center rounded-2xl border mb-2.5"
                   style={styles.verifyingIconBox}>
-                  <ActivityIndicator size="large" color="#10B981" />
+                  <ActivityIndicator size="large" color="#F6163C" />
                 </View>
-                <Text className="text-white font-bold text-base text-center px-4">
+                <Text className="text-white font-bold text-sm text-center px-4">
                   {verifyingMessage}
                 </Text>
                 <Text className="text-slate-400 text-xs text-center mt-1">
-                  Validating document with government records...
+                  Auto-cropping document & validating with records...
                 </Text>
               </View>
             )}
 
             {scannedData ? (
-              // Captured Preview with Verified Badge
+              // Captured Preview with Verified Badge in RED theme
               <View className="flex-1">
                 <Image source={{ uri: scannedData.uri }} className="flex-1" resizeMode="cover" />
                 <View className="absolute inset-0 items-center justify-center" style={styles.overlayBg}>
                   <View
-                    className="mb-2 h-14 w-14 items-center justify-center rounded-full bg-emerald-500"
+                    className="mb-2 h-12 w-12 items-center justify-center rounded-full bg-[#F6163C]"
                     style={styles.verifiedBadgeShadow}>
-                    <Ionicons name="shield-checkmark" size={28} color="white" />
+                    <Ionicons name="shield-checkmark" size={24} color="white" />
                   </View>
-                  <Text className="font-bold text-base text-white text-center px-4 mb-1">
+                  <Text className="font-bold text-sm text-white text-center px-4 mb-1" numberOfLines={1}>
                     {scannedData.displayName || scannedData.docName || 'Government Document'}
                   </Text>
-                  <View className="flex-row items-center bg-emerald-600 px-3 py-1 rounded-full mb-4">
-                    <Ionicons name="checkmark-circle" size={14} color="white" />
-                    <Text className="text-white text-xs font-bold ml-1.5">Verified Document</Text>
+                  <View className="flex-row items-center bg-[#F6163C] px-3 py-0.5 rounded-full mb-3 shadow-sm">
+                    <Ionicons name="checkmark-circle" size={12} color="white" />
+                    <Text className="text-white text-[11px] font-bold ml-1">Verified & Cropped</Text>
                   </View>
                   <TouchableOpacity
                     onPress={resetCameraCapture}
                     disabled={isVerifying || isUploading}
-                    className="flex-row items-center rounded-full px-6 py-2.5"
+                    className="flex-row items-center rounded-full px-5 py-2 border border-white/30"
                     style={styles.retakeBtnBg}>
-                    <Ionicons name="refresh-outline" size={18} color="white" />
-                    <Text className="font-bold text-sm text-white ml-1.5">Retake Photo</Text>
+                    <Ionicons name="refresh-outline" size={16} color="white" />
+                    <Text className="font-bold text-xs text-white ml-1.5">Retake / Scan Another</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -628,36 +846,147 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
                 <ActivityIndicator size="large" color="#F6163C" />
               </View>
             ) : permission.granted ? (
-              // Live Camera View with Absolute Overlay
+              // Live Camera View with Intelligent Document Detection & Auto-Cropping
               <View className="flex-1">
-                <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
-                <View className="absolute inset-0 items-center justify-center" style={styles.shutterOverlayBg}>
-                  {/* Target Frame */}
-                  <View className="h-48 w-72 items-center justify-center rounded-2xl border" style={styles.targetBorderColor}>
+                <CameraView
+                  ref={cameraRef}
+                  style={StyleSheet.absoluteFill}
+                  facing="back"
+                  barcodeScannerSettings={{
+                    barcodeTypes: ['qr', 'pdf417', 'aztec', 'code128', 'code39', 'datamatrix', 'ean13', 'upc_a'],
+                  }}
+                  onBarcodeScanned={() => {
+                    if (!isCapturing && !isVerifying && !scannedData) {
+                      setDocumentDetected(true);
+                      autoCaptureAndCrop();
+                    }
+                  }}
+                />
+                <View className="absolute inset-0 items-center justify-center bg-black/20">
+                  {/* Top Scanbot-Style Pill Badge */}
+                  <View className="absolute top-3 z-20 flex-row items-center rounded-full bg-black/85 px-3.5 py-1.5 border border-[#F6163C]/40 shadow-xl">
+                    <View className="h-2 w-2 rounded-full mr-2 bg-[#F6163C]" />
+                    <Text className="text-[11px] font-bold text-white tracking-wide">
+                      {isCapturing
+                        ? 'Auto-Capturing & Cropping...'
+                        : isVerifying
+                        ? 'Verifying Document...'
+                        : documentDetected
+                        ? 'Document Detected! Hold steady...'
+                        : 'Align Document in Red Frame'}
+                    </Text>
+                  </View>
+
+                  {/* Document Edge Detection Bounding Frame (Red outline) */}
+                  <TouchableOpacity
+                    activeOpacity={0.95}
+                    onPress={autoCaptureAndCrop}
+                    disabled={isCapturing || isVerifying}
+                    style={{
+                      width: Math.round((containerLayout?.width || 340) * 0.78),
+                      height: Math.round((containerLayout?.height || 288) * 0.70),
+                      borderColor: '#F6163C',
+                      borderWidth: 2.5,
+                      borderRadius: 14,
+                      backgroundColor: 'rgba(246, 22, 60, 0.05)',
+                    }}
+                    className="items-center justify-center relative overflow-hidden shadow-2xl">
+                    {/* Animated Red Laser Scanning Line */}
+                    <Animated.View
+                      style={{
+                        position: 'absolute',
+                        left: 2,
+                        right: 2,
+                        height: 2.5,
+                        backgroundColor: '#F6163C',
+                        shadowColor: '#F6163C',
+                        shadowOffset: { width: 0, height: 0 },
+                        shadowOpacity: 1,
+                        shadowRadius: 8,
+                        elevation: 6,
+                        transform: [
+                          {
+                            translateY: scanLineAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [6, Math.round((containerLayout?.height || 288) * 0.70) - 12],
+                            }),
+                          },
+                        ],
+                      }}
+                    />
+
+                    {/* Corner Brackets in Red */}
                     <View className="absolute left-0 top-0 h-6 w-6 rounded-tl-lg border-l-4 border-t-4 border-[#F6163C]" />
                     <View className="absolute right-0 top-0 h-6 w-6 rounded-tr-lg border-r-4 border-t-4 border-[#F6163C]" />
                     <View className="absolute bottom-0 left-0 h-6 w-6 rounded-bl-lg border-b-4 border-l-4 border-[#F6163C]" />
                     <View className="absolute bottom-0 right-0 h-6 w-6 rounded-br-lg border-b-4 border-r-4 border-[#F6163C]" />
-                    <View style={styles.frameLabelWrapper}>
-                      <Text style={styles.frameLabelText}>
-                        Align Government Document
+
+                    {/* 4 Corner Pulsing Dot Indicators */}
+                    <Animated.View
+                      style={{
+                        position: 'absolute',
+                        top: -5,
+                        left: -5,
+                        width: 12,
+                        height: 12,
+                        borderRadius: 6,
+                        backgroundColor: '#F6163C',
+                        borderWidth: 2,
+                        borderColor: '#FFFFFF',
+                        transform: [{ scale: pulseAnim }],
+                      }}
+                    />
+                    <Animated.View
+                      style={{
+                        position: 'absolute',
+                        top: -5,
+                        right: -5,
+                        width: 12,
+                        height: 12,
+                        borderRadius: 6,
+                        backgroundColor: '#F6163C',
+                        borderWidth: 2,
+                        borderColor: '#FFFFFF',
+                        transform: [{ scale: pulseAnim }],
+                      }}
+                    />
+                    <Animated.View
+                      style={{
+                        position: 'absolute',
+                        bottom: -5,
+                        left: -5,
+                        width: 12,
+                        height: 12,
+                        borderRadius: 6,
+                        backgroundColor: '#F6163C',
+                        borderWidth: 2,
+                        borderColor: '#FFFFFF',
+                        transform: [{ scale: pulseAnim }],
+                      }}
+                    />
+                    <Animated.View
+                      style={{
+                        position: 'absolute',
+                        bottom: -5,
+                        right: -5,
+                        width: 12,
+                        height: 12,
+                        borderRadius: 6,
+                        backgroundColor: '#F6163C',
+                        borderWidth: 2,
+                        borderColor: '#FFFFFF',
+                        transform: [{ scale: pulseAnim }],
+                      }}
+                    />
+
+                    <View className="rounded-full bg-black/65 px-3 py-1 border border-[#F6163C]/40">
+                      <Text className="text-[11px] font-semibold text-red-200">
+                        Align Document • Tap to Auto-Crop
                       </Text>
                     </View>
-                  </View>
-
-                  {/* Shutter Button */}
-                  <TouchableOpacity
-                    onPress={takePicture}
-                    disabled={isCapturing || isVerifying}
-                    activeOpacity={0.85}
-                    className="absolute bottom-6 h-16 w-16 items-center justify-center rounded-full border-4 border-white"
-                    style={styles.shutterBtnBg}>
-                    {isCapturing || isVerifying ? (
-                      <ActivityIndicator color="white" />
-                    ) : (
-                      <View className="h-11 w-11 rounded-full bg-white" />
-                    )}
                   </TouchableOpacity>
+
+
                 </View>
               </View>
             ) : (
@@ -747,9 +1076,9 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
                           {file.name}
                         </Text>
                         {file.verified && (
-                          <View className="flex-row items-center bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                            <Ionicons name="shield-checkmark" size={10} color="#10B981" />
-                            <Text className="text-[10px] font-bold text-emerald-700 ml-1">Verified</Text>
+                          <View className="flex-row items-center bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+                            <Ionicons name="shield-checkmark" size={10} color="#F6163C" />
+                            <Text className="text-[10px] font-bold text-[#F6163C] ml-1">Verified</Text>
                           </View>
                         )}
                       </View>
@@ -775,7 +1104,7 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
                       Document Name #{idx + 1}
                     </Text>
                     {file.displayName && (
-                      <Text className="text-[10px] font-semibold text-emerald-600">
+                      <Text className="text-[10px] font-semibold text-[#F6163C]">
                         {file.displayName}
                       </Text>
                     )}
@@ -783,7 +1112,7 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
                   <TextInput
                     value={file.docName}
                     onChangeText={(text) => updateFileDocName(file.id, text)}
-                    placeholder="e.g. GST Certificate, PAN"
+                    placeholder="e.g. Aadhaar Card, PAN, Driving License"
                     placeholderTextColor="#94A3B8"
                     className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-900"
                     editable={!isUploading && !isVerifying}
@@ -973,19 +1302,26 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
       <Modal
         visible={previewVisible}
         transparent={false}
-        animationType="slide"
+        animationType="fade"
         statusBarTranslucent={true}
         onRequestClose={() => setPreviewVisible(false)}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#0F172A' }}>
-          <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
+        <View style={{ flex: 1, backgroundColor: '#0F172A' }}>
+          <StatusBar barStyle="light-content" backgroundColor="#0F172A" translucent={true} />
           {/* Header Bar */}
           <View
             style={{
-              paddingTop: Platform.OS === 'android' ? 14 : 6,
+              paddingTop:
+                Platform.OS === 'android'
+                  ? (StatusBar.currentHeight ? StatusBar.currentHeight + 12 : Math.max(insets.top, 24) + 12)
+                  : Math.max(insets.top, 16) + 8,
+              paddingBottom: 14,
+              paddingHorizontal: 16,
             }}
-            className="flex-row items-center justify-between pb-3 px-4 border-b border-slate-800">
+            className="flex-row items-center justify-between border-b border-slate-800 bg-[#0F172A]">
             <TouchableOpacity
               onPress={() => setPreviewVisible(false)}
+              activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               className="h-10 w-10 items-center justify-center rounded-full bg-white/10 active:bg-white/20">
               <Ionicons name="close" size={22} color="#FFF" />
             </TouchableOpacity>
@@ -1004,6 +1340,7 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
 
             <TouchableOpacity
               onPress={() => handleOpenExternalUrl(getCleanDocUrl(previewDoc))}
+              activeOpacity={0.7}
               className="h-10 w-10 items-center justify-center rounded-full bg-white/10 active:bg-white/20">
               <Ionicons name="open-outline" size={20} color="#FFF" />
             </TouchableOpacity>
@@ -1059,7 +1396,7 @@ const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
               );
             })()}
           </View>
-        </SafeAreaView>
+        </View>
       </Modal>
     </ScrollView>
   );
@@ -1114,15 +1451,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(2, 6, 23, 0.85)',
   },
   verifyingIconBox: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-    borderColor: 'rgba(16, 185, 129, 0.4)',
+    backgroundColor: 'rgba(246, 22, 60, 0.15)',
+    borderColor: 'rgba(246, 22, 60, 0.4)',
   },
   verifiedBadgeShadow: {
     ...Platform.select({
       ios: {
-        shadowColor: '#10B981',
+        shadowColor: '#F6163C',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
+        shadowOpacity: 0.35,
         shadowRadius: 4,
       },
       android: {

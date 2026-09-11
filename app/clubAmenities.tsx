@@ -379,7 +379,7 @@ export default function ClubAmenitiesScreen() {
           onPress={handleSave}
           disabled={isSaving}
           activeOpacity={0.8}
-          className="flex-row items-center justify-center rounded-2xl bg-[#F6163C] py-4 shadow-md">
+          className="flex-row items-center justify-center rounded-2xl bg-[#F6163C] py-4">
           {isSaving ? (
             <ActivityIndicator color="white" />
           ) : (

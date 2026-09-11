@@ -260,16 +260,23 @@ export default function OnBoarding4_List({ onAddMore, onNext }: Props) {
         animationType="slide"
         statusBarTranslucent={true}
         onRequestClose={() => setPreviewVisible(false)}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#0F172A' }}>
-          <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
+        <View style={{ flex: 1, backgroundColor: '#0F172A' }}>
+          <StatusBar barStyle="light-content" backgroundColor="#0F172A" translucent={true} />
           {/* Header Bar */}
           <View
             style={{
-              paddingTop: Platform.OS === 'android' ? 14 : 6,
+              paddingTop:
+                Platform.OS === 'android'
+                  ? (StatusBar.currentHeight ? StatusBar.currentHeight + 12 : 36)
+                  : 44,
+              paddingBottom: 14,
+              paddingHorizontal: 16,
             }}
-            className="flex-row items-center justify-between pb-3 px-4 border-b border-slate-800">
+            className="flex-row items-center justify-between border-b border-slate-800 bg-[#0F172A]">
             <TouchableOpacity
               onPress={() => setPreviewVisible(false)}
+              activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               className="h-10 w-10 items-center justify-center rounded-full bg-white/10 active:bg-white/20">
               <Ionicons name="close" size={22} color="#FFF" />
             </TouchableOpacity>
@@ -343,7 +350,7 @@ export default function OnBoarding4_List({ onAddMore, onNext }: Props) {
               );
             })()}
           </View>
-        </SafeAreaView>
+        </View>
       </Modal>
     </View>
   );

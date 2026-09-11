@@ -1,12 +1,14 @@
 /* eslint-disable no-unused-expressions */
-import { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Platform, Modal, Alert, Switch } from 'react-native';
+import { useState, forwardRef, useImperativeHandle, useEffect, useRef } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Platform, Modal, Alert, Switch, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import CustomTimePickerModal from '@/components/CustomTimePickerModal';
 import ClubCategoryInfoModal from '@/components/ClubCategoryInfoModal';
 import LineGradient from '../lineGradient/LineGradient';
 import { useUserDetail } from '@/hooks/useUserDetail';
 import { useAuthStore } from '@/store/useAuthStore';
+import { userDetailsApi } from '@/api/userdetailsApi';
+import { useQuery } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -101,6 +103,43 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
 
   const [fitnessTypes, setFitnessTypes] = useState(['Gym']);
   const [amenities, setAmenities] = useState(['Parking', 'Wi-Fi']);
+
+  // Fetch dynamic club services & facilities from API
+  const { data: servicesData, isLoading: isServicesLoading } = useQuery<string[]>({
+    queryKey: ['club-services-list'],
+    queryFn: userDetailsApi.getClubServices,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const { data: facilitiesData, isLoading: isFacilitiesLoading } = useQuery<string[]>({
+    queryKey: ['club-facilities-list'],
+    queryFn: userDetailsApi.getClubFacilities,
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const availableServices = Array.isArray(servicesData) ? servicesData : [];
+  const availableFacilities = Array.isArray(facilitiesData) ? facilitiesData : [];
+
+  // Skeleton pulse animation
+  const skeletonOpacity = useRef(new Animated.Value(0.35)).current;
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(skeletonOpacity, {
+          toValue: 0.85,
+          duration: 750,
+          useNativeDriver: true,
+        }),
+        Animated.timing(skeletonOpacity, {
+          toValue: 0.35,
+          duration: 750,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [skeletonOpacity]);
 
   // --- EVERYDAY MODE STATE ---
   const [isEverydayMode, setIsEverydayMode] = useState(true);
@@ -488,9 +527,17 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
     },
   }));
 
+  const isSelected = (list: string[], item: string) => {
+    if (!Array.isArray(list)) return false;
+    const normalized = item.toLowerCase().trim();
+    return list.some((i) => typeof i === 'string' && i.toLowerCase().trim() === normalized);
+  };
+
   const toggleSelection = (item: string, state: string[], setState: any) => {
-    if (state.includes(item)) {
-      setState(state.filter((i: string) => i !== item));
+    const normalized = item.toLowerCase().trim();
+    const exists = state.some((i: string) => typeof i === 'string' && i.toLowerCase().trim() === normalized);
+    if (exists) {
+      setState(state.filter((i: string) => typeof i === 'string' && i.toLowerCase().trim() !== normalized));
     } else {
       setState([...state, item]);
     }
@@ -516,6 +563,22 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
           {label}
         </Text>
       </TouchableOpacity>
+      <LineGradient />
+    </View>
+  );
+
+  const CheckboxSkeleton = ({ width = 120 }: { width?: number }) => (
+    <View>
+      <View className="flex-row items-center py-4">
+        <Animated.View
+          className="mr-3 h-5 w-5 rounded bg-slate-200"
+          style={{ opacity: skeletonOpacity }}
+        />
+        <Animated.View
+          className="h-4 rounded bg-slate-200"
+          style={{ width, opacity: skeletonOpacity }}
+        />
+      </View>
       <LineGradient />
     </View>
   );
@@ -554,64 +617,46 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
         {/* --- TYPE OF FITNESS CLUB --- */}
         <View className="mb-6">
           <Text className="mb-2 ml-1 font-sans text-sm font-normal text-[#697281]">Type of Fitness club</Text>
-          {[
-            'Gym',
-            'Yoga',
-            'Dance',
-            'Pilates',
-            'Kickboxing',
-            'Zumba',
-            'Spin',
-            'Barre',
-            'Aqua Aerobics',
-            'Martial Arts',
-            'Salsa',
-            'Strength Training',
-            'CrossFit',
-            'Tai Chi',
-            'Boxing',
-            'HIIT',
-            'Ballet',
-            'Climbing',
-          ].map((item) => (
-            <CheckboxItem
-              key={item}
-              label={item}
-              isSelected={fitnessTypes.includes(item)}
-              onPress={() => toggleSelection(item, fitnessTypes, setFitnessTypes)}
-            />
-          ))}
+          {isServicesLoading ? (
+            <>
+              <CheckboxSkeleton width={110} />
+              <CheckboxSkeleton width={80} />
+              <CheckboxSkeleton width={140} />
+              <CheckboxSkeleton width={100} />
+              <CheckboxSkeleton width={125} />
+              <CheckboxSkeleton width={90} />
+            </>
+          ) : (
+            availableServices.map((item) => (
+              <CheckboxItem
+                key={item}
+                label={item}
+                isSelected={isSelected(fitnessTypes, item)}
+                onPress={() => toggleSelection(item, fitnessTypes, setFitnessTypes)}
+              />
+            ))
+          )}
         </View>
 
         {/* --- AMENITIES --- */}
         <View className="mb-6">
           <Text className="mb-2 ml-1 font-sans text-sm font-normal text-[#697281]">Amenities</Text>
-          {[
-            'Bar',
-            'Pet-Friendly',
-            '24-Hour Reception',
-            'Parking',
-            'Wi-Fi',
-            'AC',
-            'Breakfast',
-            'Airport Shuttle',
-            'Laundry',
-            'Restrooms',
-            'Pool',
-            'Gym',
-            'Room',
-            'Conference',
-            'Spa',
-            'Showers',
-            'Trainers',
-          ].map((item) => (
-            <CheckboxItem
-              key={item}
-              label={item}
-              isSelected={amenities.includes(item)}
-              onPress={() => toggleSelection(item, amenities, setAmenities)}
-            />
-          ))}
+          {isFacilitiesLoading ? (
+            <>
+              <CheckboxSkeleton width={70} />
+              <CheckboxSkeleton width={130} />
+              <CheckboxSkeleton width={95} />
+            </>
+          ) : (
+            availableFacilities.map((item) => (
+              <CheckboxItem
+                key={item}
+                label={item}
+                isSelected={isSelected(amenities, item)}
+                onPress={() => toggleSelection(item, amenities, setAmenities)}
+              />
+            ))
+          )}
         </View>
 
         {/* --- OPERATING DAYS & HOURS SECTION --- */}

@@ -6,6 +6,7 @@ import { Container } from '@/components/Container';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/useAuthStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const Completed = () => {
   const router = useRouter();
@@ -72,7 +73,12 @@ const Completed = () => {
               </View>
             </View>
 
-            <View className="my-0.5 h-[1px] bg-slate-100" />
+            <LinearGradient
+              colors={['rgba(246, 22, 60, 0)', 'rgba(246, 22, 60, 0.25)', 'rgba(246, 22, 60, 0)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{ height: 1, width: '100%', marginVertical: 3 }}
+            />
 
             {/* Checklist Item 2: Operating Schedule */}
             <View className="flex-row items-center py-2.5">
@@ -88,7 +94,12 @@ const Completed = () => {
               </View>
             </View>
 
-            <View className="my-0.5 h-[1px] bg-slate-100" />
+            <LinearGradient
+              colors={['rgba(246, 22, 60, 0)', 'rgba(248, 11, 51, 0.25)', 'rgba(248, 4, 45, 0)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{ height: 1, width: '100%', marginVertical: 3 }}
+            />
 
             {/* Checklist Item 3: Govt Verification Documents */}
             <View className="flex-row items-center py-2.5">
@@ -104,7 +115,12 @@ const Completed = () => {
               </View>
             </View>
 
-            <View className="my-0.5 h-[1px] bg-slate-100" />
+            <LinearGradient
+              colors={['rgba(246, 22, 60, 0)', 'rgba(246, 22, 60, 0.25)', 'rgba(246, 22, 60, 0)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{ height: 1, width: '100%', marginVertical: 3 }}
+            />
 
             {/* Checklist Item 4: Club & Facility Photos */}
             <View className="flex-row items-center py-2.5">
@@ -148,7 +164,7 @@ const styles = StyleSheet.create({
 
   },
   badgeImage: {
-    height: 220,
-    width: 260,
+    height: 260,
+    width: 300,
   },
 });

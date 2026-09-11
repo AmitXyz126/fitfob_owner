@@ -1,7 +1,6 @@
 import axios, { isAxiosError } from 'axios';
 import { ENDPOINTS } from './endpoint';
-import apiInstance from './apiInstance';
- 
+import apiInstance, { attachApiLogging } from './apiInstance';
 
 const api = axios.create({
   headers: {
@@ -9,6 +8,9 @@ const api = axios.create({
     Accept: 'application/json',
   },
 });
+
+attachApiLogging(api, 'AUTH API');
+
 // Auth API Functions 
 
 // 1. Signup
@@ -139,7 +141,7 @@ export interface FacebookLoginPayload {
 
 export async function googleLoginApi(payload: GoogleLoginPayload) {
   try {
-    const response = await axios.post(ENDPOINTS.GOOGLE_AUTH, payload);
+    const response = await api.post(ENDPOINTS.GOOGLE_AUTH, payload);
     return response.data;
   } catch (error) {
     if (isAxiosError(error)) {
@@ -156,7 +158,7 @@ export async function googleLoginApi(payload: GoogleLoginPayload) {
 
 export async function facebookLoginApi(payload: FacebookLoginPayload) {
   try {
-    const response = await axios.post(ENDPOINTS.FACEBOOK_AUTH, payload);
+    const response = await api.post(ENDPOINTS.FACEBOOK_AUTH, payload);
     return response.data;
   } catch (error) {
     if (isAxiosError(error)) {

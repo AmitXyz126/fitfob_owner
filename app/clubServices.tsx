@@ -335,16 +335,16 @@ export default function ClubServicesScreen() {
   };
 
   const renderServiceItem = ({ item }: { item: ServiceItem }) => (
-    <View className="mb-3 flex-row items-center justify-between rounded-[12px] border border-[#E2E8F0] bg-white p-4 shadow-sm">
+    <View className="mb-3 flex-row items-center justify-between rounded-[8px] border border-[#E2E8F0] bg-white p-4">
       <View className="flex-row items-center flex-1 pr-4">
-        {/* Icon Badge */}
-        <View className="h-12 w-12 items-center justify-center rounded-[10px] bg-[#FFF0F2]">
+        {/* Icon wrapper */}
+        <View className="h-12 w-12 items-center justify-center rounded-[6px] bg-[#FFF0F2]">
           <Ionicons name={item.iconName} size={22} color="#F6163C" />
         </View>
 
-        {/* Info */}
+        {/* Texts */}
         <View className="ml-3 flex-1">
-          <Text className="font-sans font-bold text-[15px] leading-tight text-[#1C1C1C]">
+          <Text className="font-sans font-bold text-[14px] leading-tight text-[#1C1C1C]">
             {item.title}
           </Text>
           <Text className="font-sans text-[11px] font-medium text-slate-400 mt-1 leading-snug">
@@ -393,13 +393,13 @@ export default function ClubServicesScreen() {
           onPress={handleSave}
           disabled={isSaving}
           activeOpacity={0.8}
-          className="flex-row items-center justify-center rounded-2xl bg-[#F6163C] py-4 shadow-md">
+          className="flex-row items-center justify-center rounded-2xl bg-[#F6163C] py-4">
           {isSaving ? (
             <ActivityIndicator color="white" />
           ) : (
             <>
               <Ionicons name="save-outline" size={20} color="#FFF" />
-              <Text className="font-sans font-bold text-[16px] text-white ml-2">
+              <Text className="font-sans font-bold text-[16px] text-white ml-1">
                 Save Fitness Services
               </Text>
             </>

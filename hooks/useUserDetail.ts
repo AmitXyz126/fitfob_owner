@@ -247,7 +247,47 @@ export const useUserDetail = () => {
     refetch: refetchClubPhotos,
   } = useQuery({
     queryKey: ['pending-club-photos', userKey],
-    queryFn: userDetailsApi.getClubPhotos,
+    queryFn: async () => {
+      // 1. Check local persistent storage for this user first
+      let localCached: any = null;
+      try {
+        const saved =
+          (await AsyncStorage.getItem(`@club_photos_cache_${userKey}`)) ||
+          (await AsyncStorage.getItem(`@onboarding_photos_cache_${userKey}`));
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            localCached = parsed;
+          }
+        }
+      } catch (e) {}
+
+      // 2. Fetch from backend API
+      try {
+        const res = await userDetailsApi.getClubPhotos();
+        const list =
+          res?.photos ||
+          res?.clubPhotos ||
+          res?.data?.photos ||
+          res?.data?.clubPhotos ||
+          (Array.isArray(res?.data) ? res.data : null) ||
+          (Array.isArray(res) ? res : []);
+
+        if (Array.isArray(list) && list.length > 0) {
+          AsyncStorage.setItem(`@club_photos_cache_${userKey}`, JSON.stringify(list)).catch(console.log);
+          AsyncStorage.setItem(`@onboarding_photos_cache_${userKey}`, JSON.stringify(list)).catch(console.log);
+          return { ...res, photos: list };
+        }
+      } catch (err) {
+        console.log('Error fetching club photos in useQuery:', err);
+      }
+
+      // Fallback: If backend returned empty or errored, use persistent cached photos for this user
+      if (localCached && localCached.length > 0) {
+        return { photos: localCached, data: localCached };
+      }
+      return { photos: [] };
+    },
     enabled: !!user,
     retry: 1,
     staleTime: 5 * 60 * 1000,
@@ -257,9 +297,41 @@ export const useUserDetail = () => {
   const uploadSingleClubPhoto = useMutation({
     mutationFn: (data: { file: { uri: string; name?: string; type?: string }; imageInfo: string }) =>
       userDetailsApi.uploadSingleClubPhoto(data),
-    onSuccess: (res) => {
+    onSuccess: (res, variables) => {
       queryClient.invalidateQueries({ queryKey: ['pending-club-photos'] });
       queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
+      queryClient.invalidateQueries({ queryKey: ['my-club-owner-me'] });
+
+      // Save directly to local persistent cache so it's instantly preserved
+      const serverPhoto = res?.photo || res?.data || res;
+      const newPhotoItem = {
+        id: serverPhoto?.id || `local_${Date.now()}`,
+        documentId: String(serverPhoto?.documentId || serverPhoto?.id || Date.now()),
+        imageInfo: serverPhoto?.imageInfo || variables?.imageInfo || '',
+        url: serverPhoto?.fileUrl || serverPhoto?.url || variables?.file?.uri,
+        fileUrl: serverPhoto?.fileUrl || serverPhoto?.url || variables?.file?.uri,
+        isUploading: false,
+      };
+
+      const updatePhotoStorage = (key: string) => {
+        AsyncStorage.getItem(key)
+          .then((saved) => {
+            let list = [];
+            if (saved) {
+              try {
+                const parsed = JSON.parse(saved);
+                list = Array.isArray(parsed) ? parsed : parsed?.photos || [];
+              } catch (e) {}
+            }
+            const updated = [newPhotoItem, ...list.filter((p: any) => String(p.documentId) !== String(newPhotoItem.documentId))];
+            AsyncStorage.setItem(key, JSON.stringify(updated)).catch(console.log);
+          })
+          .catch(console.log);
+      };
+
+      updatePhotoStorage(`@club_photos_cache_${userKey}`);
+      updatePhotoStorage(`@onboarding_photos_cache_${userKey}`);
+
       Toast.show({
         type: 'success',
         text1: 'Photo Uploaded! 📸',
@@ -277,9 +349,89 @@ export const useUserDetail = () => {
 
   const deleteClubPhoto = useMutation({
     mutationFn: (documentId: string) => userDetailsApi.deleteClubPhoto(documentId),
-    onSuccess: (res) => {
+    onSuccess: (res, documentId) => {
       queryClient.invalidateQueries({ queryKey: ['pending-club-photos'] });
       queryClient.invalidateQueries({ queryKey: ['club-owner-me'] });
+      queryClient.invalidateQueries({ queryKey: ['my-club-owner-me'] });
+
+      // Remove from persistent storage
+      const removePhotoFromStorage = (key: string) => {
+        AsyncStorage.getItem(key)
+          .then((saved) => {
+            if (saved) {
+              try {
+                const parsed = JSON.parse(saved);
+                const list = Array.isArray(parsed) ? parsed : parsed?.photos || [];
+                const filtered = list.filter((p: any) => String(p.documentId) !== String(documentId) && String(p.id) !== String(documentId));
+                AsyncStorage.setItem(key, JSON.stringify(filtered)).catch(console.log);
+              } catch (e) {}
+            }
+          })
+          .catch(console.log);
+      };
+
+      removePhotoFromStorage(`@club_photos_cache_${userKey}`);
+      removePhotoFromStorage(`@onboarding_photos_cache_${userKey}`);
+
+      Toast.show({
+        type: 'success',
+        text1: 'Photo Deleted 🗑️',
+        text2: res?.message || 'Club photo deleted successfully',
+      });
+    },
+    onError: (error: any) => {
+      Toast.show({
+        type: 'error',
+        text1: 'Delete Failed',
+        text2: error.response?.data?.message || 'Failed to delete photo',
+      });
+    },
+  });
+
+  // --- Club Photos (Approved Owner) hooks: /api/club-photos ---
+
+  const {
+    data: myClubPhotos,
+    isLoading: isMyClubPhotosLoading,
+    refetch: refetchMyClubPhotos,
+  } = useQuery({
+    queryKey: ['my-club-photos', userKey],
+    queryFn: async () => {
+      const res = await userDetailsApi.getMyClubPhotos();
+      // response: { data: [...] }
+      const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+      return list;
+    },
+    enabled: !!user,
+    retry: 1,
+    staleTime: 3 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+
+  const uploadMyClubPhoto = useMutation({
+    mutationFn: (data: { file: { uri: string; name?: string; type?: string }; imageInfo: string }) =>
+      userDetailsApi.uploadClubPhoto(data),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['my-club-photos'] });
+      Toast.show({
+        type: 'success',
+        text1: 'Photo Uploaded! 📸',
+        text2: res?.message || 'Club photo uploaded successfully',
+      });
+    },
+    onError: (error: any) => {
+      Toast.show({
+        type: 'error',
+        text1: 'Upload Failed',
+        text2: error.response?.data?.message || 'Failed to upload club photo',
+      });
+    },
+  });
+
+  const deleteMyClubPhoto = useMutation({
+    mutationFn: (documentId: string) => userDetailsApi.deleteMyClubPhoto(documentId),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['my-club-photos'] });
       Toast.show({
         type: 'success',
         text1: 'Photo Deleted 🗑️',
@@ -411,5 +563,11 @@ export const useUserDetail = () => {
     uploadSingleClubPhoto,
     deleteClubPhoto,
     confirmOnboarding,
+    // Club Photos (Approved Owner) - /api/club-photos
+    myClubPhotos,
+    isMyClubPhotosLoading,
+    refetchMyClubPhotos,
+    uploadMyClubPhoto,
+    deleteMyClubPhoto,
   };
 };

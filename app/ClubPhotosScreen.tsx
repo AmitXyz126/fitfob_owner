@@ -19,7 +19,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useUserDetail, useClubOwnerMe } from '@/hooks/useUserDetail';
+import { useUserDetail } from '@/hooks/useUserDetail';
 import { useAuthStore } from '@/store/useAuthStore';
 
 const MAX_PHOTOS = 10;
@@ -40,16 +40,20 @@ const ClubPhotosScreen = () => {
   const router = useRouter();
   const { user } = useAuthStore();
   const userKey = user?.id || user?.email || 'guest';
+  const CACHE_KEY = `@club_photos_cache_${userKey}`;
+  const ONBOARDING_KEY = `@onboarding_photos_cache_${userKey}`;
 
   const {
-    clubPhotos,
-    isClubPhotosLoading,
-    refetchClubPhotos,
-    uploadSingleClubPhoto,
-    deleteClubPhoto,
+    // New /api/club-photos hooks for ClubPhotosScreen
+    myClubPhotos,
+    isMyClubPhotosLoading,
+    refetchMyClubPhotos,
+    uploadMyClubPhoto,
+    deleteMyClubPhoto,
+    // Legacy pending hooks (kept for reference — not used here)
+    profileStatus,
   } = useUserDetail();
 
-  const { data: myOwnerData, refetch: refetchClubOwnerMe } = useClubOwnerMe();
 
   // Unified list of photos (server + instant optimistic local photos)
   const [localPhotos, setLocalPhotos] = useState<any[]>([]);
@@ -64,89 +68,123 @@ const ClubPhotosScreen = () => {
   const [photoCaption, setPhotoCaption] = useState('');
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
 
-  // Normalize image URL
+  // Normalize image URL robustly across all Strapi/Express/Cloudinary payload formats
   const normalizeUrl = (item: any): string => {
+    if (!item) return '';
+    if (typeof item === 'string') {
+      let clean = item.trim().replace(/\\/g, '/');
+      if (
+        clean &&
+        !clean.startsWith('http://') &&
+        !clean.startsWith('https://') &&
+        !clean.startsWith('file://') &&
+        !clean.startsWith('content://') &&
+        !clean.startsWith('data:')
+      ) {
+        const apiBase = process.env.EXPO_PUBLIC_API_URL || '';
+        return `${apiBase.replace(/\/+$/, '')}/${clean.replace(/^\/+/, '')}`;
+      }
+      return clean;
+    }
+
     let rawUrl =
-      item?.fileUrl ||
       item?.url ||
+      item?.fileUrl ||
       item?.uri ||
       item?.path ||
       item?.src ||
+      item?.photoUrl ||
+      item?.imageUrl ||
+      item?.image_url ||
+      item?.file_url ||
+      item?.image?.url ||
+      item?.image?.fileUrl ||
+      item?.photo?.url ||
+      item?.photo?.fileUrl ||
+      item?.file?.url ||
+      item?.file?.fileUrl ||
       item?.images?.[0]?.url ||
       item?.images?.[0]?.fileUrl ||
+      item?.attributes?.url ||
+      item?.attributes?.image?.data?.attributes?.url ||
+      item?.image?.data?.attributes?.url ||
+      item?.formats?.medium?.url ||
+      item?.formats?.small?.url ||
+      item?.formats?.thumbnail?.url ||
+      item?.image?.formats?.medium?.url ||
+      (typeof item?.image === 'string' ? item.image : '') ||
+      (typeof item?.photo === 'string' ? item.photo : '') ||
       '';
 
+    if (!rawUrl || typeof rawUrl !== 'string') return '';
+    let clean = rawUrl.trim().replace(/\\/g, '/');
+
     if (
-      rawUrl &&
-      typeof rawUrl === 'string' &&
-      !rawUrl.startsWith('http://') &&
-      !rawUrl.startsWith('https://') &&
-      !rawUrl.startsWith('file://') &&
-      !rawUrl.startsWith('content://') &&
-      !rawUrl.startsWith('data:')
+      clean &&
+      !clean.startsWith('http://') &&
+      !clean.startsWith('https://') &&
+      !clean.startsWith('file://') &&
+      !clean.startsWith('content://') &&
+      !clean.startsWith('data:')
     ) {
       const apiBase = process.env.EXPO_PUBLIC_API_URL || '';
-      rawUrl = `${apiBase.replace(/\/+$/, '')}/${rawUrl.replace(/^\/+/, '')}`;
+      return `${apiBase.replace(/\/+$/, '')}/${clean.replace(/^\/+/, '')}`;
     }
-    return rawUrl;
+    return clean;
   };
 
-  // 1. Instant Cache Initialization from AsyncStorage
+  // 1. Instant Cache Initialization from AsyncStorage on mount
   useEffect(() => {
-    AsyncStorage.getItem(`@club_photos_cache_${userKey}`).then((cached) => {
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
+    const loadCache = async () => {
+      try {
+        const saved = (await AsyncStorage.getItem(CACHE_KEY)) || (await AsyncStorage.getItem(ONBOARDING_KEY));
+        if (saved) {
+          const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
             setLocalPhotos((prev) => (prev.length === 0 ? parsed : prev));
             if (parsed.length > INITIAL_SLOTS_COUNT) {
               setShowMore(true);
             }
           }
-        } catch (e) {}
-      }
-    }).catch(console.log);
+        }
+      } catch (e) { }
+    };
 
-    refetchClubPhotos();
-    refetchClubOwnerMe();
+    loadCache();
+    refetchMyClubPhotos();
   }, [userKey]);
 
-  // 2. Sync server photos whenever clubPhotos query or myOwnerData changes
+  // 2. Sync server photos whenever myClubPhotos query changes
   useEffect(() => {
-    const rawPending =
-      clubPhotos?.photos ||
-      clubPhotos?.data ||
-      clubPhotos?.clubPhotos ||
-      (Array.isArray(clubPhotos) ? clubPhotos : []);
+    // myClubPhotos is already the normalized array from the hook (response.data[])
+    const raw: any[] = Array.isArray(myClubPhotos) ? myClubPhotos : [];
 
-    const rawOwner =
-      myOwnerData?.clubPhotos ||
-      myOwnerData?.photos ||
-      myOwnerData?.clubPhotoDetails ||
-      myOwnerData?.photosWithDescription ||
-      [];
+    if (raw.length > 0) {
+      const serverList = raw
+        .map((item: any, idx: number) => {
+          const docId = String(item?.documentId || item?.id || idx);
+          const caption =
+            item?.imageInfo ||
+            item?.description ||
+            item?.caption ||
+            item?.title ||
+            item?.name ||
+            item?.attributes?.imageInfo ||
+            item?.attributes?.caption ||
+            '';
+          const rawUrl = normalizeUrl(item);
 
-    const raw = Array.isArray(rawPending) && rawPending.length > 0
-      ? rawPending
-      : Array.isArray(rawOwner) && rawOwner.length > 0
-      ? rawOwner
-      : [];
-
-    if (Array.isArray(raw) && raw.length > 0) {
-      const serverList = raw.map((item: any, idx: number) => {
-        const docId = String(item?.documentId || item?.id || idx);
-        const caption = item?.imageInfo || item?.description || item?.caption || item?.title || '';
-        const rawUrl = normalizeUrl(item);
-
-        return {
-          id: item?.id || idx,
-          documentId: docId,
-          imageInfo: caption,
-          url: rawUrl,
-          isUploading: false,
-          raw: item,
-        };
-      }).filter((p) => !!p.url);
+          return {
+            id: item?.id || idx,
+            documentId: docId,
+            imageInfo: caption,
+            url: rawUrl,
+            fileUrl: rawUrl,
+            isUploading: false,
+            raw: item,
+          };
+        })
+        .filter((p: any) => !!p.url);
 
       if (serverList.length > 0) {
         setLocalPhotos((prev) => {
@@ -154,8 +192,16 @@ const ClubPhotosScreen = () => {
           const nonDuplicates = inFlight.filter(
             (u) => !serverList.some((s) => s.documentId === u.documentId)
           );
-          const combined = [...serverList, ...nonDuplicates];
-          AsyncStorage.setItem(`@club_photos_cache_${userKey}`, JSON.stringify(combined)).catch(console.log);
+          // Sort by ascending id so first uploaded photo stays in slot #1
+          const sortedServer = [...serverList].sort((a, b) => {
+            const aId = typeof a.id === 'number' ? a.id : parseInt(a.id, 10) || 0;
+            const bId = typeof b.id === 'number' ? b.id : parseInt(b.id, 10) || 0;
+            return aId - bId;
+          });
+          // In-flight uploads stay at the end
+          const combined = [...sortedServer, ...nonDuplicates];
+          AsyncStorage.setItem(CACHE_KEY, JSON.stringify(combined)).catch(console.log);
+          AsyncStorage.setItem(ONBOARDING_KEY, JSON.stringify(combined)).catch(console.log);
           return combined;
         });
 
@@ -165,7 +211,7 @@ const ClubPhotosScreen = () => {
         }
       }
     }
-  }, [clubPhotos, myOwnerData, userKey]);
+  }, [myClubPhotos, userKey]);
 
   // Pick Image from Gallery
   const pickFromGallery = async () => {
@@ -222,6 +268,16 @@ const ClubPhotosScreen = () => {
 
   // Open Source Picker
   const handleSelectSource = () => {
+    if (isUploading) {
+      Toast.show({
+        type: 'info',
+        text1: 'Upload in progress ⏳',
+        text2: 'Please wait for the current photo to finish uploading.',
+        visibilityTime: 3000,
+      });
+      return;
+    }
+
     if (localPhotos.length >= MAX_PHOTOS) {
       Alert.alert('Limit Reached', `You can upload up to ${MAX_PHOTOS} club photos.`);
       return;
@@ -263,7 +319,8 @@ const ClubPhotosScreen = () => {
 
     setLocalPhotos((prev) => {
       const updated = [...prev, tempItem];
-      AsyncStorage.setItem(`@club_photos_cache_${userKey}`, JSON.stringify(updated)).catch(console.log);
+      AsyncStorage.setItem(CACHE_KEY, JSON.stringify(updated)).catch(console.log);
+      AsyncStorage.setItem(ONBOARDING_KEY, JSON.stringify(updated)).catch(console.log);
       return updated;
     });
 
@@ -273,12 +330,13 @@ const ClubPhotosScreen = () => {
 
     // 2. RUN NETWORK UPLOAD IN BACKGROUND
     try {
-      const res = await uploadSingleClubPhoto.mutateAsync({
+      const res = await uploadMyClubPhoto.mutateAsync({
         file: photoToUpload,
         imageInfo: trimmedCaption,
       });
 
-      const serverPhoto = res?.photo || res?.data || res;
+      // Response: { message, data: { id, documentId, imageInfo, fileUrl } }
+      const serverPhoto = res?.data || res?.photo || res;
       const realDocId = String(serverPhoto?.documentId || serverPhoto?.id || tempId);
       const realUrl = normalizeUrl(serverPhoto) || photoToUpload.uri;
 
@@ -287,26 +345,28 @@ const ClubPhotosScreen = () => {
         const updated = prev.map((item) =>
           item.documentId === tempId
             ? {
-                id: serverPhoto?.id || item.id,
-                documentId: realDocId,
-                imageInfo: serverPhoto?.imageInfo || trimmedCaption,
-                url: realUrl,
-                isUploading: false,
-                raw: serverPhoto,
-              }
+              id: serverPhoto?.id || item.id,
+              documentId: realDocId,
+              imageInfo: serverPhoto?.imageInfo || trimmedCaption,
+              url: realUrl,
+              fileUrl: realUrl,
+              isUploading: false,
+              raw: serverPhoto,
+            }
             : item
         );
-        AsyncStorage.setItem(`@club_photos_cache_${userKey}`, JSON.stringify(updated)).catch(console.log);
+        AsyncStorage.setItem(CACHE_KEY, JSON.stringify(updated)).catch(console.log);
+        AsyncStorage.setItem(ONBOARDING_KEY, JSON.stringify(updated)).catch(console.log);
         return updated;
       });
 
-      refetchClubPhotos();
-      refetchClubOwnerMe();
+      refetchMyClubPhotos();
     } catch (e: any) {
       // If upload failed, remove temporary item and notify user
       setLocalPhotos((prev) => {
         const updated = prev.filter((item) => item.documentId !== tempId);
-        AsyncStorage.setItem(`@club_photos_cache_${userKey}`, JSON.stringify(updated)).catch(console.log);
+        AsyncStorage.setItem(CACHE_KEY, JSON.stringify(updated)).catch(console.log);
+        AsyncStorage.setItem(ONBOARDING_KEY, JSON.stringify(updated)).catch(console.log);
         return updated;
       });
       Alert.alert(
@@ -332,18 +392,19 @@ const ClubPhotosScreen = () => {
 
             try {
               if (!targetDocId.startsWith('temp_')) {
-                await deleteClubPhoto.mutateAsync(targetDocId);
+                // Delete by documentId via DELETE /api/club-photos/:documentId
+                await deleteMyClubPhoto.mutateAsync(targetDocId);
               }
               // Remove from local state after server deletion completes
               setLocalPhotos((prev) => {
                 const updated = prev.filter(
                   (p) => String(p.documentId) !== targetDocId && String(p.id) !== targetDocId
                 );
-                AsyncStorage.setItem(`@club_photos_cache_${userKey}`, JSON.stringify(updated)).catch(console.log);
+                AsyncStorage.setItem(CACHE_KEY, JSON.stringify(updated)).catch(console.log);
+                AsyncStorage.setItem(ONBOARDING_KEY, JSON.stringify(updated)).catch(console.log);
                 return updated;
               });
-              refetchClubPhotos();
-              refetchClubOwnerMe();
+              refetchMyClubPhotos();
             } catch (e: any) {
               Alert.alert(
                 'Delete Failed',
@@ -358,7 +419,8 @@ const ClubPhotosScreen = () => {
     );
   };
 
-  const isUploading = uploadSingleClubPhoto.isPending;
+  const isUploading = uploadMyClubPhoto.isPending;
+  const isClubPhotosLoading = isMyClubPhotosLoading;
 
   // Compute visible slots: 3 initially, expands to 10 on showMore
   const visibleSlotsCount = showMore ? MAX_PHOTOS : INITIAL_SLOTS_COUNT;
@@ -417,14 +479,12 @@ const ClubPhotosScreen = () => {
               return (
                 <View
                   key={photo.documentId || index}
-                  className={`mb-4 ${
-                    isHero ? 'w-full' : 'w-[48%]'
-                  } overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm`}>
+                  className={`mb-4 ${isHero ? 'w-full' : 'w-[48%]'
+                    } overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm`}>
                   {/* Image Box */}
                   <View
-                    className={`${
-                      isHero ? 'h-52' : 'h-36'
-                    } w-full overflow-hidden bg-slate-100 relative`}>
+                    className={`${isHero ? 'h-52' : 'h-36'
+                      } w-full overflow-hidden bg-slate-100 relative`}>
                     {photo.url ? (
                       <Image
                         source={{ uri: photo.url }}
@@ -487,11 +547,9 @@ const ClubPhotosScreen = () => {
               <TouchableOpacity
                 key={`empty_slot_${index}`}
                 onPress={handleSelectSource}
-                disabled={isUploading}
                 activeOpacity={0.7}
-                className={`mb-4 ${
-                  isHero ? 'w-full h-52' : 'w-[48%] h-44'
-                } items-center justify-center rounded-2xl border-2 border-dashed border-rose-200 bg-rose-50/40 p-3`}>
+                className={`mb-4 ${isHero ? 'w-full h-52' : 'w-[48%] h-44'
+                  } items-center justify-center rounded-2xl border-2 border-dashed border-rose-200 bg-rose-50/40 p-3`}>
                 <View className="h-11 w-11 items-center justify-center rounded-full bg-rose-100 mb-1.5">
                   <Ionicons name="camera" size={22} color="#F6163C" />
                 </View>
@@ -719,15 +777,13 @@ const ClubPhotosScreen = () => {
                         onPress={() => setPhotoCaption(tag)}
                         disabled={isUploading}
                         activeOpacity={0.7}
-                        className={`rounded-full px-3 py-1.5 border ${
-                          isSelected
+                        className={`rounded-full px-3 py-1.5 border ${isSelected
                             ? 'bg-rose-50 border-[#F6163C]'
                             : 'bg-slate-100 border-slate-200/60'
-                        }`}>
-                        <Text
-                          className={`text-xs font-semibold ${
-                            isSelected ? 'text-[#F6163C]' : 'text-slate-600'
                           }`}>
+                        <Text
+                          className={`text-xs font-semibold ${isSelected ? 'text-[#F6163C]' : 'text-slate-600'
+                            }`}>
                           {tag}
                         </Text>
                       </TouchableOpacity>
@@ -741,9 +797,8 @@ const ClubPhotosScreen = () => {
                 onPress={handleUploadSinglePhoto}
                 disabled={!photoCaption.trim() || isUploading}
                 activeOpacity={0.8}
-                className={`h-14 w-full flex-row items-center justify-center rounded-2xl ${
-                  !photoCaption.trim() || isUploading ? 'bg-slate-300' : 'bg-[#F6163C]'
-                }`}>
+                className={`h-14 w-full flex-row items-center justify-center rounded-2xl ${!photoCaption.trim() || isUploading ? 'bg-slate-300' : 'bg-[#F6163C]'
+                  }`}>
                 {isUploading ? (
                   <ActivityIndicator color="white" size="small" />
                 ) : (

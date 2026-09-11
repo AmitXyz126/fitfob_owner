@@ -475,26 +475,33 @@ export default function DocumentsScreen() {
         animationType="fade"
         statusBarTranslucent={true}
         onRequestClose={() => setPreviewVisible(false)}>
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#0F172A' }}>
-          <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
-          {/* Header Bar */}
+        <View style={{ flex: 1, backgroundColor: '#0F172A' }}>
+          <StatusBar barStyle="light-content" backgroundColor="#0F172A" translucent={true} />
+          {/* Header Bar with Proper Status Bar / Safe Area Padding */}
           <View
             style={{
-              paddingTop: Platform.OS === 'android' ? 8 : 4,
+              paddingTop:
+                Platform.OS === 'android'
+                  ? (StatusBar.currentHeight ? StatusBar.currentHeight + 12 : Math.max(insets.top, 24) + 12)
+                  : Math.max(insets.top, 16) + 8,
+              paddingBottom: 14,
+              paddingHorizontal: 16,
             }}
-            className="flex-row items-center justify-between pb-3 px-4 border-b border-slate-800">
+            className="flex-row items-center justify-between border-b border-slate-800 bg-[#0F172A]">
             <TouchableOpacity
               onPress={() => setPreviewVisible(false)}
+              activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               className="h-10 w-10 items-center justify-center rounded-full bg-white/10 active:bg-white/20">
               <Ionicons name="close" size={22} color="#FFF" />
             </TouchableOpacity>
 
-            <View className="flex-1 mx-3 items-center">
+            <View className="flex-1 mx-3 items-center justify-center">
               <Text className="font-bold text-base text-white text-center" numberOfLines={1}>
-                {selectedDoc?.name}
+                {selectedDoc?.name || 'Document Preview'}
               </Text>
               {selectedDoc?.size && (
-                <Text className="text-[11px] text-slate-400 font-medium">
+                <Text className="text-[11px] text-slate-400 font-medium mt-0.5">
                   {selectedDoc.size}
                 </Text>
               )}
@@ -502,6 +509,8 @@ export default function DocumentsScreen() {
 
             <TouchableOpacity
               onPress={handleOpenExternalUrl}
+              activeOpacity={0.7}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               className="h-10 w-10 items-center justify-center rounded-full bg-white/10 active:bg-white/20">
               <Ionicons name="open-outline" size={20} color="#FFF" />
             </TouchableOpacity>
@@ -585,7 +594,7 @@ export default function DocumentsScreen() {
               </View>
             )}
           </View>
-        </SafeAreaView>
+        </View>
       </Modal>
 
       {/* 3. UPLOAD DOCUMENT SELECTION MODAL */}

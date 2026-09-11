@@ -18,6 +18,8 @@ import { useUserDetail } from '@/hooks/useUserDetail';
 import Toast from 'react-native-toast-message';
 import { LinearGradient } from 'expo-linear-gradient';
 import GymLoader from '@/components/GymLoader';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuthStore } from '@/store/useAuthStore';
 
 interface Props {
   initialData?: any;
@@ -37,7 +39,76 @@ const SUGGESTED_TAGS = [
   'Strength Machines',
 ];
 
+const normalizePhotoUrl = (item: any): string => {
+  if (!item) return '';
+  if (typeof item === 'string') {
+    let clean = item.trim().replace(/\\/g, '/');
+    if (
+      clean &&
+      !clean.startsWith('http://') &&
+      !clean.startsWith('https://') &&
+      !clean.startsWith('file://') &&
+      !clean.startsWith('content://') &&
+      !clean.startsWith('data:')
+    ) {
+      const apiBase = process.env.EXPO_PUBLIC_API_URL || '';
+      return `${apiBase.replace(/\/+$/, '')}/${clean.replace(/^\/+/, '')}`;
+    }
+    return clean;
+  }
+
+  let rawUrl =
+    item?.url ||
+    item?.fileUrl ||
+    item?.uri ||
+    item?.path ||
+    item?.src ||
+    item?.photoUrl ||
+    item?.imageUrl ||
+    item?.image_url ||
+    item?.file_url ||
+    item?.image?.url ||
+    item?.image?.fileUrl ||
+    item?.photo?.url ||
+    item?.photo?.fileUrl ||
+    item?.file?.url ||
+    item?.file?.fileUrl ||
+    item?.images?.[0]?.url ||
+    item?.images?.[0]?.fileUrl ||
+    item?.attributes?.url ||
+    item?.attributes?.image?.data?.attributes?.url ||
+    item?.image?.data?.attributes?.url ||
+    item?.formats?.medium?.url ||
+    item?.formats?.small?.url ||
+    item?.formats?.thumbnail?.url ||
+    item?.image?.formats?.medium?.url ||
+    (typeof item?.image === 'string' ? item.image : '') ||
+    (typeof item?.photo === 'string' ? item.photo : '') ||
+    '';
+
+  if (!rawUrl || typeof rawUrl !== 'string') return '';
+  let clean = rawUrl.trim().replace(/\\/g, '/');
+
+  if (
+    clean &&
+    !clean.startsWith('http://') &&
+    !clean.startsWith('https://') &&
+    !clean.startsWith('file://') &&
+    !clean.startsWith('content://') &&
+    !clean.startsWith('data:')
+  ) {
+    const apiBase = process.env.EXPO_PUBLIC_API_URL || '';
+    return `${apiBase.replace(/\/+$/, '')}/${clean.replace(/^\/+/, '')}`;
+  }
+  return clean;
+};
+
 const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
+  const { user } = useAuthStore();
+  const userKey = user?.id || user?.email || 'guest';
+  const CACHE_KEY = `@club_photos_cache_${userKey}`;
+  const ONBOARDING_KEY = `@onboarding_photos_cache_${userKey}`;
+
   const {
     clubPhotos,
     isClubPhotosLoading,
@@ -61,69 +132,89 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
   const [isSubmittingVerification, setIsSubmittingVerification] = useState(false);
 
-  // Fetch photos on screen mount
+  // 1. Instant Cache Initialization from AsyncStorage on mount
   useEffect(() => {
+    const loadCached = async () => {
+      try {
+        const saved = (await AsyncStorage.getItem(CACHE_KEY)) || (await AsyncStorage.getItem(ONBOARDING_KEY));
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setLocalPhotos((prev) => (prev.length === 0 ? parsed : prev));
+            if (parsed.length > INITIAL_SLOTS_COUNT) {
+              setShowMore(true);
+            }
+          }
+        }
+      } catch (e) { }
+    };
+    loadCached();
     refetchClubPhotos();
-  }, []);
+  }, [userKey]);
 
-  // Sync server photos whenever clubPhotos query changes, preserving any in-flight uploads
+  // 2. Sync server photos whenever clubPhotos query changes, preserving any in-flight uploads
   useEffect(() => {
     const raw =
       clubPhotos?.photos ||
-      clubPhotos?.data ||
       clubPhotos?.clubPhotos ||
+      clubPhotos?.data?.photos ||
+      clubPhotos?.data?.clubPhotos ||
+      clubPhotos?.data ||
       (Array.isArray(clubPhotos) ? clubPhotos : []);
 
-    if (Array.isArray(raw)) {
-      const serverList = raw.map((item: any, idx: number) => {
-        const docId = String(item?.documentId || item?.id || idx);
-        const caption = item?.imageInfo || item?.description || item?.caption || '';
+    if (Array.isArray(raw) && raw.length > 0) {
+      const serverList = raw
+        .map((item: any, idx: number) => {
+          const docId = String(item?.documentId || item?.id || idx);
+          const caption =
+            item?.imageInfo ||
+            item?.description ||
+            item?.caption ||
+            item?.title ||
+            item?.name ||
+            item?.attributes?.imageInfo ||
+            item?.attributes?.caption ||
+            '';
 
-        let rawUrl =
-          item?.fileUrl ||
-          item?.url ||
-          item?.images?.[0]?.url ||
-          item?.images?.[0]?.fileUrl ||
-          '';
+          const rawUrl = normalizePhotoUrl(item);
 
-        if (
-          rawUrl &&
-          typeof rawUrl === 'string' &&
-          !rawUrl.startsWith('http://') &&
-          !rawUrl.startsWith('https://') &&
-          !rawUrl.startsWith('file://') &&
-          !rawUrl.startsWith('content://') &&
-          !rawUrl.startsWith('data:')
-        ) {
-          const apiBase = process.env.EXPO_PUBLIC_API_URL || '';
-          rawUrl = `${apiBase.replace(/\/+$/, '')}/${rawUrl.replace(/^\/+/, '')}`;
+          return {
+            id: item?.id || idx,
+            documentId: docId,
+            imageInfo: caption,
+            url: rawUrl,
+            fileUrl: rawUrl,
+            isUploading: false,
+            raw: item,
+          };
+        })
+        .filter((p: any) => !!p.url);
+
+      if (serverList.length > 0) {
+        setLocalPhotos((prev) => {
+          const inFlight = prev.filter((p) => p.isUploading);
+          const nonDuplicates = inFlight.filter(
+            (u) => !serverList.some((s) => s.documentId === u.documentId)
+          );
+          // Sort server photos by id ascending (oldest first) so slot #1 = first uploaded
+          const sortedServer = [...serverList].sort((a, b) => {
+            const aId = typeof a.id === 'number' ? a.id : parseInt(a.id, 10) || 0;
+            const bId = typeof b.id === 'number' ? b.id : parseInt(b.id, 10) || 0;
+            return aId - bId;
+          });
+          // In-flight (uploading) go at the end, after confirmed photos
+          const combined = [...sortedServer, ...nonDuplicates];
+          AsyncStorage.setItem(CACHE_KEY, JSON.stringify(combined)).catch(console.log);
+          AsyncStorage.setItem(ONBOARDING_KEY, JSON.stringify(combined)).catch(console.log);
+          return combined;
+        });
+
+        if (serverList.length > INITIAL_SLOTS_COUNT) {
+          setShowMore(true);
         }
-
-        return {
-          id: item?.id || idx,
-          documentId: docId,
-          imageInfo: caption,
-          url: rawUrl,
-          isUploading: false,
-          raw: item,
-        };
-      });
-
-      setLocalPhotos((prev) => {
-        // Keep any currently in-flight uploads that haven't landed on server yet
-        const inFlight = prev.filter((p) => p.isUploading);
-        const nonDuplicates = inFlight.filter(
-          (u) => !serverList.some((s) => s.documentId === u.documentId)
-        );
-        return [...serverList, ...nonDuplicates];
-      });
-
-      // Auto-expand if user already has more than 3 photos saved on backend
-      if (serverList.length > INITIAL_SLOTS_COUNT) {
-        setShowMore(true);
       }
     }
-  }, [clubPhotos]);
+  }, [clubPhotos, userKey]);
 
   // Expose handleUpload for OnBoardingStep.tsx bottom button
   useImperativeHandle(ref, () => ({
@@ -261,25 +352,34 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
       }
 
       // Smoothly update with real server data
-      setLocalPhotos((prev) =>
-        prev.map((item) =>
+      setLocalPhotos((prev) => {
+        const updated = prev.map((item) =>
           item.documentId === tempId
             ? {
-                id: serverPhoto?.id || item.id,
-                documentId: realDocId,
-                imageInfo: serverPhoto?.imageInfo || trimmedCaption,
-                url: realUrl,
-                isUploading: false,
-                raw: serverPhoto,
-              }
+              id: serverPhoto?.id || item.id,
+              documentId: realDocId,
+              imageInfo: serverPhoto?.imageInfo || trimmedCaption,
+              url: realUrl,
+              fileUrl: realUrl,
+              isUploading: false,
+              raw: serverPhoto,
+            }
             : item
-        )
-      );
+        );
+        AsyncStorage.setItem(CACHE_KEY, JSON.stringify(updated)).catch(console.log);
+        AsyncStorage.setItem(ONBOARDING_KEY, JSON.stringify(updated)).catch(console.log);
+        return updated;
+      });
 
       refetchClubPhotos();
     } catch (e: any) {
       // If upload failed, remove temporary item and notify user
-      setLocalPhotos((prev) => prev.filter((item) => item.documentId !== tempId));
+      setLocalPhotos((prev) => {
+        const reverted = prev.filter((item) => item.documentId !== tempId);
+        AsyncStorage.setItem(CACHE_KEY, JSON.stringify(reverted)).catch(console.log);
+        AsyncStorage.setItem(ONBOARDING_KEY, JSON.stringify(reverted)).catch(console.log);
+        return reverted;
+      });
       Alert.alert(
         'Upload Failed',
         e?.response?.data?.message || 'Could not upload this photo. Please try again.'
@@ -306,11 +406,14 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
                 await deleteClubPhoto.mutateAsync(targetDocId);
               }
               // Only remove from local state AFTER server deletion completes
-              setLocalPhotos((prev) =>
-                prev.filter(
+              setLocalPhotos((prev) => {
+                const updated = prev.filter(
                   (p) => String(p.documentId) !== targetDocId && String(p.id) !== targetDocId
-                )
-              );
+                );
+                AsyncStorage.setItem(CACHE_KEY, JSON.stringify(updated)).catch(console.log);
+                AsyncStorage.setItem(ONBOARDING_KEY, JSON.stringify(updated)).catch(console.log);
+                return updated;
+              });
               refetchClubPhotos();
             } catch (e: any) {
               Alert.alert(
@@ -416,14 +519,12 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
               return (
                 <View
                   key={photo.documentId || index}
-                  className={`mb-4 ${
-                    isHero ? 'w-full' : 'w-[48%]'
-                  } overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm`}>
+                  className={`mb-4 ${isHero ? 'w-full' : 'w-[48%]'
+                    } overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm`}>
                   {/* Image Box */}
                   <View
-                    className={`${
-                      isHero ? 'h-52' : 'h-36'
-                    } w-full overflow-hidden bg-slate-100 relative`}>
+                    className={`${isHero ? 'h-52' : 'h-36'
+                      } w-full overflow-hidden bg-slate-100 relative`}>
                     {photo.url ? (
                       <Image
                         source={{ uri: photo.url }}
@@ -488,9 +589,8 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
                 onPress={handleSelectSource}
                 disabled={isUploading || isConfirming}
                 activeOpacity={0.7}
-                className={`mb-4 ${
-                  isHero ? 'w-full h-52' : 'w-[48%] h-44'
-                } items-center justify-center rounded-2xl border-2 border-dashed border-rose-200 bg-rose-50/40 p-3`}>
+                className={`mb-4 ${isHero ? 'w-full h-52' : 'w-[48%] h-44'
+                  } items-center justify-center rounded-2xl border-2 border-dashed border-rose-200 bg-rose-50/40 p-3`}>
                 <View className="h-11 w-11 items-center justify-center rounded-full bg-rose-100 mb-1.5">
                   <Ionicons name="camera" size={22} color="#F6163C" />
                 </View>
@@ -718,15 +818,13 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
                         onPress={() => setPhotoCaption(tag)}
                         disabled={isUploading}
                         activeOpacity={0.7}
-                        className={`rounded-full px-3 py-1.5 border ${
-                          isSelected
-                            ? 'bg-rose-50 border-[#F6163C]'
-                            : 'bg-slate-100 border-slate-200/60'
-                        }`}>
-                        <Text
-                          className={`text-xs font-semibold ${
-                            isSelected ? 'text-[#F6163C]' : 'text-slate-600'
+                        className={`rounded-full px-3 py-1.5 border ${isSelected
+                          ? 'bg-rose-50 border-[#F6163C]'
+                          : 'bg-slate-100 border-slate-200/60'
                           }`}>
+                        <Text
+                          className={`text-xs font-semibold ${isSelected ? 'text-[#F6163C]' : 'text-slate-600'
+                            }`}>
                           {tag}
                         </Text>
                       </TouchableOpacity>
@@ -740,9 +838,8 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
                 onPress={handleUploadSinglePhoto}
                 disabled={!photoCaption.trim()}
                 activeOpacity={0.8}
-                className={`h-14 w-full flex-row items-center justify-center rounded-2xl ${
-                  !photoCaption.trim() ? 'bg-slate-300' : 'bg-[#F6163C]'
-                }`}>
+                className={`h-14 w-full flex-row items-center justify-center rounded-2xl ${!photoCaption.trim() ? 'bg-slate-300' : 'bg-[#F6163C]'
+                  }`}>
                 <View className="flex-row items-center">
                   <Ionicons name="cloud-upload" size={18} color="white" />
                   <Text className="ml-2 font-bold text-[15px] text-white">

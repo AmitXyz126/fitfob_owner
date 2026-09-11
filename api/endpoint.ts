@@ -25,10 +25,18 @@ export const ENDPOINTS = {
   VERIFY_GOVERNMENT_DOC: `${BASE_URL}/api/pending-club-owner/verify-government-doc`,
   Step_6: `${BASE_URL}/api/pending-club-owner/confirm-government-docs`,
   Get: `${BASE_URL}/api/pending-club-owner/documents`,
+  // Pending-club-owner photo endpoints (Onboarding flow)
   UPLOAD_CLUB_PHOTO: `${BASE_URL}/api/pending-club-owner/upload-club-photo`,
   GET_CLUB_PHOTOS: `${BASE_URL}/api/pending-club-owner/club-photos`,
   DELETE_CLUB_PHOTO: (documentId: string) => `${BASE_URL}/api/pending-club-owner/club-photos/${documentId}`,
+
+  // Club Photos endpoints (Approved club owner - ClubPhotosScreen)
+  CLUB_PHOTOS_GET_ME: `${BASE_URL}/api/club-photos/me`,
+  CLUB_PHOTOS_UPLOAD: `${BASE_URL}/api/club-photos`,
+  CLUB_PHOTOS_DELETE: (documentId: string) => `${BASE_URL}/api/club-photos/${documentId}`,
   CONFIRM_ONBOARDING: `${BASE_URL}/api/pending-club-owner/confirm`,
+  GET_CLUB_SERVICES: `${BASE_URL}/api/club-services`,
+  GET_CLUB_FACILITIES: `${BASE_URL}/api/club-facilities`,
 
   
   CHANGE_PASSWORD: `${BASE_URL}/api/change-password`,
