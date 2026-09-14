@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,83 +9,67 @@ import {
   Modal,
   StyleSheet,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Container } from '@/components/Container';
+import { useTodayCheckins } from '@/hooks/useTodayCheckins';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   useAnimatedScrollHandler,
   interpolate,
   Extrapolation,
+  withRepeat,
+  withTiming,
+  withSequence,
 } from 'react-native-reanimated';
 
-// DUMMY ALL CHECKINS DATA (COMMENTED OUT FOR LIVE DATA / EMPTY STATE)
-/*
-const DUMMY_ALL_CHECKINS = [
-  {
-    id: '1',
-    name: 'Tina Sharma',
-    time: '10 minutes ago',
-    type: 'Standard',
-    image: 'https://i.pravatar.cc/150?u=tina',
-    color: '#94A3B8',
-    verified: true,
-  },
-  {
-    id: '2',
-    name: 'Amelia Thomas',
-    time: '1 hour and 10 minutes ago',
-    type: 'Premium',
-    image: 'https://i.pravatar.cc/150?u=amelia',
-    color: '#EAB308',
-    verified: true,
-  },
-  {
-    id: '3',
-    name: 'Sophia Lee',
-    time: '35 minutes ago',
-    type: 'Luxury',
-    image: 'https://i.pravatar.cc/150?u=sophia',
-    color: '#F6163C',
-    verified: true,
-  },
-  {
-    id: '4',
-    name: 'Liam Brown',
-    time: '20 minutes ago',
-    type: 'Luxury',
-    image: 'https://i.pravatar.cc/150?u=liam',
-    color: '#F6163C',
-    verified: true,
-  },
-  {
-    id: '5',
-    name: 'Noah Martinez',
-    time: '45 minutes ago',
-    type: 'Luxury',
-    image: 'https://i.pravatar.cc/150?u=noah1',
-    color: '#F6163C',
-    verified: true,
-  },
-  {
-    id: '6',
-    name: 'Noah Martinez',
-    time: '45 minutes ago',
-    type: 'Luxury',
-    image: 'https://i.pravatar.cc/150?u=noah2',
-    color: '#F6163C',
-    verified: true,
-  },
-];
-*/
-
-const ALL_CHECKINS: any[] = [];
-
+// Dynamic item sizing for check-in animated list
 const ITEM_SIZE = 84;
 
+const SkeletonBox = ({ style, className }: { style?: any; className?: string }) => {
+  const opacity = useSharedValue(0.35);
+
+  useEffect(() => {
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(0.85, { duration: 750 }),
+        withTiming(0.35, { duration: 750 })
+      ),
+      -1,
+      true
+    );
+  }, [opacity]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View
+      style={[style, animatedStyle]}
+      className={`bg-slate-200 ${className || ''}`}
+    />
+  );
+};
+
+const CheckinItemSkeleton = () => (
+  <View className="mb-4 flex-row items-center rounded-2xl border border-[#E5E7EB] bg-white p-3.5 shadow-2xs">
+    <SkeletonBox className="h-14 w-14 rounded-2xl" />
+    <View className="ml-4 flex-1">
+      <SkeletonBox className="h-4 w-32 rounded-md mb-2" />
+      <SkeletonBox className="h-3 w-20 rounded-md" />
+    </View>
+    <SkeletonBox className="h-7 w-20 rounded-full" />
+  </View>
+);
+
 const CheckinItem = ({ item, index, scrollY, onSelect }: any) => {
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
   const animatedStyle = useAnimatedStyle(() => {
     const inputRange = [
       (index - 1) * ITEM_SIZE,
@@ -120,14 +104,35 @@ const CheckinItem = ({ item, index, scrollY, onSelect }: any) => {
     };
   });
 
+  const hasValidImage = Boolean(item.image && !imageError);
+
   return (
     <Animated.View style={animatedStyle}>
       <TouchableOpacity
         activeOpacity={0.75}
         onPress={() => onSelect(item)}
         className="mb-4 flex-row items-center rounded-2xl border border-[#E5E7EB] bg-white p-3.5 shadow-2xs">
-        {/* User Avatar */}
-        <Image source={{ uri: item.image }} className="h-14 w-14 rounded-2xl bg-slate-100" />
+        {/* User Avatar with Skeleton while loading */}
+        <View className="relative h-14 w-14 overflow-hidden rounded-2xl bg-slate-100 items-center justify-center">
+          {!imageLoaded && hasValidImage && (
+            <SkeletonBox style={StyleSheet.absoluteFill} />
+          )}
+          <Image
+            source={
+              hasValidImage
+                ? { uri: item.image }
+                : require('../assets/images/fitfob_profile.png')
+            }
+            className="h-14 w-14 rounded-2xl"
+            resizeMode="cover"
+            onLoad={() => setImageLoaded(true)}
+            onLoadEnd={() => setImageLoaded(true)}
+            onError={() => {
+              setImageError(true);
+              setImageLoaded(true);
+            }}
+          />
+        </View>
 
         {/* User Details */}
         <View className="ml-4 flex-1">
@@ -171,6 +176,7 @@ const CheckinItem = ({ item, index, scrollY, onSelect }: any) => {
 const ViewAllScreen = () => {
   const [search, setSearch] = useState('');
   const [selectedMember, setSelectedMember] = useState<any>(null);
+  const { checkins: allCheckins, isLoading, refetch } = useTodayCheckins();
 
   const scrollY = useSharedValue(0);
 
@@ -181,12 +187,46 @@ const ViewAllScreen = () => {
   });
 
   // Reset scroll offset on search change to prevent index interpolation bounds crash
-  useEffect(() => {
-    scrollY.value = 0;
-  }, [search, scrollY]);
+  // Auto-refresh when returning to view all screen
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
-  const filteredData = ALL_CHECKINS.filter((item) => {
-    return item.name.toLowerCase().includes(search.toLowerCase());
+  const [filterType, setFilterType] = useState<'all' | 'local' | 'outdoor'>('all');
+
+  const counts = useMemo(() => {
+    const list = allCheckins || [];
+    const local = list.filter((i) =>
+      (i.subscriptionType || i.type || '').toLowerCase().includes('local')
+    ).length;
+    const outdoor = list.filter((i) =>
+      (i.subscriptionType || i.type || '').toLowerCase().includes('outdoor')
+    ).length;
+    return {
+      all: list.length,
+      local,
+      outdoor,
+    };
+  }, [allCheckins]);
+
+  const filteredData = (allCheckins || []).filter((item) => {
+    const searchLower = search.toLowerCase().trim();
+    const matchesSearch =
+      !searchLower ||
+      item.name.toLowerCase().includes(searchLower) ||
+      item.clientId.toLowerCase().includes(searchLower);
+
+    const subType = (item.subscriptionType || item.type || '').toLowerCase();
+    let matchesFilter = true;
+    if (filterType === 'local') {
+      matchesFilter = subType.includes('local');
+    } else if (filterType === 'outdoor') {
+      matchesFilter = subType.includes('outdoor');
+    }
+
+    return matchesSearch && matchesFilter;
   });
 
   return (
@@ -207,12 +247,12 @@ const ViewAllScreen = () => {
       </View>
 
       {/* --- PREMIUM INTERACTIVE SEARCH BAR --- */}
-      <View className="mb-5">
+      <View className="mb-3">
         {/* Search Input Bar */}
         <View className="flex-row items-center rounded-2xl border border-slate-200 bg-white px-4 py-1 shadow-sm shadow-slate-100">
           <Ionicons name="search" size={20} color="#F6163C" />
           <TextInput
-            placeholder="Search members by name..."
+            placeholder="Search members by name or ID..."
             placeholderTextColor="#94A3B8"
             className="ml-3 h-11 flex-1 font-medium text-slate-800 text-sm"
             value={search}
@@ -235,49 +275,201 @@ const ViewAllScreen = () => {
         </View>
       </View>
 
-      {/* --- RECENT CHECK-INS LIST WITH STACKING CARD SCROLL ANIMATION --- */}
-      <Animated.FlatList
-        data={filteredData}
-        keyExtractor={(item, index) => item.id + index}
-        onScroll={scrollHandler}
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 40 }}
-        ListEmptyComponent={
-          <View className="items-center justify-center py-4">
-            <Image
-              source={require('../assets/images/view_all_empty.png')}
-              className="h-80 w-80"
-              resizeMode="contain"
+      {/* --- ATTRACTIVE SEGMENTED SWITCH FILTER BAR --- */}
+      <View className="mb-4">
+        <View className="flex-row items-center rounded-2xl bg-slate-100/90 p-1 border border-slate-200/60 shadow-xs">
+          {/* ALL OPTION */}
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={() => setFilterType('all')}
+            style={
+              filterType === 'all'
+                ? {
+                    backgroundColor: '#FFFFFF',
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.08,
+                    shadowRadius: 4,
+                    elevation: 2,
+                  }
+                : {}
+            }
+            className={`flex-1 flex-row items-center justify-center py-2 rounded-xl border ${
+              filterType === 'all'
+                ? 'border-slate-200/70'
+                : 'border-transparent'
+            }`}>
+            <Ionicons
+              name={filterType === 'all' ? 'grid' : 'grid-outline'}
+              size={13}
+              color={filterType === 'all' ? '#F6163C' : '#64748B'}
             />
-            <Text className="mt-1 text-center font-bold text-lg text-slate-900">
-              No Check-in History Found
+            <Text
+              className={`ml-1.5 text-xs ${
+                filterType === 'all' ? 'font-bold text-slate-900' : 'font-medium text-slate-500'
+              }`}>
+              All
             </Text>
-            <Text className="mt-1 px-8 text-center text-[13px] leading-5 text-slate-500">
-              {search.length > 0
-                ? 'No check-ins match your search criteria.'
-                : 'All member check-in activities will be logged and listed right here.'}
+            <View
+              className={`ml-1.5 px-1.5 py-0.5 rounded-full ${
+                filterType === 'all' ? 'bg-rose-50 border border-rose-100' : 'bg-slate-200/70'
+              }`}>
+              <Text
+                className={`text-[10px] font-bold ${
+                  filterType === 'all' ? 'text-[#F6163C]' : 'text-slate-500'
+                }`}>
+                {counts.all}
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* LOCAL OPTION */}
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={() => setFilterType('local')}
+            style={
+              filterType === 'local'
+                ? {
+                    backgroundColor: '#FFFFFF',
+                    shadowColor: '#3B82F6',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.08,
+                    shadowRadius: 4,
+                    elevation: 2,
+                  }
+                : {}
+            }
+            className={`flex-1 flex-row items-center justify-center py-2 rounded-xl border ${
+              filterType === 'local'
+                ? 'border-blue-100'
+                : 'border-transparent'
+            }`}>
+            <Ionicons
+              name={filterType === 'local' ? 'home' : 'home-outline'}
+              size={13}
+              color={filterType === 'local' ? '#3B82F6' : '#64748B'}
+            />
+            <Text
+              className={`ml-1.5 text-xs ${
+                filterType === 'local' ? 'font-bold text-slate-900' : 'font-medium text-slate-500'
+              }`}>
+              Local
             </Text>
-            {search.length > 0 && (
-              <TouchableOpacity
-                onPress={() => {
-                  setSearch('');
-                }}
-                className="mt-4 rounded-full bg-[#F6163C] px-5 py-2.5 shadow-sm">
-                <Text className="font-semibold text-xs text-white">Reset Search</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        }
-        renderItem={({ item, index }) => (
-          <CheckinItem
-            item={item}
-            index={index}
-            scrollY={scrollY}
-            onSelect={(selected: any) => setSelectedMember(selected)}
-          />
-        )}
-      />
+            <View
+              className={`ml-1.5 px-1.5 py-0.5 rounded-full ${
+                filterType === 'local' ? 'bg-blue-50 border border-blue-100' : 'bg-slate-200/70'
+              }`}>
+              <Text
+                className={`text-[10px] font-bold ${
+                  filterType === 'local' ? 'text-[#3B82F6]' : 'text-slate-500'
+                }`}>
+                {counts.local}
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* OUTDOOR OPTION */}
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={() => setFilterType('outdoor')}
+            style={
+              filterType === 'outdoor'
+                ? {
+                    backgroundColor: '#FFFFFF',
+                    shadowColor: '#10B981',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.08,
+                    shadowRadius: 4,
+                    elevation: 2,
+                  }
+                : {}
+            }
+            className={`flex-1 flex-row items-center justify-center py-2 rounded-xl border ${
+              filterType === 'outdoor'
+                ? 'border-emerald-100'
+                : 'border-transparent'
+            }`}>
+            <Ionicons
+              name={filterType === 'outdoor' ? 'compass' : 'compass-outline'}
+              size={13}
+              color={filterType === 'outdoor' ? '#10B981' : '#64748B'}
+            />
+            <Text
+              className={`ml-1.5 text-xs ${
+                filterType === 'outdoor' ? 'font-bold text-slate-900' : 'font-medium text-slate-500'
+              }`}>
+              Outdoor
+            </Text>
+            <View
+              className={`ml-1.5 px-1.5 py-0.5 rounded-full ${
+                filterType === 'outdoor' ? 'bg-emerald-50 border border-emerald-100' : 'bg-slate-200/70'
+              }`}>
+              <Text
+                className={`text-[10px] font-bold ${
+                  filterType === 'outdoor' ? 'text-[#10B981]' : 'text-slate-500'
+                }`}>
+                {counts.outdoor}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* --- RECENT CHECK-INS LIST / LOADING STATE --- */}
+      {isLoading ? (
+        <View className="py-2">
+          <CheckinItemSkeleton />
+          <CheckinItemSkeleton />
+          <CheckinItemSkeleton />
+          <CheckinItemSkeleton />
+        </View>
+      ) : (
+        <Animated.FlatList
+          data={filteredData}
+          keyExtractor={(item, index) => item.id + index}
+          onScroll={scrollHandler}
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 40 }}
+          ListEmptyComponent={
+            <View className="items-center justify-center py-4">
+              <Image
+                source={require('../assets/images/view_all_empty.png')}
+                className="h-80 w-80"
+                resizeMode="contain"
+              />
+              <Text className="mt-1 text-center font-bold text-lg text-slate-900">
+                No Check-in History Found
+              </Text>
+              <Text className="mt-1 px-8 text-center text-[13px] leading-5 text-slate-500">
+                {search.length > 0
+                  ? 'No check-ins match your search criteria.'
+                  : filterType !== 'all'
+                    ? `No ${filterType === 'local' ? 'Local' : 'Outdoor'} check-ins found for today.`
+                    : 'All member check-in activities will be logged and listed right here.'}
+              </Text>
+              {(search.length > 0 || filterType !== 'all') && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setSearch('');
+                    setFilterType('all');
+                  }}
+                  className="mt-4 rounded-full bg-[#F6163C] px-5 py-2.5 shadow-sm">
+                  <Text className="font-semibold text-sm text-white">Reset Filters</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          }
+          renderItem={({ item, index }) => (
+            <CheckinItem
+              item={item}
+              index={index}
+              scrollY={scrollY}
+              onSelect={(selected: any) => setSelectedMember({ ...selected, verified: true })}
+            />
+          )}
+        />
+      )}
 
       {/* --- MEMBER DETAIL BOTTOM SHEET --- */}
       <Modal
@@ -303,7 +495,14 @@ const ViewAllScreen = () => {
               <View style={styles.sheetContent}>
                 {/* Top row: Avatar & basic info */}
                 <View style={styles.profileHeader}>
-                  <Image source={{ uri: selectedMember?.image }} style={styles.largeAvatar} />
+                  <Image
+                    source={
+                      selectedMember?.image
+                        ? { uri: selectedMember.image }
+                        : require('../assets/images/fitfob_profile.png')
+                    }
+                    style={styles.largeAvatar}
+                  />
                   <View style={styles.profileMeta}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={styles.profileName}>{selectedMember?.name || 'Member'}</Text>
@@ -349,45 +548,37 @@ const ViewAllScreen = () => {
 
                 <View style={styles.divider} />
 
-                {/* Detailed Parameters */}
+                {/* Detailed Parameters - Real Check-in Details */}
                 <View style={styles.detailsList}>
-                  <View style={styles.detailRow}>
-                    <View style={styles.detailLeft}>
-                      <Ionicons name="card-outline" size={18} color="#64748B" />
-                      <Text style={styles.detailLabel}>Member ID</Text>
-                    </View>
-                    <Text style={styles.detailValue}>
-                      FF-MEMBER-00{selectedMember?.id || '0'}
-                    </Text>
-                  </View>
 
                   <View style={styles.detailRow}>
                     <View style={styles.detailLeft}>
                       <Ionicons name="mail-outline" size={18} color="#64748B" />
                       <Text style={styles.detailLabel}>Email Address</Text>
                     </View>
-                    <Text style={styles.detailValue}>
-                      {selectedMember?.name?.toLowerCase().replace(/\s+/g, '') || 'member'}
-                      @gmail.com
+                    <Text style={styles.detailValue} numberOfLines={1}>
+                      {selectedMember?.clientEmail || selectedMember?.email || 'Not provided'}
                     </Text>
                   </View>
 
                   <View style={styles.detailRow}>
                     <View style={styles.detailLeft}>
-                      <Ionicons name="phone-portrait-outline" size={18} color="#64748B" />
-                      <Text style={styles.detailLabel}>Phone Number</Text>
+                      <Ionicons name="time-outline" size={18} color="#64748B" />
+                      <Text style={styles.detailLabel}>Check-in Time</Text>
                     </View>
                     <Text style={styles.detailValue}>
-                      +91 98765 {43210 + (parseInt(selectedMember?.id || '1') || 1)}
+                      {selectedMember?.time || 'Today'}
                     </Text>
                   </View>
 
                   <View style={styles.detailRow}>
                     <View style={styles.detailLeft}>
-                      <Ionicons name="calendar-outline" size={18} color="#64748B" />
-                      <Text style={styles.detailLabel}>Renewal Date</Text>
+                      <Ionicons name="ribbon-outline" size={18} color="#64748B" />
+                      <Text style={styles.detailLabel}>Subscription</Text>
                     </View>
-                    <Text style={styles.detailValue}>15 Dec 2026</Text>
+                    <Text style={styles.detailValue}>
+                      {selectedMember?.subscriptionType || selectedMember?.type || 'Standard'}
+                    </Text>
                   </View>
 
                   <View style={styles.detailRow}>
@@ -398,7 +589,7 @@ const ViewAllScreen = () => {
                       </Text>
                     </View>
                     <View style={styles.statusBadge}>
-                      <Text style={styles.statusText}>Active</Text>
+                      <Text style={styles.statusText}>Checked In</Text>
                     </View>
                   </View>
                 </View>

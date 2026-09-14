@@ -1,11 +1,12 @@
-/* eslint-disable react/no-unescaped-entities */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { View, Text, Image, TouchableOpacity, Platform, Modal, StyleSheet, Pressable, ScrollView, RefreshControl } from 'react-native';
 import { Container } from '@/components/Container';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useUserDetail, useClubOwnerMe } from '@/hooks/useUserDetail';
+import { useTodayCheckins } from '@/hooks/useTodayCheckins';
 import { useAuthStore } from '@/store/useAuthStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
@@ -15,6 +16,9 @@ import Animated, {
   useAnimatedScrollHandler,
   interpolate,
   Extrapolation,
+  withRepeat,
+  withTiming,
+  withSequence,
 } from 'react-native-reanimated';
 
 export const formatIndianCurrency = (amount: number | string): string => {
@@ -33,65 +37,50 @@ export const formatIndianNumber = (numVal: number | string): string => {
   return num.toLocaleString('en-IN');
 };
 
-// DUMMY RECENT CHECKINS DATA (COMMENTED OUT FOR LIVE DATA / EMPTY STATE)
-/*
-const DUMMY_RECENT_CHECKINS = [
-  {
-    id: '1',
-    name: 'Tina Sharma',
-    time: '10 mins ago',
-    type: 'Standard',
-    image: 'https://i.pravatar.cc/150?u=tina',
-    color: '#94A3B8',
-  },
-  {
-    id: '2',
-    name: 'Amelia Thomas',
-    time: '1 hr ago',
-    type: 'Premium',
-    image: 'https://i.pravatar.cc/150?u=amelia',
-    color: '#EAB308',
-  },
-  {
-    id: '3',
-    name: 'Sophia Lee',
-    time: '35 mins ago',
-    type: 'Luxury',
-    image: 'https://i.pravatar.cc/150?u=sophia',
-    color: '#F6163C',
-  },
-  {
-    id: '4',
-    name: 'Liam Brown',
-    time: '20 mins ago',
-    type: 'Luxury',
-    image: 'https://i.pravatar.cc/150?u=liam',
-    color: '#F6163C',
-  },
-  {
-    id: '5',
-    name: 'Rahul Dev',
-    time: '45 mins ago',
-    type: 'Standard',
-    image: 'https://i.pravatar.cc/150?u=rahul',
-    color: '#94A3B8',
-  },
-  {
-    id: '6',
-    name: 'Zoya Khan',
-    time: '50 mins ago',
-    type: 'Premium',
-    image: 'https://i.pravatar.cc/150?u=zoya',
-    color: '#EAB308',
-  },
-];
-*/
-
-const RECENT_CHECKINS: any[] = [];
-
+// Dynamic item sizing for check-in animated list
 const ITEM_SIZE = 84;
 
+const SkeletonBox = ({ style, className }: { style?: any; className?: string }) => {
+  const opacity = useSharedValue(0.35);
+
+  useEffect(() => {
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(0.85, { duration: 750 }),
+        withTiming(0.35, { duration: 750 })
+      ),
+      -1,
+      true
+    );
+  }, [opacity]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View
+      style={[style, animatedStyle]}
+      className={`bg-slate-200 ${className || ''}`}
+    />
+  );
+};
+
+const CheckinItemSkeleton = () => (
+  <View className="mb-3 flex-row items-center rounded-2xl border border-slate-100 bg-white p-3">
+    <SkeletonBox className="h-14 w-14 rounded-xl" />
+    <View className="ml-4 flex-1">
+      <SkeletonBox className="h-4 w-32 rounded-md mb-2" />
+      <SkeletonBox className="h-3 w-20 rounded-md" />
+    </View>
+    <SkeletonBox className="h-7 w-20 rounded-full" />
+  </View>
+);
+
 const CheckinItem = ({ item, index, scrollY, onSelect }: any) => {
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
   const animatedStyle = useAnimatedStyle(() => {
     const inputRange = [
       (index - 1) * ITEM_SIZE,
@@ -126,13 +115,35 @@ const CheckinItem = ({ item, index, scrollY, onSelect }: any) => {
     };
   });
 
+  const hasValidImage = Boolean(item.image && !imageError);
+
   return (
     <Animated.View style={animatedStyle}>
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={() => onSelect(item)}
         className="mb-3 flex-row items-center rounded-2xl border border-slate-100 bg-white p-3">
-        <Image source={{ uri: item.image }} className="h-14 w-14 rounded-xl" />
+        {/* Member Avatar with Skeleton while image loads */}
+        <View className="relative h-14 w-14 overflow-hidden rounded-xl bg-slate-100 items-center justify-center">
+          {!imageLoaded && hasValidImage && (
+            <SkeletonBox style={StyleSheet.absoluteFill} />
+          )}
+          <Image
+            source={
+              hasValidImage
+                ? { uri: item.image }
+                : require('../../assets/images/fitfob_profile.png')
+            }
+            className="h-14 w-14 rounded-xl"
+            resizeMode="cover"
+            onLoad={() => setImageLoaded(true)}
+            onLoadEnd={() => setImageLoaded(true)}
+            onError={() => {
+              setImageError(true);
+              setImageLoaded(true);
+            }}
+          />
+        </View>
 
         <View className="ml-4 flex-1 ">
           <View className="flex-row items-center gap-1 ">
@@ -197,6 +208,12 @@ const getImageUriString = (val: any): string => {
 const HomeScreen = () => {
   const { profileStatus, refetch } = useUserDetail();
   const { data: myOwnerData, refetch: refetchOwner } = useClubOwnerMe();
+  const {
+    checkins: recentCheckins,
+    count: todayCheckinsCount,
+    isLoading: isCheckinsLoading,
+    refetch: refetchTodayCheckins,
+  } = useTodayCheckins();
   const { user } = useAuthStore();
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
@@ -211,6 +228,7 @@ const HomeScreen = () => {
       await Promise.all([
         refetch(),
         refetchOwner(),
+        refetchTodayCheckins(),
       ]);
     } catch (e) {
       console.log('Error refreshing home data:', e);
@@ -218,6 +236,13 @@ const HomeScreen = () => {
       setRefreshing(false);
     }
   };
+
+  // Auto-refresh checkins whenever the home screen comes into focus (e.g., returning from QR scan)
+  useFocusEffect(
+    useCallback(() => {
+      refetchTodayCheckins();
+    }, [refetchTodayCheckins])
+  );
 
   useEffect(() => {
     const loadClubData = async () => {
@@ -443,12 +468,30 @@ const HomeScreen = () => {
                 onPress={() => router.push('/notification')}
                 style={{ elevation: 2 }}
                 className="rounded-full border border-white bg-white p-2 shadow-sm">
-                <Ionicons name="notifications" size={20} color="#F6163C" />
+                <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+                  <Path
+                    d="M6.95508 18.1195C7.35096 19.2153 8.57752 20 9.99852 20C11.4195 20 12.6461 19.2153 13.042 18.1195C12.1264 18.1937 11.1155 18.2326 9.99852 18.2326C8.88151 18.2326 7.8706 18.1937 6.95508 18.1195Z"
+                    fill="#F6163C"
+                  />
+                  <Path
+                    d="M11.3909 1.40357C11.293 0.711327 10.6973 0.198768 9.99817 0.205261C9.30231 0.207544 8.7116 0.715813 8.60547 1.40357C9.52485 1.21979 10.4715 1.21979 11.3909 1.40357Z"
+                    fill="#F6163C"
+                  />
+                  <Path
+                    d="M17.2596 11.0535C16.7412 10.4997 16.3194 9.86286 16.0118 9.16948C15.8657 8.7492 15.7441 8.32074 15.6477 7.88637C15.068 5.53222 14.1878 1.97272 9.99914 1.97272C5.81043 1.97272 4.93029 5.53222 4.35056 7.88637C4.25414 8.32078 4.13259 8.7492 3.98647 9.16948C3.6789 9.86286 3.25708 10.4997 2.7387 11.0535C2.07416 11.8418 1.38488 12.6618 1.19048 14.0404C1.0786 14.6282 1.24427 15.2347 1.6394 15.684C2.69982 16.9071 5.51352 17.5257 9.99914 17.5257C14.4847 17.5257 17.2984 16.9071 18.3589 15.684C18.754 15.2347 18.9196 14.6282 18.8078 14.0404C18.6134 12.6618 17.9241 11.8418 17.2596 11.0535ZM7.13207 4.66368C6.41417 5.58944 6.02888 6.98781 5.72347 8.22566C5.61419 8.72126 5.47354 9.20946 5.30248 9.68727C5.25911 9.80863 5.15314 9.89678 5.02591 9.91733C4.89869 9.93787 4.77036 9.88754 4.69103 9.78597C4.6117 9.6844 4.59391 9.54769 4.64463 9.42924C4.80287 8.98177 4.93356 8.52505 5.03595 8.06164C5.35974 6.74812 5.77085 5.26565 6.57359 4.2303C6.65044 4.12889 6.77586 4.07659 6.90202 4.09339C7.02814 4.1102 7.13553 4.19351 7.18311 4.31152C7.23073 4.42958 7.21125 4.56404 7.13207 4.66368ZM8.69729 3.56509C8.47358 3.63396 8.2582 3.72738 8.05503 3.84363C8.00143 3.87503 7.9404 3.89152 7.8783 3.89136C7.71834 3.89136 7.57828 3.78389 7.53688 3.62936C7.49549 3.47482 7.56301 3.31175 7.70157 3.23174C7.95035 3.08945 8.21429 2.97537 8.48841 2.8917C8.61009 2.85062 8.74452 2.87876 8.83947 2.96521C8.93443 3.05167 8.97504 3.18287 8.94549 3.30789C8.91593 3.43287 8.82094 3.53204 8.69729 3.56683V3.56509Z"
+                    fill="#F6163C"
+                  />
+                </Svg>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => router.push('/chat')}
                 className="rounded-full border border-slate-100 bg-white p-2 shadow-sm">
-                <Ionicons name="paper-plane" size={20} color="#F6163C" />
+                <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
+                  <Path
+                    d="M19.5108 0.000251349C19.447 -0.00174692 19.3833 0.00850037 19.3233 0.0304709L0.330049 7.33928C0.240635 7.3716 0.162285 7.42876 0.10419 7.50405C0.0460947 7.57934 0.0106643 7.66965 0.00205443 7.76438C-0.00655548 7.8591 0.0120128 7.95429 0.0555803 8.03883C0.0991478 8.12337 0.165909 8.19374 0.24803 8.24166L6.56155 12.0269C9.97937 8.65503 13.9999 5.99936 13.9999 5.99936C13.9999 5.99936 11.3458 10.0191 7.9754 13.4371L11.7678 19.7576C11.8159 19.8373 11.8854 19.902 11.9683 19.9444C12.0511 19.9867 12.1442 20.0051 12.237 19.9974C12.3298 19.9897 12.4185 19.9562 12.4933 19.9008C12.5681 19.8453 12.6259 19.77 12.6603 19.6835L19.9658 0.681057C19.995 0.606098 20.0058 0.52517 19.997 0.445183C19.9883 0.365196 19.9605 0.288504 19.9158 0.221593C19.8712 0.154681 19.811 0.0995562 19.7405 0.0608635C19.67 0.0221709 19.5912 0.00196818 19.5108 0.000251349Z"
+                    fill="#F6163C"
+                  />
+                </Svg>
               </TouchableOpacity>
             </View>
           </View>
@@ -518,12 +561,18 @@ const HomeScreen = () => {
                 </View>
 
                 <View className="mt-1 flex-row items-end justify-between">
-                  <Text className="font-extrabold text-3xl text-slate-900">0</Text>
-                  {/* Green Pill Indicator */}
-                  <View className="mb-1 flex-row items-center rounded-full bg-emerald-500/10 px-2.5 py-1 border border-emerald-500/20">
-                    <Ionicons name="arrow-up" size={13} color="#10B981" />
-                    <Text className="ml-0.5 font-bold text-[11px] text-emerald-600">+5</Text>
-                  </View>
+                  <Text className="font-extrabold text-3xl text-slate-900">
+                    {formatIndianNumber(todayCheckinsCount)}
+                  </Text>
+                  {/* Green Pill Indicator - only shown when check-ins exist */}
+                  {todayCheckinsCount > 0 && (
+                    <View className="mb-1 flex-row items-center rounded-full bg-emerald-500/10 px-2.5 py-1 border border-emerald-500/20">
+                      <Ionicons name="arrow-up" size={13} color="#10B981" />
+                      <Text className="ml-0.5 font-bold text-[11px] text-emerald-600">
+                        +{todayCheckinsCount}
+                      </Text>
+                    </View>
+                  )}
                 </View>
               </View>
             </TouchableOpacity>
@@ -556,11 +605,6 @@ const HomeScreen = () => {
 
                 <View className="mt-1 flex-row items-end justify-between">
                   <Text className="font-extrabold text-3xl text-slate-900">0</Text>
-                  {/* Green Pill Indicator */}
-                  <View className="mb-1 flex-row items-center rounded-full bg-emerald-500/10 px-2.5 py-1 border border-emerald-500/20">
-                    <Ionicons name="arrow-up" size={13} color="#10B981" />
-                    <Text className="ml-0.5 font-bold text-[11px] text-emerald-600">+5</Text>
-                  </View>
                 </View>
               </View>
             </TouchableOpacity>
@@ -577,8 +621,14 @@ const HomeScreen = () => {
           </View>
         </View>
 
-        {/* --- SCROLLABLE LIST WITH STACKING CARD SCROLL ANIMATION / EMPTY STATE --- */}
-        {RECENT_CHECKINS.length === 0 ? (
+        {/* --- SCROLLABLE LIST / SKELETON / EMPTY STATE --- */}
+        {isCheckinsLoading ? (
+          <View className="mt-2 pb-6">
+            <CheckinItemSkeleton />
+            <CheckinItemSkeleton />
+            <CheckinItemSkeleton />
+          </View>
+        ) : recentCheckins.length === 0 ? (
           <View className="items-center justify-center ">
             <Image
               source={require('../../assets/images/empty_checkins.png')}
@@ -593,24 +643,17 @@ const HomeScreen = () => {
             </Text>
           </View>
         ) : (
-          <Animated.FlatList
-            data={RECENT_CHECKINS}
-            keyExtractor={(item) => item.id}
-            onScroll={scrollHandler}
-            scrollEventThrottle={16}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{
-              paddingBottom: Platform.OS === 'ios' ? 100 : 20,
-            }}
-            renderItem={({ item, index }) => (
+          <View className="mt-2 pb-6">
+            {recentCheckins.map((item, index) => (
               <CheckinItem
+                key={item.id || item.clientId || index}
                 item={item}
                 index={index}
                 scrollY={scrollY}
                 onSelect={(selected: any) => setSelectedMember({ ...selected, verified: true })}
               />
-            )}
-          />
+            ))}
+          </View>
         )}
       </ScrollView>
 
@@ -638,7 +681,14 @@ const HomeScreen = () => {
               <View style={styles.sheetContent}>
                 {/* Top row: Avatar & basic info */}
                 <View style={styles.profileHeader}>
-                  <Image source={{ uri: selectedMember?.image }} style={styles.largeAvatar} />
+                  <Image
+                    source={
+                      selectedMember?.image
+                        ? { uri: selectedMember.image }
+                        : require('../../assets/images/fitfob_profile.png')
+                    }
+                    style={styles.largeAvatar}
+                  />
                   <View style={styles.profileMeta}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={styles.profileName}>{selectedMember?.name || 'Member'}</Text>
@@ -684,45 +734,37 @@ const HomeScreen = () => {
 
                 <View style={styles.divider} />
 
-                {/* Detailed Parameters */}
+                {/* Detailed Parameters - Real Check-in Details */}
                 <View style={styles.detailsList}>
-                  <View style={styles.detailRow}>
-                    <View style={styles.detailLeft}>
-                      <Ionicons name="card-outline" size={18} color="#64748B" />
-                      <Text style={styles.detailLabel}>Member ID</Text>
-                    </View>
-                    <Text style={styles.detailValue}>
-                      FF-MEMBER-00{selectedMember?.id || '0'}
-                    </Text>
-                  </View>
 
                   <View style={styles.detailRow}>
                     <View style={styles.detailLeft}>
                       <Ionicons name="mail-outline" size={18} color="#64748B" />
                       <Text style={styles.detailLabel}>Email Address</Text>
                     </View>
-                    <Text style={styles.detailValue}>
-                      {selectedMember?.name?.toLowerCase().replace(/\s+/g, '') || 'member'}
-                      @gmail.com
+                    <Text style={styles.detailValue} numberOfLines={1}>
+                      {selectedMember?.clientEmail || selectedMember?.email || 'Not provided'}
                     </Text>
                   </View>
 
                   <View style={styles.detailRow}>
                     <View style={styles.detailLeft}>
-                      <Ionicons name="phone-portrait-outline" size={18} color="#64748B" />
-                      <Text style={styles.detailLabel}>Phone Number</Text>
+                      <Ionicons name="time-outline" size={18} color="#64748B" />
+                      <Text style={styles.detailLabel}>Check-in Time</Text>
                     </View>
                     <Text style={styles.detailValue}>
-                      +91 98765 {43210 + (parseInt(selectedMember?.id || '1') || 1)}
+                      {selectedMember?.time || 'Today'}
                     </Text>
                   </View>
 
                   <View style={styles.detailRow}>
                     <View style={styles.detailLeft}>
-                      <Ionicons name="calendar-outline" size={18} color="#64748B" />
-                      <Text style={styles.detailLabel}>Renewal Date</Text>
+                      <Ionicons name="ribbon-outline" size={18} color="#64748B" />
+                      <Text style={styles.detailLabel}>Subscription</Text>
                     </View>
-                    <Text style={styles.detailValue}>15 Dec 2026</Text>
+                    <Text style={styles.detailValue}>
+                      {selectedMember?.subscriptionType || selectedMember?.type || 'Standard'}
+                    </Text>
                   </View>
 
                   <View style={styles.detailRow}>
@@ -733,7 +775,7 @@ const HomeScreen = () => {
                       </Text>
                     </View>
                     <View style={styles.statusBadge}>
-                      <Text style={styles.statusText}>Active</Text>
+                      <Text style={styles.statusText}>Checked In</Text>
                     </View>
                   </View>
                 </View>

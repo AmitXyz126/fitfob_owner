@@ -35,14 +35,18 @@ import Animated, {
 } from 'react-native-reanimated';
 import apiInstance from '@/api/apiInstance';
 import { ENDPOINTS } from '@/api/endpoint';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCheckinStore } from '@/store/useCheckinStore';
 
 export default function CheckinsScreen() {
+  const queryClient = useQueryClient();
   const bottomSheetRef = useRef<BottomSheet>(null);
   const [status, setStatus] = useState<'success' | 'failed'>('success');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [checkinDetails, setCheckinDetails] = useState<{
     userName?: string;
     userImage?: string;
+    userEmail?: string;
     time?: string;
     message?: string;
     clientType?: string;
@@ -476,6 +480,15 @@ export default function CheckinsScreen() {
 
       const clientType = resData?.type || dataObj?.type || userObj?.type || '';
 
+      const userEmail =
+        resData?.clientEmail ||
+        resData?.email ||
+        dataObj?.clientEmail ||
+        dataObj?.email ||
+        userObj?.clientEmail ||
+        userObj?.email ||
+        '';
+
       const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       const msgStr = typeof resData?.message === 'string'
         ? resData.message
@@ -486,12 +499,17 @@ export default function CheckinsScreen() {
       setCheckinDetails({
         userName,
         userImage,
+        userEmail,
         time: timeStr,
         message: msgStr,
         clientType,
       });
 
       console.log('🎉 CHECKIN SUCCESS FOR:', userName, '| IMAGE:', userImage, '| TYPE:', clientType);
+      // Invalidate React Query check-in cache & update store immediately
+      queryClient.invalidateQueries({ queryKey: ['today-checkins'] });
+      useCheckinStore.getState().fetchTodayCheckins().catch(() => {});
+
       setStatus('success');
       setScanned(true);
       bottomSheetRef.current?.expand();
@@ -561,16 +579,11 @@ export default function CheckinsScreen() {
         </View>
 
         {/* Header */}
-        <View className="z-50 flex-row items-center justify-between py-2">
-          <TouchableOpacity
-            onPress={() => router.back()}
-            className="h-10 w-10 items-center justify-center rounded-full border border-slate-200/60 bg-white/80 backdrop-blur-md">
-            <Ionicons name="chevron-back" size={20} color="#1C1C1C" />
-          </TouchableOpacity>
+        <View className="z-50 flex-row items-center justify-center  py-2">
           <Text className="font-bold text-lg text-slate-800">Scan QR Code</Text>
-          <TouchableOpacity className="h-10 w-10 items-center justify-center rounded-full border border-slate-200/60 bg-white/80 backdrop-blur-md">
+          {/* <TouchableOpacity className="h-10 w-10 items-center justify-center rounded-full border border-slate-200/60 bg-white/80 backdrop-blur-md">
             <Ionicons name="notifications" size={20} color="#F6163C" />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
 
         {/* KeyboardAwareScrollView */}
@@ -676,28 +689,6 @@ export default function CheckinsScreen() {
                     </TouchableOpacity>
                   )}
                 </View>
-
-                {/* Torch Toggle Pill Button below scanner viewport */}
-                {permission?.granted && (
-                  <TouchableOpacity
-                    onPress={() => setTorch((prev) => !prev)}
-                    activeOpacity={0.8}
-                    className={`mt-3 flex-row items-center rounded-full px-4 py-2 border shadow-sm ${
-                      torch
-                        ? 'bg-[#F6163C] border-[#F6163C]'
-                        : 'bg-white border-slate-200'
-                    }`}>
-                    <Ionicons
-                      name={torch ? 'flash' : 'flash-outline'}
-                      size={16}
-                      color={torch ? '#FFFFFF' : '#64748B'}
-                      style={{ marginRight: 6 }}
-                    />
-                    <Text className={`font-bold text-xs ${torch ? 'text-white' : 'text-slate-700'}`}>
-                      {torch ? 'Torch ON' : 'Torch OFF'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
               </View>
 
               {/* MANUAL ID SECTION */}
@@ -740,6 +731,8 @@ export default function CheckinsScreen() {
           backgroundStyle={{ borderRadius: 28 }}
           onClose={() => {
             if (status === 'success') {
+              queryClient.invalidateQueries({ queryKey: ['today-checkins'] });
+              useCheckinStore.getState().fetchTodayCheckins().catch(() => {});
               router.replace('/(tabs)');
             } else {
               setScanned(false);
@@ -776,6 +769,12 @@ export default function CheckinsScreen() {
                   />
                 </View>
 
+                {checkinDetails?.userEmail ? (
+                  <Text className="mt-0.5 text-xs font-medium text-slate-400">
+                    {checkinDetails.userEmail}
+                  </Text>
+                ) : null}
+
                 {/* Client Type Tag */}
                 {checkinDetails?.clientType ? (
                   <View className="mt-1.5 rounded-full bg-emerald-50 px-3 py-0.5 border border-emerald-200">
@@ -798,6 +797,8 @@ export default function CheckinsScreen() {
                 <TouchableOpacity
                   onPress={() => {
                     bottomSheetRef.current?.close();
+                    queryClient.invalidateQueries({ queryKey: ['today-checkins'] });
+                    useCheckinStore.getState().fetchTodayCheckins().catch(() => {});
                     router.replace('/(tabs)');
                   }}
                   activeOpacity={0.8}

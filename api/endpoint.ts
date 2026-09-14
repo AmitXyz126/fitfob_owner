@@ -42,8 +42,11 @@ export const ENDPOINTS = {
   CHANGE_PASSWORD: `${BASE_URL}/api/change-password`,
   CLUB_OWNERS: `${BASE_URL}/api/club-owners`,
   MY_CLUB_OWNER: `${BASE_URL}/api/club-owner/me`,
-  CLIENT_CHECKIN_SCAN: `${BASE_URL}/api/client-checkin/scan`,
   MY_DOCUMENTS: `${BASE_URL}/api/my-documents`,
   VERIFICATION_STATUS: `${BASE_URL}/api/verify-approval/verification-status`,
+  
+  // Club Owner Today's Check-ins
+  CLIENT_CHECKIN_SCAN: `${BASE_URL}/api/client-checkin/scan`,
+  TODAY_CHECKINS: `${BASE_URL}/api/club-owners/today-checkins`,
 };
 
