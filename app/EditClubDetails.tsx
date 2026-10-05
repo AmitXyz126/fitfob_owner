@@ -139,13 +139,26 @@ const EditClubDetails = () => {
         user?.phone ||
         '';
 
-      const pEmail =
+      const isDummyEmail = (val?: string | null) => {
+        if (!val) return false;
+        const lower = String(val).toLowerCase().trim();
+        return (
+          lower.endsWith('@phone.user') ||
+          lower.includes('@phone.') ||
+          lower.endsWith('@dummy.user') ||
+          lower.endsWith('@temp.user')
+        );
+      };
+
+      const rawEmail =
         myOwnerData?.email ||
         pData?.email ||
         savedClubProfile?.email ||
         savedStep1?.email ||
         user?.email ||
         '';
+
+      const pEmail = isDummyEmail(rawEmail) ? '' : rawEmail;
 
       const rawLogo =
         myOwnerData?.logoUrl ||

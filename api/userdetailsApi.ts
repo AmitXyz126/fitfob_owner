@@ -172,6 +172,30 @@ export const userDetailsApi = {
     return response.data;
   },
 
+  verifyPendingOtp: async (
+    payload:
+      | {
+          otp: string;
+          [key: string]: any;
+        }
+      | string
+  ) => {
+    const otpValue = typeof payload === 'string' ? payload.trim() : String(payload?.otp || '').trim();
+    // Payload strictly { "otp": "946542" } as expected by /api/pending-club-owner/verify-otp
+    const body = { otp: otpValue };
+    console.log('📡 [verifyPendingOtp] Payload:', body);
+    const response = await api.post(ENDPOINTS.PENDING_VERIFY_OTP, body);
+    console.log('✅ [verifyPendingOtp] Response:', response.data);
+    return response.data;
+  },
+
+  resendPendingOtp: async (data?: any) => {
+    console.log('📡 [resendPendingOtp] Payload:', data);
+    const response = await api.post(ENDPOINTS.PENDING_RESEND_OTP, data || {});
+    console.log('✅ [resendPendingOtp] Response:', response.data);
+    return response.data;
+  },
+
   saveStep2: async (id: number, data: { latitude: string; longitude: string }) => {
     const payload = {
       latitude: String(data.latitude),

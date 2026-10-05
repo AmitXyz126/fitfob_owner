@@ -436,7 +436,11 @@ const ClubProfileScreen = () => {
   };
 
   const ownerName = getDisplayName();
-  const ownerEmail = user?.email || profileStatus?.email || 'owner@fitfob.com';
+  const rawOwnerEmail = myOwnerData?.email || profileStatus?.email || user?.email || '';
+  const isDummy = rawOwnerEmail && (rawOwnerEmail.includes('@phone.') || rawOwnerEmail.endsWith('@phone.user'));
+  const ownerEmail = isDummy
+    ? (myOwnerData?.phoneNumber || profileStatus?.phoneNumber || user?.phoneNumber || user?.phone || '')
+    : (rawOwnerEmail || 'owner@fitfob.com');
 
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
