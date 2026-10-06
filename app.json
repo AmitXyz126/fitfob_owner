@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "fitfob_owner",
+    "name": "FitFob Owner",
     "slug": "fitFob_owner",
     "version": "1.0.0",
     "scheme": [
@@ -87,8 +87,8 @@
     "android": {
       "softwareKeyboardLayoutMode": "pan",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#000000"
       },
       "package": "com.xyzstudio.fitfob",
       "googleServicesFile": "./google-services.json",
