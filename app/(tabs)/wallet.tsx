@@ -20,113 +20,7 @@ import { router } from 'expo-router';
 
 type TabType = 'Daily' | 'Weekly' | 'Monthly';
 
-// DUMMY TRANSACTIONS DATA (COMMENTED OUT FOR LIVE DATA / EMPTY STATE)
-/*
-const DUMMY_DATA = [
-  // Daily Transactions
-  {
-    id: '1',
-    name: 'Barbara Gordon',
-    plan: 'Premium pass',
-    price: '₹699.00',
-    date: 'Today, 9:30 pm',
-    image: 'https://randomuser.me/api/portraits/women/1.jpg',
-    type: 'Daily',
-  },
-  {
-    id: '2',
-    name: 'Sarah Connor',
-    plan: 'Premium pass',
-    price: '₹699.00',
-    date: 'Today, 8:15 pm',
-    image: 'https://randomuser.me/api/portraits/women/10.jpg',
-    type: 'Daily',
-  },
-  {
-    id: '3',
-    name: 'John Doe',
-    plan: 'Standard pass',
-    price: '₹499.00',
-    date: 'Today, 3:00 pm',
-    image: 'https://randomuser.me/api/portraits/men/11.jpg',
-    type: 'Daily',
-  },
-  // Weekly Transactions
-  {
-    id: '4',
-    name: 'James Gordon',
-    plan: 'Premium pass',
-    price: '₹1200.00',
-    date: 'This Week',
-    image: 'https://randomuser.me/api/portraits/men/2.jpg',
-    type: 'Weekly',
-  },
-  {
-    id: '5',
-    name: 'Peter Parker',
-    plan: 'Premium pass',
-    price: '₹1500.00',
-    date: '3 days ago',
-    image: 'https://randomuser.me/api/portraits/men/20.jpg',
-    type: 'Weekly',
-  },
-  {
-    id: '6',
-    name: 'Clark Kent',
-    plan: 'Premium pass',
-    price: '₹1800.00',
-    date: '5 days ago',
-    image: 'https://randomuser.me/api/portraits/men/21.jpg',
-    type: 'Weekly',
-  },
-  // Monthly Transactions
-  {
-    id: '7',
-    name: 'Bruce Wayne',
-    plan: 'Premium pass',
-    price: '₹2500.00',
-    date: '22nd Jan',
-    image: 'https://randomuser.me/api/portraits/men/3.jpg',
-    type: 'Monthly',
-  },
-  {
-    id: '8',
-    name: 'Diana Prince',
-    plan: 'Premium pass',
-    price: '₹2500.00',
-    date: '20th Jan',
-    image: 'https://randomuser.me/api/portraits/women/4.jpg',
-    type: 'Monthly',
-  },
-  {
-    id: '9',
-    name: 'Barry Allen',
-    plan: 'Premium pass',
-    price: '₹2500.00',
-    date: '15th Jan',
-    image: 'https://randomuser.me/api/portraits/men/5.jpg',
-    type: 'Monthly',
-  },
-  {
-    id: '10',
-    name: 'Hal Jordan',
-    plan: 'Premium pass',
-    price: '₹2500.00',
-    date: '12th Jan',
-    image: 'https://randomuser.me/api/portraits/men/6.jpg',
-    type: 'Monthly',
-  },
-  {
-    id: '11',
-    name: 'Arthur Curry',
-    plan: 'Premium pass',
-    price: '₹2500.00',
-    date: '10th Jan',
-    image: 'https://randomuser.me/api/portraits/men/7.jpg',
-    type: 'Monthly',
-  },
-];
-*/
+ 
 
 const DATA: any[] = [];
 
@@ -144,9 +38,9 @@ const Wallet = () => {
   const [tempSort, setTempSort] = useState<string>('None');
 
   const stats: Record<TabType, { label: string; amount: string; change: string }> = {
-    Daily: { label: 'Daily Earnings', amount: '₹8,000', change: '+5% today' },
-    Weekly: { label: 'Weekly Earnings', amount: '₹56,000', change: '+12% this week' },
-    Monthly: { label: 'Monthly Earnings', amount: '₹2,40,000', change: '+20% this month' },
+    Daily: { label: 'Daily Earnings', amount: '₹0', change: '+0% today' },
+    Weekly: { label: 'Weekly Earnings', amount: '₹0', change: '+0% this week' },
+    Monthly: { label: 'Monthly Earnings', amount: '₹0', change: '+0% this month' },
   };
 
   const filteredData = useMemo(() => {

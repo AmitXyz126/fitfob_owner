@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, Image, TouchableOpacity, Platform, Modal, StyleSheet, Pressable, ScrollView, RefreshControl } from 'react-native';
 import { Container } from '@/components/Container';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useUserDetail, useClubOwnerMe } from '@/hooks/useUserDetail';
 import { useTodayCheckins } from '@/hooks/useTodayCheckins';
 import { useAuthStore } from '@/store/useAuthStore';
+import { RefreshSoundPlayer, RefreshSoundPlayerRef } from '@/components/RefreshSoundPlayer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import Animated, {
@@ -221,6 +222,7 @@ const HomeScreen = () => {
   const [storedClubName, setStoredClubName] = useState<string>('');
   const [storedOwnerName, setStoredOwnerName] = useState<string>('');
   const [refreshing, setRefreshing] = useState(false);
+  const refreshSoundRef = useRef<RefreshSoundPlayerRef>(null);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -230,6 +232,8 @@ const HomeScreen = () => {
         refetchOwner(),
         refetchTodayCheckins(),
       ]);
+      // Play delightful refresh sound and haptics
+      refreshSoundRef.current?.playSound();
     } catch (e) {
       console.log('Error refreshing home data:', e);
     } finally {
@@ -517,7 +521,7 @@ const HomeScreen = () => {
                   <View className="flex-row items-center gap-1 rounded-full bg-[#0000001A] px-3 py-1.5 backdrop-blur-md">
                     <Ionicons name="arrow-up" size={15} color="#FFF" />
 
-                    <Text className="font-bold text-[10px]  text-[#FFF]">+20% this month</Text>
+                    <Text className="font-bold text-[10px]  text-[#FFF]">+0% this month</Text>
                   </View>
                 </View>
                 <Text className="mt-2 font-bold text-4xl text-white">
@@ -525,7 +529,7 @@ const HomeScreen = () => {
                     pData?.monthlyEarnings ||
                     pData?.totalEarnings ||
                     pData?.earnings ||
-                    22220
+                    0
                   )}
                 </Text>
               </View>
@@ -794,6 +798,9 @@ const HomeScreen = () => {
           )}
         </View>
       </Modal>
+
+      {/* Invisible sound & haptics player for refresh action */}
+      <RefreshSoundPlayer ref={refreshSoundRef} />
     </Container>
   );
 };

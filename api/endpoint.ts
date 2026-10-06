@@ -50,5 +50,9 @@ export const ENDPOINTS = {
   // Club Owner Today's Check-ins
   CLIENT_CHECKIN_SCAN: `${BASE_URL}/api/client-checkin/scan`,
   TODAY_CHECKINS: `${BASE_URL}/api/club-owners/today-checkins`,
+
+  // Holidays & Closures
+  HOLIDAYS: `${BASE_URL}/api/holidays`,
+  HOLIDAY_BY_ID: (id: string | number) => `${BASE_URL}/api/holidays/${id}`,
 };
 

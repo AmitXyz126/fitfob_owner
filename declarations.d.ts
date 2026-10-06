@@ -5,6 +5,16 @@ declare module '*.svg' {
   export default content;
 }
 
+declare module '*.mp3' {
+  const src: any;
+  export default src;
+}
+
+declare module '*.wav' {
+  const src: any;
+  export default src;
+}
+
 declare module '@react-native-community/datetimepicker' {
   import React from 'react';
   import { ViewStyle } from 'react-native';

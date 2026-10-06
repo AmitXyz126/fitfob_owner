@@ -28,6 +28,7 @@
     "axios": "^1.13.5",
     "expo": "~57.0.26",
     "expo-asset": "~57.0.16",
+    "expo-audio": "~57.0.5",
     "expo-auth-session": "~57.0.13",
     "expo-camera": "~57.0.6",
     "expo-constants": "~57.0.17",
@@ -96,6 +97,6 @@
     "protobufjs@7.6.6": true
   },
   "overrides": {
-    "lightningcss":"$lightningcss"
+    "lightningcss": "$lightningcss"
   }
 }

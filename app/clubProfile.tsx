@@ -14,6 +14,7 @@ import {
   FileText,
   Lock,
   Layers,
+  Calendar,
 } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Container } from '@/components/Container';
@@ -854,6 +855,13 @@ const ClubProfileScreen = () => {
             title="Timings"
             value={timingDisplay || undefined}
             onPress={() => router.push('/clubTimings')}
+          />
+          <LineGradient />
+
+          <MenuOption
+            icon={Calendar}
+            title="Club Holidays"
+            onPress={() => router.push('/holidays')}
           />
           <LineGradient />
 

@@ -396,7 +396,7 @@ const PayoutHistory = () => {
               <View className="flex-row items-center">
                 <View className="flex-row items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1">
                   <Sparkles size={12} color="#059669" />
-                  <Text className="ml-1 font-bold text-[11px] text-emerald-700">Processing (80%)</Text>
+                  <Text className="ml-1 font-bold text-[11px] text-emerald-700">Processing (0%)</Text>
                 </View>
                 <TouchableOpacity
                   onPress={() => router.push('/DownloadScreen')}
@@ -409,8 +409,8 @@ const PayoutHistory = () => {
 
             {/* Payout Amount */}
             <View className="my-3 flex-row items-baseline justify-between">
-              <Text className="font-extrabold text-4xl tracking-tight text-gray-900">₹2,40,000</Text>
-              <Text className="font-medium text-xs text-gray-500">Limit: ₹3,00,000</Text>
+              <Text className="font-extrabold text-4xl tracking-tight text-gray-900">₹0</Text>
+              <Text className="font-medium text-xs text-gray-500">Limit: ₹30</Text>
             </View>
 
             {/* Animated Range Bar Section */}
@@ -461,7 +461,7 @@ const PayoutHistory = () => {
             <View className="flex-row items-center justify-between">
               <View className="flex-row items-center">
                 <Text className="text-xs font-semibold text-gray-500">Completed: </Text>
-                <Text className="text-xs font-bold text-gray-900">80%</Text>
+                <Text className="text-xs font-bold text-gray-900">0%</Text>
               </View>
               <View className="flex-row items-center">
                 <Text className="text-xs font-semibold text-gray-500">Est. Release: </Text>
