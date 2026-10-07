@@ -17,7 +17,7 @@ export const RefreshSoundPlayer = forwardRef<RefreshSoundPlayerRef>((_, ref) => 
     setAudioModeAsync({
       playsInSilentMode: true,
       interruptionMode: 'mixWithOthers',
-    }).catch(() => {});
+    }).catch(() => { });
   }, []);
 
   useImperativeHandle(ref, () => ({
@@ -25,13 +25,13 @@ export const RefreshSoundPlayer = forwardRef<RefreshSoundPlayerRef>((_, ref) => 
       // 1. Crisp tactile haptic feedback
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch {}
+      } catch { }
 
       // 2. Play cheerful Swiggy-style notification tune
       try {
         if (player) {
           if (typeof player.seekTo === 'function') {
-            player.seekTo(0).catch(() => {});
+            player.seekTo(0).catch(() => { });
           }
           player.play();
         }

@@ -304,13 +304,35 @@ export const useUserDetail = () => {
 
       // Save directly to local persistent cache so it's instantly preserved
       const serverPhoto = res?.photo || res?.data || res;
+      let rawUrl =
+        serverPhoto?.fileUrl ||
+        serverPhoto?.url ||
+        serverPhoto?.images?.[0]?.url ||
+        serverPhoto?.image?.url ||
+        variables?.file?.uri ||
+        '';
+
+      if (
+        rawUrl &&
+        typeof rawUrl === 'string' &&
+        !rawUrl.startsWith('http://') &&
+        !rawUrl.startsWith('https://') &&
+        !rawUrl.startsWith('file://') &&
+        !rawUrl.startsWith('content://') &&
+        !rawUrl.startsWith('data:')
+      ) {
+        const apiBase = process.env.EXPO_PUBLIC_API_URL || 'https://backend.fitfob.com';
+        rawUrl = `${apiBase.replace(/\/+$/, '')}/${rawUrl.replace(/^\/+/, '')}`;
+      }
+
       const newPhotoItem = {
         id: serverPhoto?.id || `local_${Date.now()}`,
         documentId: String(serverPhoto?.documentId || serverPhoto?.id || Date.now()),
         imageInfo: serverPhoto?.imageInfo || variables?.imageInfo || '',
-        url: serverPhoto?.fileUrl || serverPhoto?.url || variables?.file?.uri,
-        fileUrl: serverPhoto?.fileUrl || serverPhoto?.url || variables?.file?.uri,
+        url: rawUrl,
+        fileUrl: rawUrl,
         isUploading: false,
+        raw: serverPhoto,
       };
 
       const updatePhotoStorage = (key: string) => {

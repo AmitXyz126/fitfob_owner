@@ -142,12 +142,23 @@ export const holidayApi = {
     holidayData: Partial<CreateHolidayPayload>
   ): Promise<HolidayItemData> => {
     try {
+      const normalizedClosureType =
+        holidayData.closureType === 'partial' || holidayData.closureType === 'partial_day'
+          ? 'partial_day'
+          : holidayData.closureType === 'full_day'
+          ? 'full_day'
+          : holidayData.closureType;
+
       const payload = {
         data: {
           ...holidayData,
-          endtime: holidayData.endtime || holidayData.endTime,
+          ...(normalizedClosureType ? { closureType: normalizedClosureType } : {}),
+          startTime: holidayData.startTime || '00:00:00.000',
+          endtime: holidayData.endtime || holidayData.endTime || '23:59:59.000',
+          endTime: holidayData.endTime || holidayData.endtime || '23:59:59.000',
         },
       };
+      console.log(`📤 [updateHoliday] Submitting payload to /api/holidays/${id}:`, JSON.stringify(payload));
       const response = await api.put(ENDPOINTS.HOLIDAY_BY_ID(id), payload);
       const returnedData = response.data?.data || response.data;
       return normalizeHolidayItem(returnedData);

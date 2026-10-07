@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,13 @@ import {
   Dimensions,
   StyleSheet,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+  useAnimatedStyle,
+} from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,6 +31,82 @@ import Toast from 'react-native-toast-message';
 import { useHolidays } from '@/hooks/useHolidays';
 import { HolidayItemData } from '@/api/holidayApi';
 import { CustomTimePickerModal } from '@/components/CustomTimePickerModal';
+import { useAudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
+
+const TRASH_SOUND = require('../assets/sounds/trash_delete.wav');
+
+const SkeletonBox = ({ style, className }: { style?: any; className?: string }) => {
+  const opacity = useSharedValue(0.35);
+
+  useEffect(() => {
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(0.85, { duration: 750 }),
+        withTiming(0.35, { duration: 750 })
+      ),
+      -1,
+      true
+    );
+  }, [opacity]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View
+      style={[style, animatedStyle]}
+      className={`bg-slate-200 ${className || ''}`}
+    />
+  );
+};
+
+const HolidayItemSkeleton = () => (
+  <View
+    style={{
+      shadowColor: '#0F172A',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.04,
+      shadowRadius: 8,
+      elevation: 2,
+    }}
+    className="mb-3 rounded-2xl border border-[#E2E8F0] bg-white p-3.5">
+    <View className="flex-row items-center">
+      {/* Left Date Block Skeleton */}
+      <View
+        style={{
+          borderColor: '#E2E8F0',
+          overflow: 'hidden',
+        }}
+        className="w-[58px] h-[78px] items-center rounded-2xl border bg-white mr-3">
+        <SkeletonBox className="h-5 w-full mb-1.5" />
+        <SkeletonBox className="h-6 w-7 rounded-md my-0.5" />
+        <SkeletonBox className="h-2.5 w-6 rounded mt-1" />
+      </View>
+
+      {/* Middle Info Block Skeleton */}
+      <View className="flex-1 justify-between">
+        {/* Top row: Title + Status Pill */}
+        <View className="flex-row items-center justify-between">
+          <SkeletonBox className="h-4.5 w-32 rounded-md mr-2" />
+          <SkeletonBox className="h-5 w-18 rounded-full" />
+        </View>
+
+        {/* Date Subtitle */}
+        <SkeletonBox className="h-3 w-28 rounded-md mt-1.5" />
+
+        {/* Bottom Row: Tags & Actions */}
+        <View className="flex-row items-center justify-between mt-2 pt-1.5 border-t border-slate-100">
+          <SkeletonBox className="h-6 w-28 rounded-lg" />
+          <View className="flex-row items-center gap-1.5">
+            <SkeletonBox className="h-7 w-14 rounded-xl" />
+            <SkeletonBox className="h-7 w-7 rounded-xl" />
+          </View>
+        </View>
+      </View>
+    </View>
+  </View>
+);
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -65,12 +148,61 @@ export default function HolidaysScreen() {
     refetch,
     createHoliday,
     isCreating,
+    updateHoliday,
+    isUpdating,
     deleteHoliday,
     isDeleting,
   } = useHolidays();
 
-  // Create Modal State
+  const trashPlayer = useAudioPlayer(TRASH_SOUND);
+
+  useEffect(() => {
+    setAudioModeAsync({
+      playsInSilentMode: true,
+      interruptionMode: 'mixWithOthers',
+    }).catch(() => {});
+  }, []);
+
+  // Auto-rewind player to start whenever playback finishes
+  useEffect(() => {
+    if (!trashPlayer) return;
+    const sub = (trashPlayer as any)?.addListener?.('playbackStatusUpdate', (status: any) => {
+      if (status?.didJustFinish) {
+        trashPlayer.seekTo(0).catch(() => {});
+      }
+    });
+    return () => {
+      sub?.remove?.();
+    };
+  }, [trashPlayer]);
+
+  const playTrashSound = async () => {
+    try {
+      if (trashPlayer) {
+        if (trashPlayer.playing) {
+          try {
+            trashPlayer.pause();
+          } catch {}
+        }
+        if (typeof trashPlayer.seekTo === 'function') {
+          await trashPlayer.seekTo(0).catch(() => {});
+        }
+        trashPlayer.play();
+        return;
+      }
+    } catch {}
+
+    try {
+      const tempPlayer = createAudioPlayer(TRASH_SOUND);
+      tempPlayer.play();
+    } catch (e) {
+      console.log('Error playing trash sound:', e);
+    }
+  };
+
+  // Create / Edit Modal State
   const [modalVisible, setModalVisible] = useState(false);
+  const [editingHoliday, setEditingHoliday] = useState<HolidayItemData | null>(null);
   const [title, setTitle] = useState('');
   const [titleError, setTitleError] = useState('');
   const [closureType, setClosureType] = useState<'full_day' | 'partial_day'>('full_day');
@@ -99,6 +231,7 @@ export default function HolidaysScreen() {
   const [startTimeDisplay, setStartTimeDisplay] = useState('10:00 AM');
   const [endTimeDisplay, setEndTimeDisplay] = useState('06:00 PM');
   const [timePickerTarget, setTimePickerTarget] = useState<'start' | 'end' | null>(null);
+  const [deletingHolidayId, setDeletingHolidayId] = useState<string | number | null>(null);
 
   // Tab Filter
   const [activeTab, setActiveTab] = useState<'all' | 'upcoming'>('all');
@@ -286,12 +419,10 @@ export default function HolidaysScreen() {
       };
     }
     const now = new Date();
-    const curH = now.getHours();
-    const curM = now.getMinutes();
-
-    // Round up to nearest upcoming 15-minute slot
-    let startH = curH;
-    let startM = Math.ceil(curM / 15) * 15;
+    // For today: Start time must be at least 1 hour ahead (e.g. at 10 AM, show 11 AM)
+    const advanceDate = new Date(now.getTime() + 60 * 60 * 1000);
+    let startH = advanceDate.getHours();
+    let startM = Math.ceil(advanceDate.getMinutes() / 5) * 5;
     if (startM >= 60) {
       startH += 1;
       startM = 0;
@@ -300,7 +431,7 @@ export default function HolidaysScreen() {
       startH = 23;
       startM = 45;
     }
-    let endH = Math.min(23, startH + 2);
+    let endH = Math.min(23, startH + 1); // 1 hour after start
     let endM = startM;
     if (endH <= startH) {
       endH = 23;
@@ -338,8 +469,9 @@ export default function HolidaysScreen() {
 
       // If switching to today and current startTime is in the past, auto-adjust to upcoming hours
       if (pickedDate === today) {
-        const curMin = new Date().getHours() * 60 + new Date().getMinutes();
-        if (extractTimeNumber(startTimeStr) < curMin) {
+        const now = new Date();
+        const minAllowedMin = (now.getHours() + 1) * 60 + Math.ceil(now.getMinutes() / 5) * 5;
+        if (extractTimeNumber(startTimeStr) < minAllowedMin) {
           const defaults = getDefaultTimesForDate(pickedDate);
           setStartTimeStr(defaults.startPayload);
           setStartTimeDisplay(defaults.startDisplay);
@@ -354,8 +486,9 @@ export default function HolidaysScreen() {
           setEndDate(pickedDate);
         }
         if (pickedDate === today) {
-          const curMin = new Date().getHours() * 60 + new Date().getMinutes();
-          if (extractTimeNumber(startTimeStr) < curMin) {
+          const now = new Date();
+          const minAllowedMin = (now.getHours() + 1) * 60 + Math.ceil(now.getMinutes() / 5) * 5;
+          if (extractTimeNumber(startTimeStr) < minAllowedMin) {
             const defaults = getDefaultTimesForDate(pickedDate);
             setStartTimeStr(defaults.startPayload);
             setStartTimeDisplay(defaults.startDisplay);
@@ -376,6 +509,7 @@ export default function HolidaysScreen() {
   };
 
   const handleOpenCreateModal = () => {
+    setEditingHoliday(null);
     setTitle('');
     setTitleError('');
     setClosureType('full_day');
@@ -399,27 +533,90 @@ export default function HolidaysScreen() {
     setModalVisible(true);
   };
 
+  const handleOpenEditModal = (holiday: HolidayItemData) => {
+    setEditingHoliday(holiday);
+    setTitle(holiday.title || '');
+    setTitleError('');
+
+    const isPartial = holiday.closureType === 'partial_day' || holiday.closureType === 'partial';
+    setClosureType(isPartial ? 'partial_day' : 'full_day');
+
+    const isDifferentEnd = Boolean(holiday.endDate && holiday.endDate !== holiday.startDate);
+    setIsRange(isDifferentEnd);
+
+    const sDate = holiday.startDate || getTodayStr();
+    const eDate = holiday.endDate || holiday.startDate || getTodayStr();
+    setStartDate(sDate);
+    setEndDate(eDate);
+
+    // Set calendar month/year based on holiday's start date
+    if (sDate) {
+      const parts = sDate.split('-');
+      if (parts.length === 3) {
+        setCalYear(parseInt(parts[0], 10));
+        setCalMonth(parseInt(parts[1], 10) - 1);
+      }
+    }
+    setSelectingTarget('start');
+
+    if (isPartial) {
+      const startT = holiday.startTime || '10:00:00.000';
+      const endT = holiday.endtime || holiday.endTime || '18:00:00.000';
+      setStartTimeStr(startT);
+      setEndTimeStr(endT);
+      setStartTimeDisplay(formatTimePayloadToDisplay(startT) || '10:00 AM');
+      setEndTimeDisplay(formatTimePayloadToDisplay(endT) || '06:00 PM');
+    } else {
+      const defaults = getDefaultTimesForDate(sDate);
+      setStartTimeStr(defaults.startPayload);
+      setEndTimeStr(defaults.endPayload);
+      setStartTimeDisplay(defaults.startDisplay);
+      setEndTimeDisplay(defaults.endDisplay);
+    }
+
+    setTimePickerTarget(null);
+    setModalVisible(true);
+  };
+
   const getPickerMinDate = (): Date | undefined => {
     const isToday = startDate === getTodayStr();
     const now = new Date();
 
     if (timePickerTarget === 'start') {
       if (isToday) {
-        return now;
+        // Today: Start time must be at least 1 hour in advance
+        // e.g. at 10:00 AM, min is 11:00 AM (10 AM and past hours are disabled)
+        const minStartDate = new Date(now.getTime() + 60 * 60 * 1000);
+        const minM = Math.ceil(minStartDate.getMinutes() / 5) * 5;
+        if (minM >= 60) {
+          minStartDate.setHours(minStartDate.getHours() + 1, 0, 0, 0);
+        } else {
+          minStartDate.setMinutes(minM, 0, 0);
+        }
+        return minStartDate;
       }
       return undefined;
     }
 
     if (timePickerTarget === 'end') {
-      const startD = new Date();
-      const match = startTimeStr.match(/^(\d{1,2}):(\d{2})/);
-      if (match) {
-        startD.setHours(parseInt(match[1], 10), parseInt(match[2], 10), 0, 0);
-      }
+      // Closed Until time MUST be strictly greater than Closed From time
+      const startMin = extractTimeNumber(startTimeStr);
+      const minEndMinutes = Math.min(23 * 60 + 55, startMin + 5);
+      const minEndDate = new Date();
+      minEndDate.setHours(Math.floor(minEndMinutes / 60), minEndMinutes % 60, 0, 0);
+
       if (isToday) {
-        return startD > now ? startD : now;
+        // Also ensure it is after 1 hour from now
+        const nowPlus1H = new Date(now.getTime() + 60 * 60 * 1000);
+        const minM = Math.ceil(nowPlus1H.getMinutes() / 5) * 5;
+        if (minM >= 60) {
+          nowPlus1H.setHours(nowPlus1H.getHours() + 1, 0, 0, 0);
+        } else {
+          nowPlus1H.setMinutes(minM, 0, 0);
+        }
+        return minEndDate > nowPlus1H ? minEndDate : nowPlus1H;
       }
-      return startD;
+      return minEndDate;
     }
 
     return undefined;
@@ -427,7 +624,6 @@ export default function HolidaysScreen() {
 
   const getTimePickerInitialDate = () => {
     const targetStr = timePickerTarget === 'start' ? startTimeStr : endTimeStr;
-    const isToday = startDate === getTodayStr();
     const d = new Date();
 
     if (targetStr) {
@@ -437,22 +633,9 @@ export default function HolidaysScreen() {
       }
     }
 
-    if (isToday) {
-      const now = new Date();
-      if (timePickerTarget === 'start' && d < now) {
-        return now;
-      }
-      if (timePickerTarget === 'end') {
-        const startD = new Date();
-        const startMatch = startTimeStr.match(/^(\d{1,2}):(\d{2})/);
-        if (startMatch) {
-          startD.setHours(parseInt(startMatch[1], 10), parseInt(startMatch[2], 10), 0, 0);
-        }
-        const minEnd = startD > now ? startD : now;
-        if (d < minEnd) {
-          return minEnd;
-        }
-      }
+    const minD = getPickerMinDate();
+    if (minD && d < minD) {
+      return minD;
     }
     return d;
   };
@@ -461,20 +644,24 @@ export default function HolidaysScreen() {
     const hours = selectedDate.getHours();
     const minutes = selectedDate.getMinutes();
     const isToday = startDate === getTodayStr();
-    const now = new Date();
-    const currentMin = now.getHours() * 60 + now.getMinutes();
     const selectedMin = hours * 60 + minutes;
 
     if (timePickerTarget === 'start') {
-      // Prevent selecting past time for today
-      if (isToday && selectedMin < currentMin) {
-        Toast.show({
-          type: 'error',
-          text1: 'Past Time Not Allowed',
-          text2: 'Closed From time cannot be in the past for today.',
-          position: 'top',
-        });
-        return;
+      // Prevent selecting past time or less than 1 hour ahead for today
+      if (isToday) {
+        const minDate = getPickerMinDate();
+        if (minDate) {
+          const minAllowed = minDate.getHours() * 60 + minDate.getMinutes();
+          if (selectedMin < minAllowed) {
+            Toast.show({
+              type: 'error',
+              text1: 'Past Time Not Allowed',
+              text2: 'Closed From time must be at least 1 hour ahead for today.',
+              position: 'top',
+            });
+            return;
+          }
+        }
       }
 
       const strH = String(hours).padStart(2, '0');
@@ -511,14 +698,20 @@ export default function HolidaysScreen() {
         });
         return;
       }
-      if (isToday && selectedMin < currentMin) {
-        Toast.show({
-          type: 'error',
-          text1: 'Past Time Not Allowed',
-          text2: 'Closed Until time cannot be in the past for today.',
-          position: 'top',
-        });
-        return;
+      if (isToday) {
+        const minDate = getPickerMinDate();
+        if (minDate) {
+          const minAllowed = minDate.getHours() * 60 + minDate.getMinutes();
+          if (selectedMin < minAllowed) {
+            Toast.show({
+              type: 'error',
+              text1: 'Past Time Not Allowed',
+              text2: 'Closed Until time cannot be in the past for today.',
+              position: 'top',
+            });
+            return;
+          }
+        }
       }
 
       const strH = String(hours).padStart(2, '0');
@@ -569,17 +762,17 @@ export default function HolidaysScreen() {
       return;
     }
 
-    // Validation: prevent saving a past time for today
+    // Validation: prevent saving a past time for today (must be at least 1 hour ahead)
     const isTodayHoliday = startDate === getTodayStr();
     if (isCurrentPartial && isTodayHoliday) {
       const now = new Date();
-      const nowMin = now.getHours() * 60 + now.getMinutes();
+      const minAllowed = (now.getHours() + 1) * 60 + Math.ceil(now.getMinutes() / 5) * 5;
       const startMin = extractTimeNumber(startTimeStr);
-      if (startMin < nowMin) {
+      if (startMin < minAllowed) {
         Toast.show({
           type: 'error',
-          text1: 'Start Time in Past',
-          text2: 'Closed From time cannot be in the past for today.',
+          text1: 'Start Time Too Soon',
+          text2: 'Closed From time must be at least 1 hour ahead for today.',
           position: 'top',
         });
         return;
@@ -588,6 +781,15 @@ export default function HolidaysScreen() {
 
     // Check for duplicate or conflicting holidays on the same date/time
     for (const existing of holidays) {
+      // Skip checking against the holiday currently being edited
+      if (
+        editingHoliday &&
+        ((editingHoliday.documentId && existing.documentId === editingHoliday.documentId) ||
+          existing.id === editingHoliday.id)
+      ) {
+        continue;
+      }
+
       const exStart = existing.startDate || '';
       const exEnd = existing.endDate || existing.startDate || '';
       if (!exStart) continue;
@@ -660,20 +862,36 @@ export default function HolidaysScreen() {
         payload.endTime = endTimeStr;
       }
 
-      await createHoliday(payload);
+      if (editingHoliday) {
+        await updateHoliday({
+          id: editingHoliday.id,
+          documentId: editingHoliday.documentId,
+          payload,
+        });
 
-      setModalVisible(false);
-      Toast.show({
-        type: 'success',
-        text1: 'Holiday Created! 🎉',
-        text2: `${title.trim()} added to club schedule.`,
-      });
+        setModalVisible(false);
+        setEditingHoliday(null);
+        Toast.show({
+          type: 'success',
+          text1: 'Holiday Updated! 🎉',
+          text2: `${title.trim()} updated successfully.`,
+        });
+      } else {
+        await createHoliday(payload);
+
+        setModalVisible(false);
+        Toast.show({
+          type: 'success',
+          text1: 'Holiday Created! 🎉',
+          text2: `${title.trim()} added to club schedule.`,
+        });
+      }
 
       refetch();
     } catch (err: any) {
       Toast.show({
         type: 'error',
-        text1: 'Failed to Save Holiday',
+        text1: editingHoliday ? 'Failed to Update Holiday' : 'Failed to Save Holiday',
         text2: err?.response?.data?.message || err?.message || 'Something went wrong.',
         position: 'top',
       });
@@ -689,21 +907,32 @@ export default function HolidaysScreen() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteHoliday(holiday);
-              Toast.show({
-                type: 'success',
-                text1: 'Holiday Deleted',
-                text2: `"${holiday.title}" has been removed.`,
-              });
-            } catch (err: any) {
-              Toast.show({
-                type: 'error',
-                text1: 'Delete Failed',
-                text2: err?.message || 'Unable to delete holiday.',
-              });
-            }
+          onPress: () => {
+            const hId = holiday.documentId || holiday.id;
+            setDeletingHolidayId(hId);
+            playTrashSound();
+
+            setTimeout(async () => {
+              try {
+                await deleteHoliday(holiday);
+                Toast.show({
+                  type: 'success',
+                  text1: 'Holiday Deleted',
+                  text2: `"${holiday.title}" has been removed.`,
+                  position: 'top',
+                  visibilityTime: 2000,
+                });
+              } catch (err: any) {
+                Toast.show({
+                  type: 'error',
+                  text1: 'Delete Failed',
+                  text2: err?.message || 'Unable to delete holiday.',
+                  position: 'top',
+                });
+              } finally {
+                setDeletingHolidayId(null);
+              }
+            }, 260);
           },
         },
       ]
@@ -720,44 +949,76 @@ export default function HolidaysScreen() {
     const isToday = status.label === 'Today';
     const startOffTime = formatTimePayloadToDisplay(item.startTime) || '10:00 AM';
     const endOffTime = formatTimePayloadToDisplay(item.endtime || item.endTime) || '06:00 PM';
+    const itemId = item.documentId || item.id;
+    const isThisDeleting = deletingHolidayId !== null && deletingHolidayId === itemId;
 
     return (
       <View
+        pointerEvents={isThisDeleting ? 'none' : 'auto'}
         style={{
           shadowColor: '#0F172A',
           shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.05,
+          shadowOpacity: isThisDeleting ? 0.02 : 0.04,
           shadowRadius: 8,
-          elevation: 2,
+          elevation: isThisDeleting ? 1 : 2,
+          position: 'relative',
         }}
-        className="mb-3 rounded-2xl border border-[#E2E8F0] bg-white p-3.5">
+        className={`mb-3 rounded-2xl border ${isThisDeleting ? 'border-red-200' : 'border-[#E2E8F0]'} bg-white p-3.5 overflow-hidden`}>
+        {/* Normal clean subtle layer covering card from start to end */}
+        {isThisDeleting && (
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                backgroundColor: 'rgba(255, 255, 255, 0.76)',
+                zIndex: 99,
+                elevation: 99,
+                borderRadius: 16,
+              },
+            ]}
+          />
+        )}
+
         <View className="flex-row items-center">
-          {/* Left Date Block */}
+          {/* Left Calendar Ticket Badge */}
           <View
             style={{
-              backgroundColor: isToday ? '#ECFDF5' : isUpcoming ? '#FFF1F2' : '#F8FAFC',
+              backgroundColor: '#FFFFFF',
               borderColor: isToday ? '#A7F3D0' : isUpcoming ? '#FECDD3' : '#E2E8F0',
+              overflow: 'hidden',
             }}
-            className="w-14 items-center justify-center rounded-xl border py-2 mr-3">
+            className="w-[58px] items-center rounded-2xl border shadow-sm mr-3">
+            {/* Month Header Banner */}
+            <View
+              style={{
+                backgroundColor: isToday ? '#D1FAE5' : isUpcoming ? '#FFF1F2' : '#F1F5F9',
+                borderBottomColor: isToday ? '#A7F3D0' : isUpcoming ? '#FECDD3' : '#E2E8F0',
+              }}
+              className="w-full py-1 items-center border-b">
+              <Text
+                style={{
+                  color: isToday ? '#059669' : isUpcoming ? '#E11D48' : '#64748B',
+                  fontWeight: '800',
+                }}
+                className="text-[10px] tracking-wider uppercase">
+                {startBadge.month}
+              </Text>
+            </View>
+
+            {/* Big Day Number */}
             <Text
               style={{
-                color: isToday ? '#059669' : isUpcoming ? '#F6163C' : '#64748B',
+                color: isToday ? '#065F46' : isUpcoming ? '#991B1B' : '#0F172A',
                 fontWeight: '800',
               }}
-              className="font-bold text-[11px] tracking-wider uppercase">
-              {startBadge.month}
-            </Text>
-            <Text
-              style={{
-                color: isToday ? '#065F46' : isUpcoming ? '#991B1B' : '#1E293B',
-                fontWeight: '800',
-              }}
-              className="font-bold text-[20px] leading-tight my-0.5">
+              className="text-[21px] leading-tight mt-1 mb-0.5">
               {startBadge.day}
             </Text>
+
+            {/* Weekday Subtitle */}
             <Text
               style={{ fontWeight: '700' }}
-              className="font-semibold text-[11px] text-slate-500">
+              className="text-[10.5px] text-slate-400 pb-1.5">
               {startBadge.weekday}
             </Text>
           </View>
@@ -765,11 +1026,11 @@ export default function HolidaysScreen() {
           {/* Middle Info Block */}
           <View className="flex-1 justify-between">
             {/* Top row: Title + Status Pill */}
-            <View className="flex-row items-start justify-between">
+            <View className="flex-row items-center justify-between">
               <Text
                 numberOfLines={1}
-                style={{ fontWeight: '700' }}
-                className="font-bold text-[15px] text-slate-900 leading-tight flex-1 mr-2">
+                style={{ fontWeight: '800' }}
+                className="font-bold text-[15.5px] text-[#0F172A] leading-tight flex-1 mr-2">
                 {item.title}
               </Text>
 
@@ -782,80 +1043,108 @@ export default function HolidaysScreen() {
                 className="flex-row items-center px-2 py-0.5 rounded-full border">
                 <View
                   style={{ backgroundColor: status.color }}
-                  className="h-1.5 w-1.5 rounded-full mr-1"
+                  className="h-1.5 w-1.5 rounded-full mr-1.5"
                 />
                 <Text
                   style={{ color: status.color, fontWeight: '700' }}
-                  className="font-bold text-[11px]">
+                  className="font-bold text-[10.5px]">
                   {status.label}
                 </Text>
               </View>
             </View>
 
-            {/* Date Subtitle */}
-            <Text
-              style={{ fontWeight: '600' }}
-              className="font-semibold text-[12px] text-slate-500 mt-0.5">
-              {isSingleDay
-                ? `${formatShortDate(item.startDate)} (${startBadge.weekday})`
-                : `${formatShortDate(item.startDate)} → ${formatShortDate(item.endDate)}`}
-            </Text>
+            {/* Date Subtitle with Calendar Icon */}
+            <View className="flex-row items-center mt-1">
+              <Ionicons name="calendar-outline" size={11} color="#94A3B8" />
+              <Text
+                style={{ fontWeight: '600' }}
+                className="font-semibold text-[11.5px] text-slate-500 ml-1">
+                {isSingleDay
+                  ? `${formatShortDate(item.startDate)} (${startBadge.weekday})`
+                  : `${formatShortDate(item.startDate)} → ${formatShortDate(item.endDate)}`}
+              </Text>
+            </View>
 
-            {/* Clear Off Hours Timing if Partial Closure */}
-            {!isFullDay && (
-              <View className="flex-row items-center mt-1.5 bg-[#FFF7ED] border border-[#FED7AA] px-2 py-0.5 rounded-lg self-start">
-                <Ionicons name="time" size={12} color="#EA580C" />
-                <Text
-                  style={{ fontWeight: '700' }}
-                  className="font-bold text-[11px] text-[#C2410C] ml-1">
-                  Off: {startOffTime} - {endOffTime}
-                </Text>
-              </View>
-            )}
-
-            {/* Bottom Row: Tags & Delete Action */}
-            <View className="flex-row items-center justify-between mt-2 pt-1 border-t border-slate-100">
+            {/* Bottom Row: Tags & Actions */}
+            <View className="flex-row items-center justify-between mt-2 pt-1.5 border-t border-slate-100">
+              {/* Timing or Closure Type Pill */}
               <View className="flex-row items-center flex-wrap gap-1.5 flex-1 pr-2">
-                {/* Closure Type Pill */}
-                <View
-                  style={{
-                    backgroundColor: isFullDay ? '#FEF2F2' : '#FFF7ED',
-                    borderColor: isFullDay ? '#FEE2E2' : '#FFEDD5',
-                  }}
-                  className="flex-row items-center px-2 py-0.5 rounded-md border">
-                  <Ionicons
-                    name={isFullDay ? 'lock-closed' : 'time'}
-                    size={10}
-                    color={isFullDay ? '#DC2626' : '#EA580C'}
-                  />
-                  <Text
-                    style={{ color: isFullDay ? '#DC2626' : '#EA580C', fontWeight: '700' }}
-                    className="font-bold text-[11px] ml-1">
-                    {isFullDay ? 'Full Day Closed' : 'Partial Closure'}
-                  </Text>
-                </View>
+                {isFullDay ? (
+                  <View className="flex-row items-center bg-[#FEF2F2] border border-[#FEE2E2] px-2 py-1 rounded-lg">
+                    <Ionicons name="lock-closed" size={11} color="#DC2626" />
+                    <Text
+                      style={{ color: '#DC2626', fontWeight: '700' }}
+                      className="font-bold text-[10.5px] ml-1">
+                      Full Day Closed
+                    </Text>
+                  </View>
+                ) : (
+                  <View className="flex-row items-center bg-[#FFF7ED] border border-[#FED7AA] px-2 py-1 rounded-lg">
+                    <Ionicons name="time" size={12} color="#EA580C" />
+                    <Text
+                      style={{ color: '#C2410C', fontWeight: '700' }}
+                      className="font-bold text-[10.5px] ml-1">
+                      Off: {startOffTime} – {endOffTime}
+                    </Text>
+                  </View>
+                )}
 
                 {/* Multi-Day Badge */}
                 {!isSingleDay && (
-                  <View className="flex-row items-center bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md">
+                  <View className="flex-row items-center bg-slate-100 border border-slate-200 px-1.5 py-1 rounded-lg">
                     <Ionicons name="calendar-outline" size={10} color="#64748B" />
                     <Text
                       style={{ fontWeight: '700' }}
-                      className="font-bold text-[11px] text-slate-700 ml-1">
+                      className="font-bold text-[10px] text-slate-700 ml-1">
                       Multi-Day
                     </Text>
                   </View>
                 )}
               </View>
 
-              {/* Delete Button */}
-              <TouchableOpacity
-                onPress={() => handleDelete(item)}
-                disabled={isDeleting}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                className="h-7 w-7 items-center justify-center rounded-lg bg-red-50 border border-red-100 active:bg-red-100">
-                <Ionicons name="trash-outline" size={13} color="#EF4444" />
-              </TouchableOpacity>
+              {/* Action Buttons: Edit & Delete */}
+              <View className="flex-row items-center gap-1.5">
+                {/* Modern Edit Pill Button with Icon */}
+                <TouchableOpacity
+                  onPress={() => handleOpenEditModal(item)}
+                  disabled={isDeleting || isThisDeleting}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  style={{
+                    shadowColor: '#2563EB',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 2,
+                    elevation: 1,
+                    opacity: isDeleting || isThisDeleting ? 0.5 : 1,
+                  }}
+                  className="flex-row items-center bg-[#EFF6FF] border border-[#BFDBFE] px-2.5 py-1.5 rounded-xl active:bg-blue-100">
+                  <Ionicons name="pencil" size={11} color="#2563EB" />
+                  <Text
+                    style={{ fontWeight: '700' }}
+                    className="font-bold text-[11px] text-[#2563EB] ml-1">
+                    Edit
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Modern Delete Button */}
+                <TouchableOpacity
+                  onPress={() => handleDelete(item)}
+                  disabled={isDeleting || isThisDeleting}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  style={{
+                    shadowColor: '#EF4444',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 2,
+                    elevation: 1,
+                    opacity: isDeleting || isThisDeleting ? 0.4 : 1,
+                  }}
+                  className="h-8 w-8 items-center justify-center rounded-xl bg-[#FFF1F2] border border-[#FECDD3] active:bg-red-100">
+                  <Ionicons name="trash-outline" size={13} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
@@ -956,14 +1245,13 @@ export default function HolidaysScreen() {
 
       {/* Main List */}
       {isLoading ? (
-        <View className="flex-1 items-center justify-center py-20">
-          <ActivityIndicator size="large" color="#F6163C" />
-          <Text
-            style={{ fontWeight: '600' }}
-            className="font-semibold text-sm text-slate-400 mt-3">
-            Loading club holidays...
-          </Text>
-        </View>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 40 }}>
+          {[1, 2, 3, 4, 5].map((key) => (
+            <HolidayItemSkeleton key={key} />
+          ))}
+        </ScrollView>
       ) : (
         <FlatList
           data={filteredHolidays}
@@ -1032,6 +1320,7 @@ export default function HolidaysScreen() {
         onRequestClose={() => {
           Keyboard.dismiss();
           setModalVisible(false);
+          setEditingHoliday(null);
         }}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -1049,6 +1338,7 @@ export default function HolidaysScreen() {
               onPress={() => {
                 Keyboard.dismiss();
                 setModalVisible(false);
+                setEditingHoliday(null);
               }}
               style={StyleSheet.absoluteFill}
             />
@@ -1086,16 +1376,21 @@ export default function HolidaysScreen() {
               <View className="flex-row items-center justify-between mb-3">
                 <View className="flex-row items-center">
                   <View className="h-9 w-9 items-center justify-center rounded-xl bg-[#FFF0F2] mr-2.5">
-                    <Ionicons name="calendar" size={18} color="#F6163C" />
+                    <Ionicons
+                      name={editingHoliday ? 'create' : 'calendar'}
+                      size={18}
+                      color="#F6163C"
+                    />
                   </View>
                   <Text className="font-bold text-[15px] text-[#0F172A]">
-                    Add Club Holiday
+                    {editingHoliday ? 'Edit Club Holiday' : 'Add Club Holiday'}
                   </Text>
                 </View>
                 <TouchableOpacity
                   onPress={() => {
                     Keyboard.dismiss();
                     setModalVisible(false);
+                    setEditingHoliday(null);
                   }}
                   className="h-8 w-8 items-center justify-center rounded-full bg-slate-100">
                   <Ionicons name="close" size={18} color="#64748B" />
@@ -1193,8 +1488,9 @@ export default function HolidaysScreen() {
                         Keyboard.dismiss();
                         setClosureType('partial_day');
                         if (startDate === getTodayStr()) {
-                          const curMin = new Date().getHours() * 60 + new Date().getMinutes();
-                          if (extractTimeNumber(startTimeStr) < curMin) {
+                          const now = new Date();
+                          const minAllowedMin = (now.getHours() + 1) * 60 + Math.ceil(now.getMinutes() / 5) * 5;
+                          if (extractTimeNumber(startTimeStr) < minAllowedMin) {
                             const defaults = getDefaultTimesForDate(startDate);
                             setStartTimeStr(defaults.startPayload);
                             setStartTimeDisplay(defaults.startDisplay);
@@ -1474,7 +1770,7 @@ export default function HolidaysScreen() {
                           </Text>
                         </View>
                         <Text className="text-[9.5px] font-medium text-slate-400 mt-0.5">
-                          Tap to set start time
+                          {startDate === getTodayStr() ? 'Min 1 hr ahead for today' : 'Tap to set start time'}
                         </Text>
                       </TouchableOpacity>
 
@@ -1501,7 +1797,7 @@ export default function HolidaysScreen() {
                           </Text>
                         </View>
                         <Text className="text-[9.5px] font-medium text-slate-400 mt-0.5">
-                          Tap to set end time
+                          Must be after start time
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -1511,16 +1807,20 @@ export default function HolidaysScreen() {
                 {/* 5. Submit Button */}
                 <TouchableOpacity
                   onPress={handleSaveHoliday}
-                  disabled={isCreating}
+                  disabled={isCreating || isUpdating}
                   activeOpacity={0.85}
                   className="mt-1.5 flex-row items-center justify-center rounded-2xl bg-[#F6163C] py-3 shadow-md">
-                  {isCreating ? (
+                  {isCreating || isUpdating ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
                     <>
-                      <Ionicons name="checkmark-circle" size={17} color="#FFFFFF" />
+                      <Ionicons
+                        name={editingHoliday ? 'checkmark-circle' : 'add-circle'}
+                        size={17}
+                        color="#FFFFFF"
+                      />
                       <Text className="font-bold text-[13.5px] text-white ml-2">
-                        Save Holiday
+                        {editingHoliday ? 'Update Holiday' : 'Save Holiday'}
                       </Text>
                     </>
                   )}

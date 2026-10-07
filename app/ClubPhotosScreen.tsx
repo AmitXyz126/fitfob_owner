@@ -22,8 +22,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUserDetail } from '@/hooks/useUserDetail';
 import { useAuthStore } from '@/store/useAuthStore';
 
-const MAX_PHOTOS = 10;
-const INITIAL_SLOTS_COUNT = 3;
+const MAX_PHOTOS = 20;
+const INITIAL_SLOTS_COUNT = 5;
 
 const SUGGESTED_TAGS = [
   'Cardio Zone',
@@ -44,13 +44,19 @@ const ClubPhotosScreen = () => {
   const ONBOARDING_KEY = `@onboarding_photos_cache_${userKey}`;
 
   const {
-    // New /api/club-photos hooks for ClubPhotosScreen
+    // Approved Owner club-photos hooks
     myClubPhotos,
     isMyClubPhotosLoading,
     refetchMyClubPhotos,
     uploadMyClubPhoto,
     deleteMyClubPhoto,
-    // Legacy pending hooks (kept for reference — not used here)
+    // Onboarding / Pending club-photos hooks (from OnBoarding5)
+    clubPhotos,
+    isClubPhotosLoading: isPendingPhotosLoading,
+    refetchClubPhotos,
+    uploadSingleClubPhoto,
+    deleteClubPhoto,
+    // Legacy pending hooks
     profileStatus,
   } = useUserDetail();
 
@@ -71,23 +77,34 @@ const ClubPhotosScreen = () => {
   // Normalize image URL robustly across all Strapi/Express/Cloudinary payload formats
   const normalizeUrl = (item: any): string => {
     if (!item) return '';
-    if (typeof item === 'string') {
-      let clean = item.trim().replace(/\\/g, '/');
+
+    const formatStringUrl = (str: string): string => {
+      let clean = str.trim().replace(/\\/g, '/');
+      if (!clean) return '';
+
+      // Fix http -> https for backend domain to avoid cleartext HTTP block on Android
+      if (clean.startsWith('http://backend.fitfob.com')) {
+        clean = clean.replace('http://backend.fitfob.com', 'https://backend.fitfob.com');
+      }
+
       if (
-        clean &&
         !clean.startsWith('http://') &&
         !clean.startsWith('https://') &&
         !clean.startsWith('file://') &&
         !clean.startsWith('content://') &&
         !clean.startsWith('data:')
       ) {
-        const apiBase = process.env.EXPO_PUBLIC_API_URL || '';
+        const apiBase = process.env.EXPO_PUBLIC_API_URL || 'https://backend.fitfob.com';
         return `${apiBase.replace(/\/+$/, '')}/${clean.replace(/^\/+/, '')}`;
       }
       return clean;
+    };
+
+    if (typeof item === 'string') {
+      return formatStringUrl(item);
     }
 
-    let rawUrl =
+    const rawUrl =
       item?.url ||
       item?.fileUrl ||
       item?.uri ||
@@ -97,40 +114,36 @@ const ClubPhotosScreen = () => {
       item?.imageUrl ||
       item?.image_url ||
       item?.file_url ||
+      item?.raw?.url ||
+      item?.raw?.fileUrl ||
       item?.image?.url ||
       item?.image?.fileUrl ||
+      (Array.isArray(item?.image) ? item.image[0]?.url || item.image[0]?.fileUrl : '') ||
       item?.photo?.url ||
       item?.photo?.fileUrl ||
+      (Array.isArray(item?.photo) ? item.photo[0]?.url || item.photo[0]?.fileUrl : '') ||
       item?.file?.url ||
       item?.file?.fileUrl ||
       item?.images?.[0]?.url ||
       item?.images?.[0]?.fileUrl ||
       item?.attributes?.url ||
+      item?.attributes?.fileUrl ||
       item?.attributes?.image?.data?.attributes?.url ||
+      item?.attributes?.image?.data?.[0]?.attributes?.url ||
       item?.image?.data?.attributes?.url ||
+      item?.image?.data?.[0]?.attributes?.url ||
       item?.formats?.medium?.url ||
       item?.formats?.small?.url ||
       item?.formats?.thumbnail?.url ||
       item?.image?.formats?.medium?.url ||
+      item?.image?.formats?.small?.url ||
+      item?.image?.formats?.thumbnail?.url ||
       (typeof item?.image === 'string' ? item.image : '') ||
       (typeof item?.photo === 'string' ? item.photo : '') ||
       '';
 
     if (!rawUrl || typeof rawUrl !== 'string') return '';
-    let clean = rawUrl.trim().replace(/\\/g, '/');
-
-    if (
-      clean &&
-      !clean.startsWith('http://') &&
-      !clean.startsWith('https://') &&
-      !clean.startsWith('file://') &&
-      !clean.startsWith('content://') &&
-      !clean.startsWith('data:')
-    ) {
-      const apiBase = process.env.EXPO_PUBLIC_API_URL || '';
-      return `${apiBase.replace(/\/+$/, '')}/${clean.replace(/^\/+/, '')}`;
-    }
-    return clean;
+    return formatStringUrl(rawUrl);
   };
 
   // 1. Instant Cache Initialization from AsyncStorage on mount
@@ -141,8 +154,26 @@ const ClubPhotosScreen = () => {
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setLocalPhotos((prev) => (prev.length === 0 ? parsed : prev));
-            if (parsed.length > INITIAL_SLOTS_COUNT) {
+            const normalizedCached = parsed.map((item: any, idx: number) => {
+              const cleanUrl = normalizeUrl(item?.url || item?.fileUrl || item?.raw || item);
+              const caption =
+                item?.imageInfo ||
+                item?.description ||
+                item?.caption ||
+                item?.title ||
+                item?.name ||
+                '';
+              return {
+                ...item,
+                id: item?.id || idx,
+                documentId: String(item?.documentId || item?.id || idx),
+                imageInfo: caption,
+                url: cleanUrl || item?.url || item?.fileUrl || '',
+                fileUrl: cleanUrl || item?.fileUrl || item?.url || '',
+              };
+            });
+            setLocalPhotos((prev) => (prev.length === 0 ? normalizedCached : prev));
+            if (normalizedCached.length > INITIAL_SLOTS_COUNT) {
               setShowMore(true);
             }
           }
@@ -152,12 +183,24 @@ const ClubPhotosScreen = () => {
 
     loadCache();
     refetchMyClubPhotos();
+    refetchClubPhotos();
   }, [userKey]);
 
-  // 2. Sync server photos whenever myClubPhotos query changes
+  // 2. Sync server photos whenever myClubPhotos or clubPhotos (onboarding) query changes
   useEffect(() => {
-    // myClubPhotos is already the normalized array from the hook (response.data[])
-    const raw: any[] = Array.isArray(myClubPhotos) ? myClubPhotos : [];
+    const rawMy: any[] = Array.isArray(myClubPhotos) ? myClubPhotos : [];
+    const rawPending: any[] = Array.isArray(clubPhotos?.photos)
+      ? clubPhotos.photos
+      : Array.isArray(clubPhotos?.data?.photos)
+      ? clubPhotos.data.photos
+      : Array.isArray(clubPhotos?.data)
+      ? clubPhotos.data
+      : Array.isArray(clubPhotos)
+      ? clubPhotos
+      : [];
+
+    // Use approved club photos if present; fallback to onboarding/pending photos
+    const raw: any[] = rawMy.length > 0 ? rawMy : rawPending;
 
     if (raw.length > 0) {
       const serverList = raw
@@ -211,7 +254,7 @@ const ClubPhotosScreen = () => {
         }
       }
     }
-  }, [myClubPhotos, userKey]);
+  }, [myClubPhotos, clubPhotos, userKey]);
 
   // Pick Image from Gallery
   const pickFromGallery = async () => {
@@ -330,10 +373,19 @@ const ClubPhotosScreen = () => {
 
     // 2. RUN NETWORK UPLOAD IN BACKGROUND
     try {
-      const res = await uploadMyClubPhoto.mutateAsync({
-        file: photoToUpload,
-        imageInfo: trimmedCaption,
-      });
+      let res: any = null;
+      try {
+        res = await uploadMyClubPhoto.mutateAsync({
+          file: photoToUpload,
+          imageInfo: trimmedCaption,
+        });
+      } catch (uploadErr) {
+        // Fallback to pending/onboarding upload endpoint if not yet approved
+        res = await uploadSingleClubPhoto.mutateAsync({
+          file: photoToUpload,
+          imageInfo: trimmedCaption,
+        });
+      }
 
       // Response: { message, data: { id, documentId, imageInfo, fileUrl } }
       const serverPhoto = res?.data || res?.photo || res;
@@ -361,6 +413,7 @@ const ClubPhotosScreen = () => {
       });
 
       refetchMyClubPhotos();
+      refetchClubPhotos();
     } catch (e: any) {
       // If upload failed, remove temporary item and notify user
       setLocalPhotos((prev) => {
@@ -392,8 +445,13 @@ const ClubPhotosScreen = () => {
 
             try {
               if (!targetDocId.startsWith('temp_')) {
-                // Delete by documentId via DELETE /api/club-photos/:documentId
-                await deleteMyClubPhoto.mutateAsync(targetDocId);
+                try {
+                  // Delete by documentId via DELETE /api/club-photos/:documentId
+                  await deleteMyClubPhoto.mutateAsync(targetDocId);
+                } catch (delErr) {
+                  // Fallback to onboarding / pending endpoint
+                  await deleteClubPhoto.mutateAsync(targetDocId);
+                }
               }
               // Remove from local state after server deletion completes
               setLocalPhotos((prev) => {
@@ -405,6 +463,7 @@ const ClubPhotosScreen = () => {
                 return updated;
               });
               refetchMyClubPhotos();
+              refetchClubPhotos();
             } catch (e: any) {
               Alert.alert(
                 'Delete Failed',
@@ -419,8 +478,8 @@ const ClubPhotosScreen = () => {
     );
   };
 
-  const isUploading = uploadMyClubPhoto.isPending;
-  const isClubPhotosLoading = isMyClubPhotosLoading;
+  const isUploading = uploadMyClubPhoto.isPending || uploadSingleClubPhoto.isPending;
+  const isClubPhotosLoading = isMyClubPhotosLoading || isPendingPhotosLoading;
 
   // Compute visible slots: 3 initially, expands to 10 on showMore
   const visibleSlotsCount = showMore ? MAX_PHOTOS : INITIAL_SLOTS_COUNT;
@@ -476,6 +535,8 @@ const ClubPhotosScreen = () => {
 
             if (photo) {
               // Filled Photo Card (Exact UI as OnBoarding5)
+              const imageUri = normalizeUrl(photo.url || photo.fileUrl || photo.raw || photo);
+
               return (
                 <View
                   key={photo.documentId || index}
@@ -485,9 +546,10 @@ const ClubPhotosScreen = () => {
                   <View
                     className={`${isHero ? 'h-52' : 'h-36'
                       } w-full overflow-hidden bg-slate-100 relative`}>
-                    {photo.url ? (
+                    {imageUri ? (
                       <Image
-                        source={{ uri: photo.url }}
+                        source={{ uri: imageUri }}
+                        style={{ width: '100%', height: '100%' }}
                         className="h-full w-full"
                         resizeMode="cover"
                       />
@@ -628,12 +690,12 @@ const ClubPhotosScreen = () => {
                         paddingVertical: 2,
                       }}>
                       <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.5 }}>
-                        +7 SLOTS
+                        +{MAX_PHOTOS - INITIAL_SLOTS_COUNT} SLOTS
                       </Text>
                     </View>
                   </View>
                   <Text style={{ fontSize: 11, color: '#64748B', marginTop: 3 }}>
-                    Expand to upload up to 10 facility photos
+                    Expand to upload up to {MAX_PHOTOS} facility photos
                   </Text>
                 </View>
               </View>
@@ -671,7 +733,7 @@ const ClubPhotosScreen = () => {
             }}>
             <Ionicons name="chevron-up-circle-outline" size={18} color="#64748B" />
             <Text style={{ marginLeft: 8, fontSize: 12, fontWeight: '700', color: '#475569' }}>
-              Collapse Extra Slots (Show First 3)
+              Collapse Extra Slots (Show First {INITIAL_SLOTS_COUNT})
             </Text>
           </TouchableOpacity>
         )}

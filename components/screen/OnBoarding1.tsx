@@ -298,26 +298,23 @@ console.log(initialData,"initialdata")
         type: verifyType,
       };
       if (verifyType === 'phone') {
-        payload.phone = targetVal.trim();
-        payload.phoneNumber = targetVal.trim();
+
         payload.identifier = targetVal.trim();
       } else {
-        payload.email = targetVal.toLowerCase().trim();
         payload.identifier = targetVal.toLowerCase().trim();
       }
 
-      console.log('📡 [POST ' + ENDPOINTS.PENDING_RESEND_OTP + '] Sending OTP');
-      const res = await api.post(ENDPOINTS.PENDING_RESEND_OTP, {});
+      console.log('📡 [POST ' + ENDPOINTS.PENDING_SEND_OTP + ']:', payload, 'Sending OTP');
+      const res = await api.post(ENDPOINTS.PENDING_SEND_OTP, payload);
       console.log('✅ resendPendingOtp success:', res);
       setOtpSent(true);
+      setOtpModalVisible(true);
       Toast.show({
         type: 'success',
         text1: 'OTP Sent! 📩',
         text2: `Verification code sent to ${verifyType === 'phone' ? `+91 ${targetVal}` : targetVal}`,
         position: 'top',
       });
-      // Automatically open the bottom sheet modal
-      setOtpModalVisible(true);
     } catch (error: any) {
       console.error('Send OTP error:', error?.response?.data || error.message);
       const msg =

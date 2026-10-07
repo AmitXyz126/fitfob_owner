@@ -19,6 +19,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { Button } from '@/components/Button';
 import { Container } from '@/components/Container';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import api from '@/api/apiInstance';
+import { ENDPOINTS } from '@/api/endpoint';
+import Toast from 'react-native-toast-message';
+import { VerificationOtpModal } from '@/components/VerificationOtpModal';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useUserDetail, useClubOwnerMe } from '@/hooks/useUserDetail';
 import { userDetailsApi } from '@/api/userdetailsApi';
@@ -41,6 +45,77 @@ const EditClubDetails = () => {
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [isVerified, setIsVerified] = useState(false);
+
+  // OTP Verification States
+  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+  const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [initialVerifiedPhone, setInitialVerifiedPhone] = useState('');
+  const [initialVerifiedEmail, setInitialVerifiedEmail] = useState('');
+  const [otpModalVisible, setOtpModalVisible] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [targetOtpType, setTargetOtpType] = useState<'phone' | 'email'>('phone');
+
+  const isDummyEmail = (val?: string | null): boolean => {
+    if (!val) return false;
+    const lower = String(val).toLowerCase().trim();
+    return (
+      lower.endsWith('@phone.user') ||
+      lower.includes('@phone.') ||
+      lower.endsWith('@dummy.user') ||
+      lower.endsWith('@temp.user')
+    );
+  };
+
+  const formatPhoneDigits = (raw: any): string => {
+    if (!raw) return '';
+    const digits = String(raw).replace(/\D/g, '');
+    if (digits.length > 10) {
+      return digits.slice(-10);
+    }
+    return digits;
+  };
+
+  const rawAuthEmail = myOwnerData?.email || profileStatus?.email || user?.email || '';
+  const isEmailDummy = isDummyEmail(rawAuthEmail);
+  const realAuthEmail = isEmailDummy ? '' : rawAuthEmail.trim();
+
+  // If email is dummy (e.g. +917018235911@phone.user), phone is embedded before the '@'
+  const phoneFromEmail = isEmailDummy && rawAuthEmail.includes('@') ? rawAuthEmail.split('@')[0] : '';
+  const rawAuthPhone =
+    myOwnerData?.phoneNumber ||
+    myOwnerData?.phone ||
+    profileStatus?.phoneNumber ||
+    profileStatus?.phone ||
+    user?.phoneNumber ||
+    user?.phone ||
+    phoneFromEmail ||
+    (user?.username && /^\+?[0-9]{10,15}$/.test(user.username) ? user.username : '');
+
+  const cleanAuthPhone = formatPhoneDigits(rawAuthPhone);
+
+  // If signed up with phone:
+  // - Email was dummy (@phone.user) or absent, and cleanAuthPhone exists
+  const isSignedUpWithPhone = isEmailDummy || (!realAuthEmail && !!cleanAuthPhone);
+
+  // When signed up with phone: phone is locked from account (already verified), email is editable & requires verification
+  // When signed up with email: email is locked from account (already verified), phone is editable & requires verification
+  const isPhoneLocked = isSignedUpWithPhone && !!cleanAuthPhone;
+  const isEmailLocked = !isSignedUpWithPhone && !!realAuthEmail;
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  // Sync auth credentials to state if locked
+  useEffect(() => {
+    if (isPhoneLocked && cleanAuthPhone && phone !== cleanAuthPhone) {
+      setPhone(cleanAuthPhone);
+      setIsPhoneVerified(true);
+    }
+    if (isEmailLocked && realAuthEmail && email !== realAuthEmail) {
+      setEmail(realAuthEmail);
+      setIsEmailVerified(true);
+    }
+  }, [cleanAuthPhone, realAuthEmail, isPhoneLocked, isEmailLocked]);
 
   const extractUri = (val: any): string => {
     if (!val) return '';
@@ -139,17 +214,6 @@ const EditClubDetails = () => {
         user?.phone ||
         '';
 
-      const isDummyEmail = (val?: string | null) => {
-        if (!val) return false;
-        const lower = String(val).toLowerCase().trim();
-        return (
-          lower.endsWith('@phone.user') ||
-          lower.includes('@phone.') ||
-          lower.endsWith('@dummy.user') ||
-          lower.endsWith('@temp.user')
-        );
-      };
-
       const rawEmail =
         myOwnerData?.email ||
         pData?.email ||
@@ -181,11 +245,31 @@ const EditClubDetails = () => {
 
       if (cName) setClubName(cName);
       if (oName) setOwnerName(oName);
-      if (pPhone) {
-        const cleaned = String(pPhone).replace(/[^0-9]/g, '');
-        setPhone(cleaned.length > 10 ? cleaned.slice(-10) : cleaned);
+
+      // Phone resolution
+      const rawCandidatePhone = pPhone || cleanAuthPhone || '';
+      const candidatePhone = formatPhoneDigits(rawCandidatePhone);
+      const resolvedPhone = isPhoneLocked ? cleanAuthPhone : (candidatePhone || cleanAuthPhone || '');
+
+      // Email resolution
+      const resolvedEmail = isEmailLocked ? realAuthEmail : (pEmail || realAuthEmail || '');
+
+      if (resolvedPhone) {
+        setPhone(resolvedPhone);
+        setInitialVerifiedPhone(resolvedPhone);
+        setIsPhoneVerified(true);
+      } else if (isPhoneLocked) {
+        setIsPhoneVerified(true);
       }
-      if (pEmail) setEmail(pEmail);
+
+      if (resolvedEmail) {
+        setEmail(resolvedEmail);
+        setInitialVerifiedEmail(resolvedEmail);
+        setIsEmailVerified(true);
+      } else if (isEmailLocked) {
+        setIsEmailVerified(true);
+      }
+
       if (logo) setClubImage(logo);
 
       if (myOwnerData?.id || pData?.status === 'completed' || pData?.isApprovedOwner) {
@@ -194,7 +278,82 @@ const EditClubDetails = () => {
     };
 
     populateForm();
-  }, [profileStatus, myOwnerData, user]);
+  }, [profileStatus, myOwnerData, user, isPhoneLocked, isEmailLocked, cleanAuthPhone, realAuthEmail]);
+
+  const handlePhoneChange = (text: string) => {
+    const cleaned = text.replace(/[^0-9]/g, '').slice(0, 10);
+    setPhone(cleaned);
+    if (isPhoneLocked) return;
+    if (initialVerifiedPhone && cleaned === initialVerifiedPhone && cleaned.length === 10) {
+      setIsPhoneVerified(true);
+    } else {
+      setIsPhoneVerified(false);
+      setOtpSent(false);
+    }
+  };
+
+  const handleEmailChange = (text: string) => {
+    setEmail(text);
+    if (isEmailLocked) return;
+    const trimmed = text.trim().toLowerCase();
+    if (initialVerifiedEmail && trimmed === initialVerifiedEmail.toLowerCase() && trimmed.length > 0) {
+      setIsEmailVerified(true);
+    } else {
+      setIsEmailVerified(false);
+      setOtpSent(false);
+    }
+  };
+
+  const handleSendOtp = async (type: 'phone' | 'email') => {
+    const targetVal = type === 'phone' ? phone.trim() : email.trim();
+
+    if (type === 'phone') {
+      if (targetVal.length !== 10) {
+        Alert.alert('Required', 'Please enter a valid 10-digit phone number before verifying.');
+        return;
+      }
+    } else {
+      if (!targetVal || !emailRegex.test(targetVal)) {
+        Alert.alert('Required', 'Please enter a valid email address before verifying.');
+        return;
+      }
+    }
+
+    setTargetOtpType(type);
+
+    if (otpSent && targetOtpType === type) {
+      setOtpModalVisible(true);
+      return;
+    }
+
+    setIsSendingOtp(true);
+    try {
+      const payload: any = {
+        type,
+        identifier: type === 'phone' ? targetVal : targetVal.toLowerCase(),
+      };
+
+      console.log('📡 [POST ' + ENDPOINTS.PENDING_SEND_OTP + ']:', payload);
+      await api.post(ENDPOINTS.PENDING_SEND_OTP, payload);
+      setOtpSent(true);
+      setOtpModalVisible(true);
+      Toast.show({
+        type: 'success',
+        text1: 'OTP Sent! 📩',
+        text2: `Verification code sent to ${type === 'phone' ? `+91 ${targetVal}` : targetVal}`,
+        position: 'top',
+      });
+    } catch (error: any) {
+      console.error('Send OTP error in EditClubDetails:', error?.response?.data || error.message);
+      const msg =
+        error?.response?.data?.message ||
+        error?.response?.data?.error?.message ||
+        'Failed to send OTP. Please check the details and try again.';
+      Alert.alert('Error', msg);
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
 
   const handlePickImage = async () => {
     try {
@@ -267,6 +426,36 @@ const EditClubDetails = () => {
     if (!cleanPhone) return Alert.alert('Required', 'Please enter Phone Number');
     if (cleanPhone.length !== 10) {
       return Alert.alert('Invalid Phone Number', 'Please enter a valid 10-digit phone number');
+    }
+
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) return Alert.alert('Required', 'Please enter Email Address');
+    if (!emailRegex.test(trimmedEmail)) {
+      return Alert.alert('Invalid Email', 'Please enter a valid email address');
+    }
+
+    if (!isPhoneLocked && !isPhoneVerified) {
+      Alert.alert(
+        'Phone Verification Required',
+        'Please verify your phone number with OTP before saving changes.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Verify Now', onPress: () => handleSendOtp('phone') },
+        ]
+      );
+      return;
+    }
+
+    if (!isEmailLocked && !isEmailVerified) {
+      Alert.alert(
+        'Email Verification Required',
+        'Please verify your email address with OTP before saving changes.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Verify Now', onPress: () => handleSendOtp('email') },
+        ]
+      );
+      return;
     }
 
     setIsSaving(true);
@@ -511,41 +700,137 @@ const EditClubDetails = () => {
               className="mb-5 h-14 rounded-xl border border-slate-200 bg-white px-4 text-base text-slate-800"
             />
 
-            <Text className="mb-2 ml-1 text-sm text-[#697281] leading-5 font-sans">Phone Number</Text>
-            <View className="mb-5 h-14 flex-row items-center rounded-xl border border-slate-200 bg-white px-3">
+            {/* PHONE NUMBER FIELD */}
+            <View className="mb-2 ml-1 flex-row items-center justify-between">
+              <Text className="text-sm text-[#697281] leading-5 font-sans">Phone Number</Text>
+              {isPhoneLocked ? (
+                <View className="flex-row items-center">
+                  <Ionicons name="lock-closed" size={12} color="#10B981" style={{ marginRight: 4 }} />
+                  <Text className="text-[11px] font-semibold text-emerald-600">Account Phone (Verified)</Text>
+                </View>
+              ) : isPhoneVerified ? (
+                <View className="flex-row items-center">
+                  <Ionicons name="checkmark-circle" size={13} color="#10B981" style={{ marginRight: 4 }} />
+                  <Text className="text-[11px] font-semibold text-emerald-600">Verified</Text>
+                </View>
+              ) : (
+                <View className="flex-row items-center">
+                  <Ionicons name="alert-circle-outline" size={13} color="#F6163C" style={{ marginRight: 4 }} />
+                  <Text className="text-[11px] font-semibold text-rose-500">Verification Required</Text>
+                </View>
+              )}
+            </View>
+
+            <View
+              className={`mb-5 h-14 flex-row items-center rounded-xl border px-3 ${
+                isPhoneLocked
+                  ? 'border-slate-200 bg-slate-100'
+                  : !isPhoneVerified && phone.length === 10
+                  ? 'border-rose-300 bg-white'
+                  : 'border-slate-200 bg-white'
+              }`}>
               <Image source={{ uri: 'https://flagcdn.com/w40/in.png' }} className="mr-2 h-4 w-6 rounded-sm" />
               <Ionicons name="chevron-down" size={14} color="#64748B" />
               <View style={{ width: 1, height: '40%', backgroundColor: '#E2E8F0', marginHorizontal: 12 }} />
               <TextInput
                 value={phone}
+                editable={!isPhoneLocked && !isSaving}
                 keyboardType="numeric"
                 maxLength={10}
-                onChangeText={(text) => {
-                  const cleaned = text.replace(/[^0-9]/g, '').slice(0, 10);
-                  setPhone(cleaned);
-                }}
+                onChangeText={handlePhoneChange}
                 placeholder="Enter 10-digit number"
                 placeholderTextColor="#94A3B8"
-                className="flex-1 text-base text-slate-800"
+                className={`flex-1 text-base ${isPhoneLocked ? 'text-slate-500' : 'text-slate-800'}`}
               />
+              {isPhoneLocked ? (
+                <Ionicons name="lock-closed-outline" size={18} color="#94A3B8" />
+              ) : isPhoneVerified ? (
+                <View className="flex-row items-center bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                  <Ionicons name="checkmark-circle" size={13} color="#10B981" />
+                  <Text className="ml-1 text-[11px] font-bold text-emerald-700">Verified</Text>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => handleSendOtp('phone')}
+                  disabled={isSendingOtp || phone.length < 10}
+                  activeOpacity={0.8}
+                  className={`rounded-lg px-3 py-1.5 shadow-sm ${
+                    phone.length === 10 ? 'bg-[#F6163C]' : 'bg-slate-300'
+                  }`}>
+                  {isSendingOtp && targetOtpType === 'phone' ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Text className="text-[12px] font-bold text-white">
+                      {otpSent && targetOtpType === 'phone' ? 'Enter OTP' : 'Verify'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
 
+            {/* EMAIL ADDRESS FIELD */}
             <View className="mb-2 ml-1 flex-row items-center justify-between">
               <Text className="text-sm text-[#697281] leading-5 font-sans">Email Address</Text>
-              <View className="flex-row items-center">
-                <Ionicons name="lock-closed" size={12} color="#94A3B8" style={{ marginRight: 4 }} />
-                <Text className="text-[11px] font-medium text-slate-400">Non-editable</Text>
-              </View>
+              {isEmailLocked ? (
+                <View className="flex-row items-center">
+                  <Ionicons name="lock-closed" size={12} color="#10B981" style={{ marginRight: 4 }} />
+                  <Text className="text-[11px] font-semibold text-emerald-600">Account Email (Verified)</Text>
+                </View>
+              ) : isEmailVerified ? (
+                <View className="flex-row items-center">
+                  <Ionicons name="checkmark-circle" size={13} color="#10B981" style={{ marginRight: 4 }} />
+                  <Text className="text-[11px] font-semibold text-emerald-600">Verified</Text>
+                </View>
+              ) : (
+                <View className="flex-row items-center">
+                  <Ionicons name="alert-circle-outline" size={13} color="#F6163C" style={{ marginRight: 4 }} />
+                  <Text className="text-[11px] font-semibold text-rose-500">Verification Required</Text>
+                </View>
+              )}
             </View>
-            <View className="mb-8 h-14 flex-row items-center rounded-xl border border-slate-200 bg-slate-100 px-4">
+
+            <View
+              className={`mb-8 h-14 flex-row items-center rounded-xl border px-4 ${
+                isEmailLocked
+                  ? 'border-slate-200 bg-slate-100'
+                  : !isEmailVerified && email.length > 0
+                  ? 'border-rose-300 bg-white'
+                  : 'border-slate-200 bg-white'
+              }`}>
               <TextInput
                 value={email}
-                editable={false}
+                editable={!isEmailLocked && !isSaving}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                onChangeText={handleEmailChange}
                 placeholder="Enter email address"
                 placeholderTextColor="#94A3B8"
-                className="flex-1 text-base text-slate-500"
+                className={`flex-1 text-base ${isEmailLocked ? 'text-slate-500' : 'text-slate-800'}`}
               />
-              <Ionicons name="lock-closed-outline" size={18} color="#94A3B8" />
+              {isEmailLocked ? (
+                <Ionicons name="lock-closed-outline" size={18} color="#94A3B8" />
+              ) : isEmailVerified ? (
+                <View className="flex-row items-center bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                  <Ionicons name="checkmark-circle" size={13} color="#10B981" />
+                  <Text className="ml-1 text-[11px] font-bold text-emerald-700">Verified</Text>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => handleSendOtp('email')}
+                  disabled={isSendingOtp || !email.trim()}
+                  activeOpacity={0.8}
+                  className={`rounded-lg px-3 py-1.5 shadow-sm ${
+                    email.trim().length > 0 ? 'bg-[#F6163C]' : 'bg-slate-300'
+                  }`}>
+                  {isSendingOtp && targetOtpType === 'email' ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Text className="text-[12px] font-bold text-white">
+                      {otpSent && targetOtpType === 'email' ? 'Enter OTP' : 'Verify'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </ScrollView>
@@ -571,6 +856,23 @@ const EditClubDetails = () => {
         </View>
 
       </KeyboardAvoidingView>
+
+      {/* VERIFICATION OTP BOTTOM SHEET MODAL */}
+      <VerificationOtpModal
+        visible={otpModalVisible}
+        type={targetOtpType}
+        targetValue={targetOtpType === 'phone' ? phone.trim() : email.trim()}
+        onClose={() => setOtpModalVisible(false)}
+        onSuccess={() => {
+          if (targetOtpType === 'phone') {
+            setIsPhoneVerified(true);
+            setInitialVerifiedPhone(phone.trim());
+          } else {
+            setIsEmailVerified(true);
+            setInitialVerifiedEmail(email.trim());
+          }
+        }}
+      />
     </Container>
   );
 };

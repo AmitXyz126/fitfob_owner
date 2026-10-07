@@ -20,44 +20,49 @@ import { LinearGradient } from 'expo-linear-gradient';
 import GymLoader from '@/components/GymLoader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '@/store/useAuthStore';
+import {
+  analyzeGymImage,
+  GYM_AREA_CATEGORIES,
+  GymAreaAnalysisResult,
+} from '@/services/gymAreaAiService';
 
 interface Props {
   initialData?: any;
 }
 
-const MAX_PHOTOS = 10;
-const INITIAL_SLOTS_COUNT = 3;
-
-const SUGGESTED_TAGS = [
-  'Cardio Zone',
-  'Free Weights',
-  'Crossfit Area',
-  'Reception & Entry',
-  'Locker & Showers',
-  'Steam & Sauna',
-  'Zumba / Yoga Studio',
-  'Strength Machines',
-];
+const MAX_PHOTOS = 20;
+const MIN_REQUIRED_PHOTOS = 7;
+const INITIAL_SLOTS_COUNT = 5;
 
 const normalizePhotoUrl = (item: any): string => {
   if (!item) return '';
-  if (typeof item === 'string') {
-    let clean = item.trim().replace(/\\/g, '/');
+
+  const formatStringUrl = (str: string): string => {
+    let clean = str.trim().replace(/\\/g, '/');
+    if (!clean) return '';
+
+    if (clean.startsWith('http://backend.fitfob.com')) {
+      clean = clean.replace('http://backend.fitfob.com', 'https://backend.fitfob.com');
+    }
+
     if (
-      clean &&
       !clean.startsWith('http://') &&
       !clean.startsWith('https://') &&
       !clean.startsWith('file://') &&
       !clean.startsWith('content://') &&
       !clean.startsWith('data:')
     ) {
-      const apiBase = process.env.EXPO_PUBLIC_API_URL || '';
+      const apiBase = process.env.EXPO_PUBLIC_API_URL || 'https://backend.fitfob.com';
       return `${apiBase.replace(/\/+$/, '')}/${clean.replace(/^\/+/, '')}`;
     }
     return clean;
+  };
+
+  if (typeof item === 'string') {
+    return formatStringUrl(item);
   }
 
-  let rawUrl =
+  const rawUrl =
     item?.url ||
     item?.fileUrl ||
     item?.uri ||
@@ -67,40 +72,36 @@ const normalizePhotoUrl = (item: any): string => {
     item?.imageUrl ||
     item?.image_url ||
     item?.file_url ||
+    item?.raw?.url ||
+    item?.raw?.fileUrl ||
     item?.image?.url ||
     item?.image?.fileUrl ||
+    (Array.isArray(item?.image) ? item.image[0]?.url || item.image[0]?.fileUrl : '') ||
     item?.photo?.url ||
     item?.photo?.fileUrl ||
+    (Array.isArray(item?.photo) ? item.photo[0]?.url || item.photo[0]?.fileUrl : '') ||
     item?.file?.url ||
     item?.file?.fileUrl ||
     item?.images?.[0]?.url ||
     item?.images?.[0]?.fileUrl ||
     item?.attributes?.url ||
+    item?.attributes?.fileUrl ||
     item?.attributes?.image?.data?.attributes?.url ||
+    item?.attributes?.image?.data?.[0]?.attributes?.url ||
     item?.image?.data?.attributes?.url ||
+    item?.image?.data?.[0]?.attributes?.url ||
     item?.formats?.medium?.url ||
     item?.formats?.small?.url ||
     item?.formats?.thumbnail?.url ||
     item?.image?.formats?.medium?.url ||
+    item?.image?.formats?.small?.url ||
+    item?.image?.formats?.thumbnail?.url ||
     (typeof item?.image === 'string' ? item.image : '') ||
     (typeof item?.photo === 'string' ? item.photo : '') ||
     '';
 
   if (!rawUrl || typeof rawUrl !== 'string') return '';
-  let clean = rawUrl.trim().replace(/\\/g, '/');
-
-  if (
-    clean &&
-    !clean.startsWith('http://') &&
-    !clean.startsWith('https://') &&
-    !clean.startsWith('file://') &&
-    !clean.startsWith('content://') &&
-    !clean.startsWith('data:')
-  ) {
-    const apiBase = process.env.EXPO_PUBLIC_API_URL || '';
-    return `${apiBase.replace(/\/+$/, '')}/${clean.replace(/^\/+/, '')}`;
-  }
-  return clean;
+  return formatStringUrl(rawUrl);
 };
 
 const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
@@ -131,6 +132,25 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
   const [photoCaption, setPhotoCaption] = useState('');
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
   const [isSubmittingVerification, setIsSubmittingVerification] = useState(false);
+  const [isAnalyzingAi, setIsAnalyzingAi] = useState(false);
+  const [aiResult, setAiResult] = useState<GymAreaAnalysisResult | null>(null);
+
+  // Automatically classify gym area using Gemini Vision
+  const runAiAnalysis = async (uri: string) => {
+    setIsAnalyzingAi(true);
+    setAiResult(null);
+    try {
+      const res = await analyzeGymImage(uri);
+      setAiResult(res);
+      if (res?.area && res.area !== 'Other') {
+        setPhotoCaption(res.area);
+      }
+    } catch (e) {
+      console.log('AI Area Analysis error:', e);
+    } finally {
+      setIsAnalyzingAi(false);
+    }
+  };
 
   // 1. Instant Cache Initialization from AsyncStorage on mount
   useEffect(() => {
@@ -247,7 +267,9 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
         type: asset.mimeType || 'image/jpeg',
       });
       setPhotoCaption('');
+      setAiResult(null);
       setUploadModalVisible(true);
+      runAiAnalysis(asset.uri);
     }
   };
 
@@ -273,7 +295,9 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
         type: 'image/jpeg',
       });
       setPhotoCaption('');
+      setAiResult(null);
       setUploadModalVisible(true);
+      runAiAnalysis(asset.uri);
     }
   };
 
@@ -322,6 +346,8 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
     setUploadModalVisible(false);
     setPickedPhoto(null);
     setPhotoCaption('');
+    setAiResult(null);
+    setIsAnalyzingAi(false);
 
     // 2. RUN NETWORK UPLOAD IN BACKGROUND
     try {
@@ -431,12 +457,12 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
 
   // Final Onboarding Submit (POST /api/pending-club-owner/confirm)
   const handleFinalConfirm = async () => {
-    // 1. If no photo is uploaded, show toast immediately and do not start loader
-    if (!localPhotos || localPhotos.length === 0) {
+    // 1. Minimum 6 photos are required
+    if (!localPhotos || localPhotos.length < MIN_REQUIRED_PHOTOS) {
       Toast.show({
         type: 'error',
-        text1: 'Photo Required 📷',
-        text2: 'Please upload at least 1 club photo before submitting.',
+        text1: 'Minimum 6 Photos Required 📷',
+        text2: `Please upload at least 6 club photos (${localPhotos?.length || 0}/${MIN_REQUIRED_PHOTOS} uploaded).`,
         visibilityTime: 4000,
       });
       return false;
@@ -471,7 +497,7 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
   const isUploading = uploadSingleClubPhoto.isPending;
   const isConfirming = confirmOnboarding.isPending || isSubmittingVerification;
 
-  // Compute visible slots: 3 initially, expands to 10 on showMore
+  // Compute visible slots: 6 initially (required), expands to 20 on showMore
   const visibleSlotsCount = showMore ? MAX_PHOTOS : INITIAL_SLOTS_COUNT;
   const slots = Array.from({ length: visibleSlotsCount }, (_, idx) => localPhotos[idx] || null);
 
@@ -483,16 +509,28 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
         {/* Title Header */}
         <View className="mt-2 mb-5">
           <View className="flex-row items-center justify-between">
-            <Text className="font-bold text-[26px] text-slate-900">Upload Club Photos</Text>
-            {/* <View className="flex-row items-center rounded-full bg-emerald-50 px-3 py-1 border border-emerald-200">
-              <Ionicons name="images" size={13} color="#10B981" />
-              <Text className="ml-1.5 text-xs font-bold text-emerald-700">
-                {localPhotos.length} / {MAX_PHOTOS} Uploaded
+            <Text className="font-bold text-[24px] text-slate-900">Upload Club Photos</Text>
+            <View
+              className={`flex-row items-center rounded-full px-3 py-1 border ${
+                localPhotos.length >= MIN_REQUIRED_PHOTOS
+                  ? 'bg-emerald-50 border-emerald-200'
+                  : 'bg-rose-50 border-rose-200'
+              }`}>
+              <Ionicons
+                name={localPhotos.length >= MIN_REQUIRED_PHOTOS ? 'checkmark-circle' : 'images'}
+                size={13}
+                color={localPhotos.length >= MIN_REQUIRED_PHOTOS ? '#10B981' : '#F6163C'}
+              />
+              <Text
+                className={`ml-1.5 text-xs font-bold ${
+                  localPhotos.length >= MIN_REQUIRED_PHOTOS ? 'text-emerald-700' : 'text-rose-600'
+                }`}>
+                {localPhotos.length} / {MAX_PHOTOS} ({localPhotos.length < MIN_REQUIRED_PHOTOS ? `Min ${MIN_REQUIRED_PHOTOS} Req` : 'Required'})
               </Text>
-            </View> */}
+            </View>
           </View>
           <Text className="mt-1.5 text-sm text-slate-500 font-medium">
-            Upload clear photos with captions so members know what equipment and facilities to expect.
+            Upload clear photos with captions. Minimum {MIN_REQUIRED_PHOTOS} required (up to {MAX_PHOTOS} photos allowed).
           </Text>
         </View>
 
@@ -506,7 +544,7 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
           </View>
         )}
 
-        {/* 3 Boxes Initially (Expands to 10 on Show More) */}
+        {/* 6 Boxes Initially (Expands to 20 on Show More) */}
         <View className="flex-row flex-wrap justify-between">
           {slots.map((photo, index) => {
             const isHero = index === 0;
@@ -525,17 +563,21 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
                   <View
                     className={`${isHero ? 'h-52' : 'h-36'
                       } w-full overflow-hidden bg-slate-100 relative`}>
-                    {photo.url ? (
-                      <Image
-                        source={{ uri: photo.url }}
-                        className="h-full w-full"
-                        resizeMode="cover"
-                      />
-                    ) : (
-                      <View className="flex-1 items-center justify-center bg-slate-100">
-                        <Ionicons name="image-outline" size={32} color="#94A3B8" />
-                      </View>
-                    )}
+                    {(() => {
+                      const imageUri = normalizePhotoUrl(photo.url || photo.fileUrl || photo.raw || photo);
+                      return imageUri ? (
+                        <Image
+                          source={{ uri: imageUri }}
+                          style={{ width: '100%', height: '100%' }}
+                          className="h-full w-full"
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View className="flex-1 items-center justify-center bg-slate-100">
+                          <Ionicons name="image-outline" size={32} color="#94A3B8" />
+                        </View>
+                      );
+                    })()}
 
                     {/* Top Right Status / Delete Button */}
                     {photo.isUploading ? (
@@ -565,6 +607,7 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
                     <View className="absolute bottom-2 left-2.5 rounded-full bg-black/60 px-2.5 py-0.5">
                       <Text className="text-[10px] font-semibold text-white">
                         {isHero ? '#1 Main Photo' : `#${index + 1}`}
+                        {index < MIN_REQUIRED_PHOTOS ? ' • Req' : ''}
                       </Text>
                     </View>
                   </View>
@@ -590,15 +633,33 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
                 disabled={isUploading || isConfirming}
                 activeOpacity={0.7}
                 className={`mb-4 ${isHero ? 'w-full h-52' : 'w-[48%] h-44'
-                  } items-center justify-center rounded-2xl border-2 border-dashed border-rose-200 bg-rose-50/40 p-3`}>
-                <View className="h-11 w-11 items-center justify-center rounded-full bg-rose-100 mb-1.5">
-                  <Ionicons name="camera" size={22} color="#F6163C" />
+                  } items-center justify-center rounded-2xl border-2 border-dashed ${
+                    index < MIN_REQUIRED_PHOTOS
+                      ? 'border-rose-300 bg-rose-50/50'
+                      : 'border-slate-200 bg-slate-50/60'
+                  } p-3`}>
+                <View
+                  className={`h-11 w-11 items-center justify-center rounded-full mb-1.5 ${
+                    index < MIN_REQUIRED_PHOTOS ? 'bg-rose-100' : 'bg-slate-100'
+                  }`}>
+                  <Ionicons
+                    name="camera"
+                    size={22}
+                    color={index < MIN_REQUIRED_PHOTOS ? '#F6163C' : '#64748B'}
+                  />
                 </View>
-                <Text className="font-bold text-xs text-center text-slate-800">
-                  {isHero ? '+ Add Main Photo #1' : `+ Add Photo #${index + 1}`}
+                <Text
+                  className={`font-bold text-xs text-center ${
+                    index < MIN_REQUIRED_PHOTOS ? 'text-slate-800' : 'text-slate-600'
+                  }`}>
+                  {isHero
+                    ? '+ Add Main Photo #1 (Required)'
+                    : index < MIN_REQUIRED_PHOTOS
+                    ? `+ Add Photo #${index + 1} (Required)`
+                    : `+ Add Photo #${index + 1} (Optional)`}
                 </Text>
                 <Text className="mt-0.5 text-[10px] text-center text-slate-400">
-                  With description
+                  {index < MIN_REQUIRED_PHOTOS ? 'Required • with caption' : 'Optional • with caption'}
                 </Text>
               </TouchableOpacity>
             );
@@ -669,12 +730,12 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
                         paddingVertical: 2,
                       }}>
                       <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.5 }}>
-                        +7 SLOTS
+                        +{MAX_PHOTOS - INITIAL_SLOTS_COUNT} SLOTS
                       </Text>
                     </View>
                   </View>
                   <Text style={{ fontSize: 11, color: '#64748B', marginTop: 3 }}>
-                    Expand to upload up to 10 facility photos
+                    Expand to upload up to {MAX_PHOTOS} facility photos ({MIN_REQUIRED_PHOTOS} required)
                   </Text>
                 </View>
               </View>
@@ -712,7 +773,7 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
             }}>
             <Ionicons name="chevron-up-circle-outline" size={18} color="#64748B" />
             <Text style={{ marginLeft: 8, fontSize: 12, fontWeight: '700', color: '#475569' }}>
-              Collapse Extra Slots (Show First 3)
+              Collapse Extra Slots (Show First {INITIAL_SLOTS_COUNT})
             </Text>
           </TouchableOpacity>
         )}
@@ -727,7 +788,7 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
             <View className="flex-row items-start">
               <Text className="mr-2 text-slate-400">•</Text>
               <Text className="flex-1 text-xs text-slate-500">
-                Upload up to 10 photos showcasing your gym facilities, machines, and zones.
+                Upload at least {MIN_REQUIRED_PHOTOS} photos (up to {MAX_PHOTOS} total) showcasing your gym facilities, machines, and zones.
               </Text>
             </View>
             <View className="flex-row items-start">
@@ -785,46 +846,134 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
                 </View>
               )}
 
+              {/* AI Detection Loading Banner */}
+              {isAnalyzingAi && (
+                <View className="mb-4 flex-row items-center rounded-2xl border border-rose-200 bg-rose-50/70 p-3">
+                  <ActivityIndicator size="small" color="#F6163C" />
+                  <View className="ml-3 flex-1">
+                    <Text className="text-xs font-bold text-rose-800">
+                      Analyzing gym area with AI...
+                    </Text>
+                    <Text className="text-[11px] text-rose-600 mt-0.5">
+                      Identifying equipment & specific facility zone
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {/* AI Detection Result Card */}
+              {!isAnalyzingAi && aiResult && (
+                <View className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3.5">
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-row items-center flex-1 mr-2">
+                      <View className="h-6 w-6 items-center justify-center rounded-full bg-emerald-100 mr-2">
+                        <Ionicons name="sparkles" size={13} color="#059669" />
+                      </View>
+                      <View className="flex-1">
+                        <View className="flex-row items-center flex-wrap gap-1.5">
+                          <Text className="text-xs font-bold text-emerald-950">
+                            {aiResult.area}
+                          </Text>
+                          <View className="rounded-full bg-emerald-200/80 px-2 py-0.5">
+                            <Text className="text-[10px] font-bold text-emerald-800">
+                              {Math.round(aiResult.confidence * 100)}% match
+                            </Text>
+                          </View>
+                        </View>
+                        {aiResult.reason ? (
+                          <Text className="text-[11px] text-emerald-700 mt-1 leading-4">
+                            {aiResult.reason}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
+                    {photoCaption !== aiResult.area && (
+                      <TouchableOpacity
+                        onPress={() => setPhotoCaption(aiResult.area)}
+                        disabled={isUploading}
+                        className="rounded-xl bg-emerald-600 px-3 py-1.5">
+                        <Text className="text-xs font-bold text-white">Apply</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              )}
+
               {/* Caption Input */}
               <View className="mb-3">
-                <Text className="mb-2 text-xs font-bold text-slate-700">
-                  Facility Description / Caption <Text className="text-rose-500">*</Text>
-                </Text>
+                <View className="flex-row items-center justify-between mb-2">
+                  <Text className="text-xs font-bold text-slate-700">
+                    Facility Area / Caption <Text className="text-rose-500">*</Text>
+                  </Text>
+                  {pickedPhoto?.uri && !isAnalyzingAi && (
+                    <TouchableOpacity
+                      onPress={() => runAiAnalysis(pickedPhoto.uri)}
+                      disabled={isUploading}
+                      className="flex-row items-center">
+                      <Ionicons name="sparkles" size={12} color="#F6163C" />
+                      <Text className="ml-1 text-[11px] font-bold text-[#F6163C]">
+                        Re-scan with AI
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
                 <View className="flex-row items-center rounded-2xl border border-slate-200 bg-[#F8FAFC] px-4 py-3">
                   <Ionicons name="create-outline" size={18} color="#F6163C" />
                   <TextInput
                     value={photoCaption}
                     onChangeText={setPhotoCaption}
-                    placeholder="e.g. Cardio Zone, Free Weights Section"
+                    placeholder="e.g. Cardio Area, Free Weights Area"
                     placeholderTextColor="#94A3B8"
                     maxLength={60}
                     editable={!isUploading}
                     className="ml-2.5 flex-1 font-semibold text-sm text-slate-900 p-0"
                   />
+                  {photoCaption ? (
+                    <TouchableOpacity onPress={() => setPhotoCaption('')} disabled={isUploading}>
+                      <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               </View>
 
               {/* Suggested Quick Tags */}
               <View className="mb-5">
                 <Text className="mb-2 text-[11px] font-semibold text-slate-400">
-                  Quick suggestions (tap to use):
+                  Quick categories (tap to select):
                 </Text>
                 <View className="flex-row flex-wrap gap-2">
-                  {SUGGESTED_TAGS.map((tag) => {
+                  {GYM_AREA_CATEGORIES.map((tag) => {
                     const isSelected = photoCaption.toLowerCase() === tag.toLowerCase();
+                    const isAiSuggested = aiResult?.area.toLowerCase() === tag.toLowerCase();
                     return (
                       <TouchableOpacity
                         key={tag}
                         onPress={() => setPhotoCaption(tag)}
                         disabled={isUploading}
                         activeOpacity={0.7}
-                        className={`rounded-full px-3 py-1.5 border ${isSelected
-                          ? 'bg-rose-50 border-[#F6163C]'
-                          : 'bg-slate-100 border-slate-200/60'
-                          }`}>
+                        className={`rounded-full px-3 py-1.5 border flex-row items-center ${
+                          isSelected
+                            ? 'bg-rose-50 border-[#F6163C]'
+                            : isAiSuggested
+                            ? 'bg-emerald-50 border-emerald-300'
+                            : 'bg-slate-100 border-slate-200/60'
+                        }`}>
+                        {isAiSuggested && (
+                          <Ionicons
+                            name="sparkles"
+                            size={10}
+                            color={isSelected ? '#F6163C' : '#059669'}
+                            style={{ marginRight: 4 }}
+                          />
+                        )}
                         <Text
-                          className={`text-xs font-semibold ${isSelected ? 'text-[#F6163C]' : 'text-slate-600'
-                            }`}>
+                          className={`text-xs font-semibold ${
+                            isSelected
+                              ? 'text-[#F6163C]'
+                              : isAiSuggested
+                              ? 'text-emerald-800'
+                              : 'text-slate-600'
+                          }`}>
                           {tag}
                         </Text>
                       </TouchableOpacity>

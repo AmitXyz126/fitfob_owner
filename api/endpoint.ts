@@ -25,6 +25,7 @@ export const ENDPOINTS = {
   VERIFY_GOVERNMENT_DOC: `${BASE_URL}/api/pending-club-owner/verify-government-doc`,
   Step_6: `${BASE_URL}/api/pending-club-owner/confirm-government-docs`,
   Get: `${BASE_URL}/api/pending-club-owner/documents`,
+  PENDING_SEND_OTP: `${BASE_URL}/api/pending-club-owner/send-otp`,
   PENDING_VERIFY_OTP: `${BASE_URL}/api/pending-club-owner/verify-otp`,
   PENDING_RESEND_OTP: `${BASE_URL}/api/pending-club-owner/resend-otp`,
   // Pending-club-owner photo endpoints (Onboarding flow)
