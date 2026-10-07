@@ -97,6 +97,17 @@
     "protobufjs@7.6.6": true
   },
   "overrides": {
-    "lightningcss": "$lightningcss"
+    "lightningcss": "$lightningcss",
+    "@callstack/react-theme-provider": {
+      "react": "$react"
+    },
+    "modal-react-native-web": {
+      "react": "$react",
+      "react-dom": "$react-dom",
+      "react-native-web": "$react-native-web"
+    },
+    "react-art": {
+      "react": "$react"
+    }
   }
 }
