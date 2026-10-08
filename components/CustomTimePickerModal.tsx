@@ -251,26 +251,6 @@ export const CustomTimePickerModal: React.FC<CustomTimePickerModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Past Time Notice */}
-          {minTotalMinutes !== null && (
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                backgroundColor: '#FFF7ED',
-                borderWidth: 1,
-                borderColor: '#FED7AA',
-                borderRadius: 10,
-                paddingHorizontal: 10,
-                paddingVertical: 6,
-                marginBottom: 12,
-              }}>
-              <Ionicons name="time" size={13} color="#EA580C" style={{ marginRight: 6 }} />
-              <Text style={{ fontSize: 11, fontWeight: '700', color: '#C2410C' }}>
-                Past hours are disabled for today
-              </Text>
-            </View>
-          )}
 
           {/* Compact Digital Clock Display in FitFob Brand Colors */}
           <View

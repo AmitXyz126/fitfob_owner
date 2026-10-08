@@ -15,14 +15,18 @@ import {
   Keyboard,
   Dimensions,
   StyleSheet,
+  Image,
+  LayoutAnimation,
 } from 'react-native';
 import Animated, {
   useSharedValue,
   withRepeat,
   withSequence,
   withTiming,
+  withSpring,
   useAnimatedStyle,
 } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,6 +38,7 @@ import { CustomTimePickerModal } from '@/components/CustomTimePickerModal';
 import { useAudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 
 const TRASH_SOUND = require('../assets/sounds/trash_delete.wav');
+const HOLIDAYS_EMPTY_IMG = require('../assets/images/holidays_empty.png');
 
 const SkeletonBox = ({ style, className }: { style?: any; className?: string }) => {
   const opacity = useSharedValue(0.35);
@@ -111,13 +116,13 @@ const HolidayItemSkeleton = () => (
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const QUICK_SUGGESTIONS = [
-  'Gandhi Jayanti',
+  'Annual Maintenance',
   'Diwali',
+  'New Year',
   'Holi',
   'Independence Day',
   'Republic Day',
-  'Annual Maintenance',
-  'New Year',
+  'Gym Renovation',
   'Christmas',
 ];
 
@@ -163,22 +168,20 @@ export default function HolidaysScreen() {
     }).catch(() => {});
   }, []);
 
-  // Auto-rewind player to start whenever playback finishes
   useEffect(() => {
-    if (!trashPlayer) return;
-    const sub = (trashPlayer as any)?.addListener?.('playbackStatusUpdate', (status: any) => {
-      if (status?.didJustFinish) {
-        trashPlayer.seekTo(0).catch(() => {});
-      }
-    });
-    return () => {
-      sub?.remove?.();
-    };
+    if (trashPlayer) {
+      try {
+        trashPlayer.loop = false;
+      } catch {}
+    }
   }, [trashPlayer]);
 
   const playTrashSound = async () => {
     try {
       if (trashPlayer) {
+        try {
+          trashPlayer.loop = false;
+        } catch {}
         if (trashPlayer.playing) {
           try {
             trashPlayer.pause();
@@ -194,6 +197,9 @@ export default function HolidaysScreen() {
 
     try {
       const tempPlayer = createAudioPlayer(TRASH_SOUND);
+      try {
+        tempPlayer.loop = false;
+      } catch {}
       tempPlayer.play();
     } catch (e) {
       console.log('Error playing trash sound:', e);
@@ -233,8 +239,37 @@ export default function HolidaysScreen() {
   const [timePickerTarget, setTimePickerTarget] = useState<'start' | 'end' | null>(null);
   const [deletingHolidayId, setDeletingHolidayId] = useState<string | number | null>(null);
 
-  // Tab Filter
+  // Tab Filter & Animation State
   const [activeTab, setActiveTab] = useState<'all' | 'upcoming'>('all');
+  const [tabsWidth, setTabsWidth] = useState(0);
+  const tabIndicatorOffset = useSharedValue(0);
+
+  const handleTabChange = (tab: 'all' | 'upcoming') => {
+    if (activeTab === tab) return;
+    try {
+      Haptics.selectionAsync();
+    } catch {}
+    try {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    } catch {}
+    setActiveTab(tab);
+  };
+
+  useEffect(() => {
+    if (tabsWidth > 0) {
+      const pillWidth = (tabsWidth - 8) / 2;
+      const target = activeTab === 'all' ? 0 : pillWidth;
+      tabIndicatorOffset.value = withSpring(target, {
+        damping: 20,
+        stiffness: 220,
+        mass: 0.6,
+      });
+    }
+  }, [activeTab, tabsWidth]);
+
+  const tabIndicatorAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: tabIndicatorOffset.value }],
+  }));
 
   // Format YYYY-MM-DD to readable date
   const formatDisplayDate = (dStr?: string) => {
@@ -1188,53 +1223,90 @@ export default function HolidaysScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Filter Tabs with Dynamic Counters */}
-      <View className="flex-row items-center bg-[#F1F5F9] p-1.5 rounded-2xl mb-3.5 border border-[#E2E8F0]">
+      {/* Filter Tabs with Dynamic Counters & Smooth Spring Sliding Indicator */}
+      <View
+        onLayout={(e) => {
+          const w = e.nativeEvent.layout.width;
+          setTabsWidth(w);
+          const pillW = (w - 8) / 2;
+          tabIndicatorOffset.value = activeTab === 'all' ? 0 : pillW;
+        }}
+        className="relative flex-row items-center bg-[#F1F5F9] p-1 rounded-2xl mb-3.5 border border-[#E2E8F0]"
+        style={{
+          height: 48,
+          shadowColor: '#0F172A',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.03,
+          shadowRadius: 3,
+        }}>
+        {tabsWidth > 0 && (
+          <Animated.View
+            style={[
+              {
+                position: 'absolute',
+                top: 4,
+                left: 4,
+                bottom: 4,
+                width: (tabsWidth - 8) / 2,
+                backgroundColor: '#FFFFFF',
+                borderRadius: 13,
+                shadowColor: '#0F172A',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.08,
+                shadowRadius: 5,
+                elevation: 3,
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+              },
+              tabIndicatorAnimatedStyle,
+            ]}
+          />
+        )}
+
         {(['all', 'upcoming'] as const).map((tab) => {
           const isActive = activeTab === tab;
           const label = tab === 'all' ? 'All' : 'Upcoming';
+          const icon = tab === 'all' ? 'calendar-outline' : 'time-outline';
+          const activeIcon = tab === 'all' ? 'calendar' : 'time';
           const count = tabCounts[tab];
+
           return (
             <TouchableOpacity
               key={tab}
-              onPress={() => setActiveTab(tab)}
-              activeOpacity={0.8}
-              style={{
-                flex: 1,
-                paddingVertical: 7,
-                borderRadius: 12,
-                backgroundColor: isActive ? '#FFFFFF' : 'transparent',
-                shadowColor: isActive ? '#0F172A' : 'transparent',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: isActive ? 0.08 : 0,
-                shadowRadius: 3,
-                elevation: isActive ? 2 : 0,
-              }}
+              onPress={() => handleTabChange(tab)}
+              activeOpacity={0.7}
+              style={{ flex: 1, height: '100%', zIndex: 1 }}
               className="flex-row items-center justify-center">
+              <Ionicons
+                name={isActive ? activeIcon : icon}
+                size={16}
+                color={isActive ? '#F6163C' : '#64748B'}
+                style={{ marginRight: 6 }}
+              />
               <Text
                 style={{
                   color: isActive ? '#0F172A' : '#64748B',
-                  fontWeight: isActive ? '800' : '700',
+                  fontWeight: isActive ? '800' : '600',
                   fontSize: 13,
-                }}
-                className="font-bold">
+                }}>
                 {label}
               </Text>
               <View
                 style={{
                   backgroundColor: isActive ? '#FFF0F2' : '#E2E8F0',
-                  marginLeft: 5,
-                  paddingHorizontal: 6,
+                  borderColor: isActive ? '#FECDD3' : 'transparent',
+                  borderWidth: isActive ? 1 : 0,
+                  marginLeft: 6,
+                  paddingHorizontal: 7,
                   paddingVertical: 1.5,
-                  borderRadius: 8,
+                  borderRadius: 10,
                 }}>
                 <Text
                   style={{
                     color: isActive ? '#F6163C' : '#64748B',
                     fontWeight: '800',
                     fontSize: 11,
-                  }}
-                  className="font-bold">
+                  }}>
                   {count}
                 </Text>
               </View>
@@ -1271,14 +1343,13 @@ export default function HolidaysScreen() {
             />
           }
           ListEmptyComponent={
-            <View className="flex-1 items-center justify-center py-16 px-6">
-              <View className="h-16 w-16 items-center justify-center rounded-2xl bg-[#FFF0F2] mb-3.5 border border-[#FECDD3]">
-                <Ionicons
-                  name="calendar-outline"
-                  size={30}
-                  color="#F6163C"
-                />
-              </View>
+            <View className="flex-1 items-center justify-center py-6 px-6">
+              <Image
+                source={HOLIDAYS_EMPTY_IMG}
+                style={{ width: 280, height: 280 }}
+                className="w-72 h-72 mb-2"
+                resizeMode="contain"
+              />
               <Text
                 style={{ fontWeight: '700' }}
                 className="font-bold text-base text-slate-800 text-center mb-1">
@@ -1421,7 +1492,7 @@ export default function HolidaysScreen() {
                       setTitle(val);
                       if (titleError) setTitleError('');
                     }}
-                    placeholder="e.g. Gandhi Jayanti"
+                    placeholder="e.g. Annual Maintenance, Diwali, New Year"
                     placeholderTextColor="#94A3B8"
                     className={`rounded-xl border bg-white px-3 py-2 text-[13px] text-[#0F172A] ${
                       titleError ? 'border-[#EF4444] bg-[#FEF2F2]' : 'border-[#CBD5E1]'
