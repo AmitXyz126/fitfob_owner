@@ -769,12 +769,6 @@ export default function CheckinsScreen() {
                   />
                 </View>
 
-                {checkinDetails?.userEmail ? (
-                  <Text className="mt-0.5 text-xs font-medium text-slate-400">
-                    {checkinDetails.userEmail}
-                  </Text>
-                ) : null}
-
                 {/* Client Type Tag */}
                 {checkinDetails?.clientType ? (
                   <View className="mt-1.5 rounded-full bg-emerald-50 px-3 py-0.5 border border-emerald-200">

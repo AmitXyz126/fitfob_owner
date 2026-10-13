@@ -740,17 +740,6 @@ const HomeScreen = () => {
 
                 {/* Detailed Parameters - Real Check-in Details */}
                 <View style={styles.detailsList}>
-
-                  <View style={styles.detailRow}>
-                    <View style={styles.detailLeft}>
-                      <Ionicons name="mail-outline" size={18} color="#64748B" />
-                      <Text style={styles.detailLabel}>Email Address</Text>
-                    </View>
-                    <Text style={styles.detailValue} numberOfLines={1}>
-                      {selectedMember?.clientEmail || selectedMember?.email || 'Not provided'}
-                    </Text>
-                  </View>
-
                   <View style={styles.detailRow}>
                     <View style={styles.detailLeft}>
                       <Ionicons name="time-outline" size={18} color="#64748B" />

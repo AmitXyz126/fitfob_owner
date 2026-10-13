@@ -30,8 +30,8 @@ interface Props {
   initialData?: any;
 }
 
-const MAX_PHOTOS = 20;
-const MIN_REQUIRED_PHOTOS = 7;
+const MAX_PHOTOS = 17;
+const MIN_REQUIRED_PHOTOS = 2;
 const INITIAL_SLOTS_COUNT = 5;
 
 const normalizePhotoUrl = (item: any): string => {
@@ -457,12 +457,12 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
 
   // Final Onboarding Submit (POST /api/pending-club-owner/confirm)
   const handleFinalConfirm = async () => {
-    // 1. Minimum 6 photos are required
+    // 1. Minimum photos are required
     if (!localPhotos || localPhotos.length < MIN_REQUIRED_PHOTOS) {
       Toast.show({
         type: 'error',
-        text1: 'Minimum 6 Photos Required 📷',
-        text2: `Please upload at least 6 club photos (${localPhotos?.length || 0}/${MIN_REQUIRED_PHOTOS} uploaded).`,
+        text1: `Minimum ${MIN_REQUIRED_PHOTOS} Photos Required 📷`,
+        text2: `Please upload at least ${MIN_REQUIRED_PHOTOS} club photos (${localPhotos?.length || 0}/${MIN_REQUIRED_PHOTOS} uploaded).`,
         visibilityTime: 4000,
       });
       return false;
@@ -497,7 +497,7 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
   const isUploading = uploadSingleClubPhoto.isPending;
   const isConfirming = confirmOnboarding.isPending || isSubmittingVerification;
 
-  // Compute visible slots: 6 initially (required), expands to 20 on showMore
+  // Compute visible slots: INITIAL_SLOTS_COUNT initially, expands to MAX_PHOTOS (17) on showMore
   const visibleSlotsCount = showMore ? MAX_PHOTOS : INITIAL_SLOTS_COUNT;
   const slots = Array.from({ length: visibleSlotsCount }, (_, idx) => localPhotos[idx] || null);
 
@@ -544,7 +544,7 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
           </View>
         )}
 
-        {/* 6 Boxes Initially (Expands to 20 on Show More) */}
+        {/* Boxes Initially (Expands to 17 on Show More) */}
         <View className="flex-row flex-wrap justify-between">
           {slots.map((photo, index) => {
             const isHero = index === 0;

@@ -301,7 +301,7 @@ const ClubLocationScreen = () => {
         `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
         {
           headers: {
-            'User-Agent': 'fitfob-owner-app/1.0',
+            'User-Agent': 'fitfob-club-app/1.0',
             'Accept-Language': 'en',
           },
         }
@@ -412,7 +412,7 @@ const ClubLocationScreen = () => {
           )}&limit=5`,
           {
             headers: {
-              'User-Agent': 'fitfob-owner-app',
+              'User-Agent': 'fitfob-club-app',
               'Accept-Language': 'en',
             },
           }

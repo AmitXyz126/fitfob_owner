@@ -1,9 +1,10 @@
 {
   "expo": {
-    "name": "FitFob Owner",
+    "name": "FitFob Club",
     "slug": "fitFob_owner",
     "version": "1.0.0",
     "scheme": [
+      "fitfob-club",
       "fitfob-owner",
       "fb2349725998870415"
     ],
@@ -33,7 +34,7 @@
         {
           "appID": "2349725998870415",
           "clientToken": "51394908565334eb54ab6530f699c04d",
-          "displayName": "fitfob_owner",
+          "displayName": "fitfob_club",
           "scheme": "fb2349725998870415",
           "iosUserTrackingPermission": "This identifier will be used to deliver personalized ads to you."
         }

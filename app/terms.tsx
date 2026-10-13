@@ -76,10 +76,10 @@ export default function TermsAndConditions() {
             </Text>
           </View>
           <Text className="font-sans font-bold text-2xl text-[#1C1C1C]">
-            FitFob Owner Terms
+            FitFob Club Terms
           </Text>
           <Text className="mt-2 font-sans text-sm leading-5 text-[#6B7280]">
-            Please read these terms carefully before registering and listing your club/gym facilities on the FitFob platform. By using the FitFob Owner App, you agree to these Terms.
+            Please read these terms carefully before registering and listing your club/gym facilities on the FitFob platform. By using the FitFob Club App, you agree to these Terms.
           </Text>
         </View>
 
@@ -87,7 +87,7 @@ export default function TermsAndConditions() {
         <TermSection
           number="1"
           title="Account Creation & Verification"
-          content="To list your facilities, you must create a FitFob Owner account. You are responsible for ensuring that all data uploaded is accurate and current. FitFob reserves the right to suspend accounts with incomplete or unverifiable documents."
+          content="To list your facilities, you must create a FitFob Club account. You are responsible for ensuring that all data uploaded is accurate and current. FitFob reserves the right to suspend accounts with incomplete or unverifiable documents."
           bullets={[
             'Provide valid government/business licenses.',
             'Maintain safe and secure login credentials.',

@@ -201,7 +201,7 @@ const OnBoarding2_Part2 = ({ onConfirm, onMapTouchStart, onMapTouchEnd }: OnBoar
         `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
         {
           headers: {
-            'User-Agent': 'fitfob-owner-app/1.0',
+            'User-Agent': 'fitfob-club-app/1.0',
             'Accept-Language': 'en',
           },
         }

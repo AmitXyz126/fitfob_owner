@@ -223,12 +223,24 @@ export default function HolidaysScreen() {
     return `${y}-${m}-${day}`;
   };
 
-  const [startDate, setStartDate] = useState(getTodayStr());
-  const [endDate, setEndDate] = useState(getTodayStr());
+  // Tomorrow as YYYY-MM-DD (Minimum allowed date for holiday application)
+  const getTomorrowStr = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
 
-  // Calendar Navigation in Modal
-  const [calMonth, setCalMonth] = useState<number>(new Date().getMonth());
-  const [calYear, setCalYear] = useState<number>(new Date().getFullYear());
+  const [startDate, setStartDate] = useState(getTomorrowStr());
+  const [endDate, setEndDate] = useState(getTomorrowStr());
+
+  // Calendar Navigation in Modal - initialized to tomorrow's month/year
+  const tomorrowInit = new Date();
+  tomorrowInit.setDate(tomorrowInit.getDate() + 1);
+  const [calMonth, setCalMonth] = useState<number>(tomorrowInit.getMonth());
+  const [calYear, setCalYear] = useState<number>(tomorrowInit.getFullYear());
   const [selectingTarget, setSelectingTarget] = useState<'start' | 'end'>('start');
 
   // Time States (for partial closure)
@@ -405,10 +417,14 @@ export default function HolidaysScreen() {
     return days;
   }, [calMonth, calYear]);
 
-  // Check if current calendar month is current month or in the past
+  // Check if current calendar month is strictly before tomorrow's month
   const isCurrentMonthOrPast = useMemo(() => {
-    const now = new Date();
-    return calYear < now.getFullYear() || (calYear === now.getFullYear() && calMonth <= now.getMonth());
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return (
+      calYear < tomorrow.getFullYear() ||
+      (calYear === tomorrow.getFullYear() && calMonth <= tomorrow.getMonth())
+    );
   }, [calYear, calMonth]);
 
   const handlePrevCalMonth = () => {
@@ -493,43 +509,27 @@ export default function HolidaysScreen() {
     const m = String(calMonth + 1).padStart(2, '0');
     const d = String(day).padStart(2, '0');
     const pickedDate = `${calYear}-${m}-${d}`;
-    const today = getTodayStr();
+    const minAllowedDate = getTomorrowStr();
 
-    // Prevent selecting dates in the past
-    if (pickedDate < today) return;
+    // Prevent selecting today or past dates (minimum selectable date is tomorrow)
+    if (pickedDate < minAllowedDate) {
+      Toast.show({
+        type: 'info',
+        text1: 'Date Not Allowed',
+        text2: 'Holidays can only be applied from tomorrow onwards.',
+        position: 'top',
+      });
+      return;
+    }
 
     if (!isRange) {
       setStartDate(pickedDate);
       setEndDate(pickedDate);
-
-      // If switching to today and current startTime is in the past, auto-adjust to upcoming hours
-      if (pickedDate === today) {
-        const now = new Date();
-        const minAllowedMin = (now.getHours() + 1) * 60 + Math.ceil(now.getMinutes() / 5) * 5;
-        if (extractTimeNumber(startTimeStr) < minAllowedMin) {
-          const defaults = getDefaultTimesForDate(pickedDate);
-          setStartTimeStr(defaults.startPayload);
-          setStartTimeDisplay(defaults.startDisplay);
-          setEndTimeStr(defaults.endPayload);
-          setEndTimeDisplay(defaults.endDisplay);
-        }
-      }
     } else {
       if (selectingTarget === 'start') {
         setStartDate(pickedDate);
         if (pickedDate > endDate) {
           setEndDate(pickedDate);
-        }
-        if (pickedDate === today) {
-          const now = new Date();
-          const minAllowedMin = (now.getHours() + 1) * 60 + Math.ceil(now.getMinutes() / 5) * 5;
-          if (extractTimeNumber(startTimeStr) < minAllowedMin) {
-            const defaults = getDefaultTimesForDate(pickedDate);
-            setStartTimeStr(defaults.startPayload);
-            setStartTimeDisplay(defaults.startDisplay);
-            setEndTimeStr(defaults.endPayload);
-            setEndTimeDisplay(defaults.endDisplay);
-          }
         }
         setSelectingTarget('end');
       } else {
@@ -549,16 +549,17 @@ export default function HolidaysScreen() {
     setTitleError('');
     setClosureType('full_day');
     setIsRange(false);
-    const today = getTodayStr();
-    setStartDate(today);
-    setEndDate(today);
-    const now = new Date();
-    setCalMonth(now.getMonth());
-    setCalYear(now.getFullYear());
+    const tomorrow = getTomorrowStr();
+    setStartDate(tomorrow);
+    setEndDate(tomorrow);
+    const tomorrowDate = new Date();
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    setCalMonth(tomorrowDate.getMonth());
+    setCalYear(tomorrowDate.getFullYear());
     setSelectingTarget('start');
 
-    // Default to clean upcoming hours if today
-    const defaults = getDefaultTimesForDate(today);
+    // Default clean hours
+    const defaults = getDefaultTimesForDate(tomorrow);
     setStartTimeStr(defaults.startPayload);
     setEndTimeStr(defaults.endPayload);
     setStartTimeDisplay(defaults.startDisplay);
@@ -769,6 +770,17 @@ export default function HolidaysScreen() {
         type: 'error',
         text1: 'Title Required',
         text2: 'Please enter a title for the holiday or closure.',
+        position: 'top',
+      });
+      return;
+    }
+
+    const minAllowedDate = getTomorrowStr();
+    if (startDate < minAllowedDate) {
+      Toast.show({
+        type: 'error',
+        text1: 'Invalid Holiday Date',
+        text2: 'Holiday cannot be applied for today. Please select tomorrow or a future date.',
         position: 'top',
       });
       return;
@@ -1610,9 +1622,14 @@ export default function HolidaysScreen() {
                 {/* 3. Date Selection & Inline Calendar */}
                 <View className="mb-3.5">
                   <View className="flex-row items-center justify-between mb-1.5">
-                    <Text className="font-bold text-[12px] text-[#334155]">
-                      {isRange ? 'Holiday Date Range' : 'Holiday Date'}
-                    </Text>
+                    <View className="flex-row items-center gap-1.5">
+                      <Text className="font-bold text-[12px] text-[#334155]">
+                        {isRange ? 'Holiday Date Range' : 'Holiday Date'}
+                      </Text>
+                      <View className="px-1.5 py-0.5 rounded-md bg-amber-50 border border-amber-200">
+                        <Text className="text-[9px] font-semibold text-amber-700">Tomorrow onwards</Text>
+                      </View>
+                    </View>
 
                     {/* Multi-day toggle */}
                     <TouchableOpacity
@@ -1731,7 +1748,8 @@ export default function HolidaysScreen() {
                         const cellDate = `${calYear}-${mStr}-${dStr}`;
 
                         const today = getTodayStr();
-                        const isPast = cellDate < today;
+                        const minAllowedDate = getTomorrowStr();
+                        const isPastOrToday = cellDate < minAllowedDate;
                         const isStart = cellDate === startDate;
                         const isEnd = cellDate === endDate;
                         const inRange = isRange && cellDate > startDate && cellDate < endDate;
@@ -1741,9 +1759,9 @@ export default function HolidaysScreen() {
                         return (
                           <TouchableOpacity
                             key={`d-${day}`}
-                            disabled={isPast}
-                            activeOpacity={isPast ? 1 : 0.7}
-                            onPress={() => !isPast && handleSelectDay(day)}
+                            disabled={isPastOrToday}
+                            activeOpacity={isPastOrToday ? 1 : 0.7}
+                            onPress={() => !isPastOrToday && handleSelectDay(day)}
                             style={{
                               width: 34,
                               height: 32,
@@ -1756,11 +1774,11 @@ export default function HolidaysScreen() {
                                 : inRange
                                 ? '#FFE4E6'
                                 : isToday
-                                ? '#FFF1F2'
+                                ? '#F1F5F9'
                                 : 'transparent',
                               borderWidth: isToday && !isSelected ? 1 : 0,
-                              borderColor: '#F6163C',
-                              opacity: isPast ? 0.3 : 1,
+                              borderColor: '#CBD5E1',
+                              opacity: isPastOrToday ? 0.35 : 1,
                             }}>
                             <Text
                               style={{
@@ -1768,12 +1786,10 @@ export default function HolidaysScreen() {
                                   ? '#FFFFFF'
                                   : inRange
                                   ? '#BE123C'
-                                  : isToday
-                                  ? '#F6163C'
-                                  : isPast
+                                  : isPastOrToday
                                   ? '#94A3B8'
                                   : '#1E293B',
-                                fontWeight: isSelected || inRange || isToday ? '700' : '500',
+                                fontWeight: isSelected || inRange ? '700' : '500',
                               }}
                               className="text-[12px]">
                               {day}
@@ -1841,7 +1857,7 @@ export default function HolidaysScreen() {
                           </Text>
                         </View>
                         <Text className="text-[9.5px] font-medium text-slate-400 mt-0.5">
-                          {startDate === getTodayStr() ? 'Min 1 hr ahead for today' : 'Tap to set start time'}
+                          Tap to set start time
                         </Text>
                       </TouchableOpacity>
 
