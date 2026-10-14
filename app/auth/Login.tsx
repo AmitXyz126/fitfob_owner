@@ -52,17 +52,52 @@ export default function Login() {
 
   const onSubmit = (data: LoginFormData) => {
     loginMutation.mutate(data, {
-      onSuccess: () => {
+      onSuccess: (res: any) => {
+        const roleType = (
+          res?.user?.role?.type ||
+          res?.user?.role?.name ||
+          (typeof res?.user?.role === 'string' ? res?.user?.role : '')
+        )?.toLowerCase();
+
+        if (roleType && roleType !== 'clubowner') {
+          setError('identifier', {
+            type: 'manual',
+            message: 'Access denied: Only Club Owners can log in.',
+          });
+          Toast.show({
+            type: 'error',
+            text1: 'Access Denied',
+            text2: 'Only Club Owners are allowed to access this portal.',
+          });
+          return;
+        }
+
         Toast.show({
           type: 'success',
           text1: 'Login Successful',
           text2: 'Welcome back! 👋',
         });
-
-
       },
 
       onError: (error: any) => {
+        if (
+          error?.code === 'NOT_CLUB_OWNER' ||
+          error?.isRoleError ||
+          error?.message?.toLowerCase().includes('club owner')
+        ) {
+          setError('identifier', {
+            type: 'manual',
+            message: 'Access denied: Only Club Owners can log in.',
+          });
+
+          Toast.show({
+            type: 'error',
+            text1: 'Access Denied',
+            text2: 'Only Club Owners are allowed to access this portal.',
+          });
+          return;
+        }
+
         const serverMsg =
           error?.response?.data?.error?.message || "Something went wrong";
         const status = error?.response?.status;
@@ -127,6 +162,22 @@ export default function Login() {
           },
           onError: (err: any) => {
             console.error('Google Login: Backend verification failed:', err);
+            if (
+              err?.code === 'NOT_CLUB_OWNER' ||
+              err?.isRoleError ||
+              err?.message?.toLowerCase().includes('club owner')
+            ) {
+              setError('identifier', {
+                type: 'manual',
+                message: 'Access denied: Only Club Owners can log in.',
+              });
+              Toast.show({
+                type: 'error',
+                text1: 'Access Denied',
+                text2: 'Only Club Owners are allowed to access this portal.',
+              });
+              return;
+            }
             Toast.show({
               type: 'error',
               text1: 'Google Login Failed',
@@ -165,6 +216,22 @@ export default function Login() {
         },
         onError: (err: any) => {
           console.error('Facebook Login: Backend verification failed:', err);
+          if (
+            err?.code === 'NOT_CLUB_OWNER' ||
+            err?.isRoleError ||
+            err?.message?.toLowerCase().includes('club owner')
+          ) {
+            setError('identifier', {
+              type: 'manual',
+              message: 'Access denied: Only Club Owners can log in.',
+            });
+            Toast.show({
+              type: 'error',
+              text1: 'Access Denied',
+              text2: 'Only Club Owners are allowed to access this portal.',
+            });
+            return;
+          }
           Toast.show({
             type: 'error',
             text1: 'Facebook Login Failed',

@@ -11,6 +11,8 @@ import {
   facebookLoginApi,
   googleLoginApi,
   changePasswordApi,
+  type GoogleLoginPayload,
+  type FacebookLoginPayload,
 } from '@/api/authApi';
 import { userDetailsApi } from '@/api/userdetailsApi';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -18,6 +20,17 @@ import { useRouter } from 'expo-router';
 import Toast from 'react-native-toast-message';
 
 export const navigateAfterAuth = async (user: any, router: any) => {
+  const roleType = (
+    user?.role?.type ||
+    user?.role?.name ||
+    (typeof user?.role === 'string' ? user?.role : '')
+  )?.toLowerCase();
+
+  if (roleType && roleType !== 'clubowner') {
+    console.warn('⛔ Non-clubowner user attempted post-auth navigation:', roleType);
+    return;
+  }
+
   const resetAndNavigate = (targetPath: string) => {
     if (router.canGoBack()) {
       try {
@@ -124,9 +137,34 @@ export const useLoginRequest = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: loginUserApi,
+    mutationFn: async (payload: any) => {
+      const data = await loginUserApi(payload);
+      const roleType = (
+        data?.user?.role?.type ||
+        data?.user?.role?.name ||
+        (typeof data?.user?.role === 'string' ? data?.user?.role : '')
+      )?.toLowerCase();
+
+      if (roleType && roleType !== 'clubowner') {
+        const error: any = new Error('Access denied: Only Club Owners can log in.');
+        error.code = 'NOT_CLUB_OWNER';
+        error.isRoleError = true;
+        throw error;
+      }
+      return data;
+    },
     onSuccess: (data) => {
       if (data && data.jwt && data.user) {
+        const roleType = (
+          data.user?.role?.type ||
+          data.user?.role?.name ||
+          (typeof data.user?.role === 'string' ? data.user?.role : '')
+        )?.toLowerCase();
+
+        if (roleType && roleType !== 'clubowner') {
+          return;
+        }
+
         console.log('✅ Login Success:', data.user.username);
 
         const userWithToken = {
@@ -143,7 +181,9 @@ export const useLoginRequest = () => {
     },
 
     onError: (error: any) => {
-      console.error('❌ Login Error:', error.response?.data || error.message);
+      if (!error?.isRoleError) {
+        console.error('❌ Login Error:', error.response?.data || error.message);
+      }
     },
   });
 };
@@ -229,9 +269,34 @@ export const useGoogleLogin = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: googleLoginApi,
+    mutationFn: async (payload: GoogleLoginPayload) => {
+      const data = await googleLoginApi(payload);
+      const roleType = (
+        data?.user?.role?.type ||
+        data?.user?.role?.name ||
+        (typeof data?.user?.role === 'string' ? data?.user?.role : '')
+      )?.toLowerCase();
+
+      if (roleType && roleType !== 'clubowner') {
+        const error: any = new Error('Access denied: Only Club Owners can log in.');
+        error.code = 'NOT_CLUB_OWNER';
+        error.isRoleError = true;
+        throw error;
+      }
+      return data;
+    },
     onSuccess: (data) => {
       if (data && data.jwt && data.user) {
+        const roleType = (
+          data.user?.role?.type ||
+          data.user?.role?.name ||
+          (typeof data.user?.role === 'string' ? data.user?.role : '')
+        )?.toLowerCase();
+
+        if (roleType && roleType !== 'clubowner') {
+          return;
+        }
+
         console.log('✅ Google Auth Success:', data.user.username || data.user.email);
 
         const userWithToken = {
@@ -251,7 +316,9 @@ export const useGoogleLogin = () => {
       }
     },
     onError: (error: any) => {
-      console.error('❌ Google Auth Error:', error.response?.data || error.message);
+      if (!error?.isRoleError) {
+        console.error('❌ Google Auth Error:', error.response?.data || error.message);
+      }
       const msg = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Verification Failed';
       Toast.show({
         type: 'error',
@@ -268,9 +335,34 @@ export const useFacebookLogin = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: facebookLoginApi,
+    mutationFn: async (payload: FacebookLoginPayload) => {
+      const data = await facebookLoginApi(payload);
+      const roleType = (
+        data?.user?.role?.type ||
+        data?.user?.role?.name ||
+        (typeof data?.user?.role === 'string' ? data?.user?.role : '')
+      )?.toLowerCase();
+
+      if (roleType && roleType !== 'clubowner') {
+        const error: any = new Error('Access denied: Only Club Owners can log in.');
+        error.code = 'NOT_CLUB_OWNER';
+        error.isRoleError = true;
+        throw error;
+      }
+      return data;
+    },
     onSuccess: (data) => {
       if (data && data.jwt && data.user) {
+        const roleType = (
+          data.user?.role?.type ||
+          data.user?.role?.name ||
+          (typeof data.user?.role === 'string' ? data.user?.role : '')
+        )?.toLowerCase();
+
+        if (roleType && roleType !== 'clubowner') {
+          return;
+        }
+
         console.log('✅ Facebook Auth Success:', data.user.username || data.user.email);
 
         const userWithToken = {
@@ -290,7 +382,9 @@ export const useFacebookLogin = () => {
       }
     },
     onError: (error: any) => {
-      console.error('❌ Facebook Auth Error:', error.response?.data || error.message);
+      if (!error?.isRoleError) {
+        console.error('❌ Facebook Auth Error:', error.response?.data || error.message);
+      }
       const msg = error.response?.data?.error?.message || error.response?.data?.message || error.message || 'Verification Failed';
       Toast.show({
         type: 'error',
