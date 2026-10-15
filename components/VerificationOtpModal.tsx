@@ -23,6 +23,8 @@ interface VerificationOtpModalProps {
   targetValue: string;
   onClose: () => void;
   onSuccess: () => void;
+  verifyEndpoint?: string;
+  resendEndpoint?: string;
 }
 
 export const VerificationOtpModal: React.FC<VerificationOtpModalProps> = ({
@@ -31,6 +33,8 @@ export const VerificationOtpModal: React.FC<VerificationOtpModalProps> = ({
   targetValue,
   onClose,
   onSuccess,
+  verifyEndpoint,
+  resendEndpoint,
 }) => {
   const insets = useSafeAreaInsets();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -116,15 +120,24 @@ export const VerificationOtpModal: React.FC<VerificationOtpModalProps> = ({
     setErrorMessage('');
 
     try {
-      console.log('📡 Verifying pending OTP with payload: { otp:', otpString, '}');
-      // POST /api/pending-club-owner/verify-otp with { "otp": "946542" }
-      const res = await api.post(ENDPOINTS.PENDING_VERIFY_OTP, { otp: otpString });
-      console.log('✅ Pending OTP Verified:', res);
+      const endpoint = verifyEndpoint || ENDPOINTS.PENDING_VERIFY_OTP;
+      const isClubOwner = endpoint.includes('club-owner');
+      const payload = isClubOwner
+        ? { identifier: targetValue, otp: otpString }
+        : { otp: otpString };
+
+      console.log('📡 Verifying OTP at ' + endpoint + ' with payload:', payload);
+      const res = await api.post(endpoint, payload);
+      console.log('✅ OTP Verified:', res?.data || res);
+
+      const successMsg =
+        res?.data?.message ||
+        `${type === 'phone' ? 'Phone number' : 'Email address'} verified.`;
 
       Toast.show({
         type: 'success',
         text1: 'Verification Successful! ✅',
-        text2: `${type === 'phone' ? 'Phone number' : 'Email address'} verified.`,
+        text2: successMsg,
         position: 'top',
       });
 
@@ -161,15 +174,22 @@ export const VerificationOtpModal: React.FC<VerificationOtpModalProps> = ({
     setErrorMessage('');
 
     try {
-      console.log('📡 [POST ' + ENDPOINTS.PENDING_RESEND_OTP + '] Resending OTP');
-      // POST /api/pending-club-owner/resend-otp
-      const res = await api.post(ENDPOINTS.PENDING_RESEND_OTP, {});
-      console.log('✅ [PENDING_RESEND_OTP] Success:', res.data);
+      const endpoint = resendEndpoint || ENDPOINTS.PENDING_RESEND_OTP;
+      const isClubOwner = endpoint.includes('club-owner');
+      const payload = isClubOwner
+        ? { identifier: targetValue }
+        : {};
+
+      console.log('📡 [POST ' + endpoint + '] Resending OTP with payload:', payload);
+      const res = await api.post(endpoint, payload);
+      console.log('✅ Resend OTP Success:', res?.data || res);
+
+      const successMsg = res?.data?.message || 'A new 6-digit code has been sent.';
 
       Toast.show({
         type: 'success',
         text1: 'OTP Sent! 📩',
-        text2: `A new 6-digit code has been sent.`,
+        text2: successMsg,
         position: 'top',
       });
 

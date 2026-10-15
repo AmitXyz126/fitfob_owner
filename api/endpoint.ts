@@ -55,5 +55,10 @@ export const ENDPOINTS = {
   // Holidays & Closures
   HOLIDAYS: `${BASE_URL}/api/holidays`,
   HOLIDAY_BY_ID: (id: string | number) => `${BASE_URL}/api/holidays/${id}`,
+
+  // Club Owner OTP endpoints (Edit Phone Number / Profile)
+  CLUB_OWNER_SEND_OTP: `${BASE_URL}/api/club-owner/send-otp`,
+  CLUB_OWNER_VERIFY_OTP: `${BASE_URL}/api/club-owner/verify-otp`,
+  CLUB_OWNER_RESEND_OTP: `${BASE_URL}/api/club-owner/resend-otp`,
 };
 

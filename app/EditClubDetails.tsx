@@ -98,24 +98,19 @@ const EditClubDetails = () => {
   // - Email was dummy (@phone.user) or absent, and cleanAuthPhone exists
   const isSignedUpWithPhone = isEmailDummy || (!realAuthEmail && !!cleanAuthPhone);
 
-  // When signed up with phone: phone is locked from account (already verified), email is editable & requires verification
-  // When signed up with email: email is locked from account (already verified), phone is editable & requires verification
-  const isPhoneLocked = isSignedUpWithPhone && !!cleanAuthPhone;
+  // Phone number is editable with OTP verification via /api/club-owner/send-otp
+  const isPhoneLocked = false;
   const isEmailLocked = !isSignedUpWithPhone && !!realAuthEmail;
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   // Sync auth credentials to state if locked
   useEffect(() => {
-    if (isPhoneLocked && cleanAuthPhone && phone !== cleanAuthPhone) {
-      setPhone(cleanAuthPhone);
-      setIsPhoneVerified(true);
-    }
     if (isEmailLocked && realAuthEmail && email !== realAuthEmail) {
       setEmail(realAuthEmail);
       setIsEmailVerified(true);
     }
-  }, [cleanAuthPhone, realAuthEmail, isPhoneLocked, isEmailLocked]);
+  }, [realAuthEmail, isEmailLocked]);
 
   const extractUri = (val: any): string => {
     if (!val) return '';
@@ -283,7 +278,6 @@ const EditClubDetails = () => {
   const handlePhoneChange = (text: string) => {
     const cleaned = text.replace(/[^0-9]/g, '').slice(0, 10);
     setPhone(cleaned);
-    if (isPhoneLocked) return;
     if (initialVerifiedPhone && cleaned === initialVerifiedPhone && cleaned.length === 10) {
       setIsPhoneVerified(true);
     } else {
@@ -328,19 +322,22 @@ const EditClubDetails = () => {
 
     setIsSendingOtp(true);
     try {
-      const payload: any = {
-        type,
-        identifier: type === 'phone' ? targetVal : targetVal.toLowerCase(),
-      };
+      const endpoint = type === 'phone' ? ENDPOINTS.CLUB_OWNER_SEND_OTP : ENDPOINTS.PENDING_SEND_OTP;
+      const payload: any =
+        type === 'phone'
+          ? { identifier: targetVal }
+          : { type, identifier: targetVal.toLowerCase() };
 
-      console.log('📡 [POST ' + ENDPOINTS.PENDING_SEND_OTP + ']:', payload);
-      await api.post(ENDPOINTS.PENDING_SEND_OTP, payload);
+      console.log('📡 [POST ' + endpoint + ']:', payload);
+      const res = await api.post(endpoint, payload);
       setOtpSent(true);
       setOtpModalVisible(true);
       Toast.show({
         type: 'success',
         text1: 'OTP Sent! 📩',
-        text2: `Verification code sent to ${type === 'phone' ? `+91 ${targetVal}` : targetVal}`,
+        text2:
+          res?.data?.message ||
+          `Verification code sent to ${type === 'phone' ? `+91 ${targetVal}` : targetVal}`,
         position: 'top',
       });
     } catch (error: any) {
@@ -862,6 +859,16 @@ const EditClubDetails = () => {
         visible={otpModalVisible}
         type={targetOtpType}
         targetValue={targetOtpType === 'phone' ? phone.trim() : email.trim()}
+        verifyEndpoint={
+          targetOtpType === 'phone'
+            ? ENDPOINTS.CLUB_OWNER_VERIFY_OTP
+            : ENDPOINTS.PENDING_VERIFY_OTP
+        }
+        resendEndpoint={
+          targetOtpType === 'phone'
+            ? ENDPOINTS.CLUB_OWNER_RESEND_OTP
+            : ENDPOINTS.PENDING_RESEND_OTP
+        }
         onClose={() => setOtpModalVisible(false)}
         onSuccess={() => {
           if (targetOtpType === 'phone') {

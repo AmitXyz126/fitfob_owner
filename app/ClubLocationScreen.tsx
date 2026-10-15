@@ -516,31 +516,23 @@ const ClubLocationScreen = () => {
       user?.clubOwnerDetail?.id ||
       user?.id;
 
+    const resolvedAddress =
+      locationInfo.clubAddress || locationInfo.address || searchQuery || 'Location Address';
+    const resolvedCity = locationInfo.city || myOwnerData?.city || pData?.city || '';
+    const resolvedState = locationInfo.state || myOwnerData?.state || pData?.state || '';
+    const resolvedPincode = locationInfo.pincode || myOwnerData?.pincode || pData?.pincode || '';
+
     const payloadData: any = {
       id: ownerId,
-      ownerName: myOwnerData?.ownerName || pData?.ownerName || pData?.owner_name || user?.username || '',
-      phoneNumber: myOwnerData?.phoneNumber || pData?.phoneNumber || pData?.phone_number || user?.phoneNumber || '',
-      email: myOwnerData?.email || pData?.email || user?.email || '',
-      clubName: myOwnerData?.clubName || pData?.clubName || pData?.club_name || '',
       latitude: String(region.latitude),
       longitude: String(region.longitude),
-      clubAddress: locationInfo.address || searchQuery || 'Location Address',
-      city: locationInfo.city || myOwnerData?.city || pData?.city || '',
-      state: locationInfo.state || myOwnerData?.state || pData?.state || '',
-      pincode: locationInfo.pincode || myOwnerData?.pincode || pData?.pincode || '',
-      openingTime: myOwnerData?.openingTime || pData?.openingTime || '06:00:00.000',
-      closingTime: myOwnerData?.closingTime || pData?.closingTime || '22:00:00.000',
-      weekday: myOwnerData?.weekday || pData?.weekday || 'Monday to Friday',
-      weekend: myOwnerData?.weekend || pData?.weekend || 'Saturday & Sunday',
-      facilities: myOwnerData?.facilities || pData?.facilities || [],
-      services: myOwnerData?.services || pData?.services || [],
-      clubCategory: myOwnerData?.clubCategory || pData?.clubCategory || 'Premium',
+      clubAddress: resolvedAddress,
+      city: resolvedCity,
+      state: resolvedState,
+      pincode: resolvedPincode,
     };
 
-    if (myOwnerData?.logo || pData?.logo) {
-      const rawLogo = myOwnerData?.logo || pData?.logo;
-      payloadData.logo = typeof rawLogo === 'number' ? rawLogo : rawLogo?.id;
-    }
+    console.log('📡 [ClubLocationScreen] Sending location-only payload:', payloadData);
 
     try {
       // 1. Update backend via updateClubOwner or submitStep2

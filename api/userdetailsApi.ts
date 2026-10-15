@@ -515,11 +515,14 @@ export const userDetailsApi = {
   },
 
   updateClubOwner: async (id: number | string, payloadData: any) => {
+    // Strip id from the body payload because id is passed in the URL
+    const { id: _ignoredId, ...bodyData } = payloadData || {};
+
     // 1. Try PUT /api/club-owners/:id (for approved owners)
     if (id && id !== 0 && id !== '0') {
       try {
         const response = await api.put(`${ENDPOINTS.CLUB_OWNERS}/${id}`, {
-          data: payloadData,
+          data: bodyData,
         });
         return response.data;
       } catch (error: any) {
@@ -530,7 +533,7 @@ export const userDetailsApi = {
     // 2. Try PUT /api/club-owner/me
     try {
       const response = await api.put(ENDPOINTS.MY_CLUB_OWNER, {
-        data: payloadData,
+        data: bodyData,
       });
       return response.data;
     } catch (e: any) {
@@ -587,7 +590,7 @@ export const userDetailsApi = {
 
     // Final attempt: PUT /api/club-owners
     const response = await api.put(ENDPOINTS.CLUB_OWNERS, {
-      data: payloadData,
+      data: bodyData,
     });
     return response.data;
   },
