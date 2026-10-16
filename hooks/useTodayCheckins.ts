@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { checkinApi, CheckinItemData } from '@/api/checkinApi';
+import { checkinApi, CheckinItemData, CheckinQueryParams } from '@/api/checkinApi';
 import { useCheckinStore } from '@/store/useCheckinStore';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -12,6 +12,8 @@ export interface FormattedCheckinItem {
   email?: string;
   time: string;
   rawTime: string;
+  createdAt?: string;
+  date?: string;
   image: string;
   type: string;
   color: string;
@@ -196,7 +198,10 @@ export const getSubscriptionBadge = (subscriptionType?: string) => {
   };
 };
 
-export const useTodayCheckins = (enabled: boolean = true) => {
+export const useTodayCheckins = (
+  enabled: boolean = true,
+  dateParams?: string | CheckinQueryParams | null
+) => {
   const { user } = useAuthStore();
   const setTodayCheckins = useCheckinStore((state) => state.setTodayCheckins);
   const userKey = user?.id || user?.email || 'guest';
@@ -209,12 +214,32 @@ export const useTodayCheckins = (enabled: boolean = true) => {
     return () => clearInterval(timer);
   }, []);
 
+  const normalizedParams: CheckinQueryParams | undefined = useMemo(() => {
+    if (!dateParams) return undefined;
+    if (typeof dateParams === 'string') {
+      if (dateParams === 'today' || dateParams === 'all') return undefined;
+      return { date: dateParams };
+    }
+    return dateParams;
+  }, [dateParams]);
+
+  const isTodayOnly =
+    !normalizedParams ||
+    (!normalizedParams.startDate &&
+      (!normalizedParams.date ||
+        normalizedParams.date === 'today' ||
+        normalizedParams.date === new Date().toISOString().split('T')[0]));
+
+  const queryKey = useMemo(() => {
+    return ['today-checkins', userKey, JSON.stringify(normalizedParams || {})];
+  }, [userKey, normalizedParams]);
+
   const query = useQuery({
-    queryKey: ['today-checkins', userKey],
-    queryFn: checkinApi.getTodayCheckins,
+    queryKey,
+    queryFn: () => checkinApi.getTodayCheckins(normalizedParams),
     enabled: !!user && enabled,
     staleTime: 0, // Always consider stale so fresh data is fetched instantly
-    refetchInterval: 5000, // Poll every 5 seconds for real-time live checkin updates
+    refetchInterval: isTodayOnly ? 5000 : false, // Poll only for today's live checkins
     refetchIntervalInBackground: false,
     gcTime: 5 * 60 * 1000,
     retry: 1,
@@ -274,6 +299,8 @@ export const useTodayCheckins = (enabled: boolean = true) => {
         email,
         time: formatCheckinTime(checkinTime),
         rawTime: checkinTime,
+        createdAt: item.createdAt || item.attributes?.createdAt || '',
+        date: item.date || item.attributes?.date || '',
         image: resolveCheckinImage(item),
         type,
         color,

@@ -15,6 +15,7 @@ import {
   Lock,
   Layers,
   Calendar,
+  BadgePercent,
 } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Container } from '@/components/Container';
@@ -448,6 +449,7 @@ const ClubProfileScreen = () => {
   const [servicesList, setServicesList] = useState<string[]>([]);
   const [amenitiesList, setAmenitiesList] = useState<string[]>([]);
   const [clubCategory, setClubCategory] = useState<string>('');
+  const [plansCount, setPlansCount] = useState<number | null>(null);
 
   const parseArrayData = (val: any): string[] => {
     if (!val) return [];
@@ -524,6 +526,16 @@ const ClubProfileScreen = () => {
         if (parsedData.everydayCloseTime) everydayCloseFromStorage = parsedData.everydayCloseTime;
         if (parsedData.daySchedules) daySchedulesFromStorage = parsedData.daySchedules;
       }
+
+      try {
+        const savedPlans = await AsyncStorage.getItem('@club_membership_plans_v1');
+        if (savedPlans) {
+          const parsed = JSON.parse(savedPlans);
+          if (Array.isArray(parsed)) {
+            setPlansCount(parsed.filter((p: any) => p.isActive).length);
+          }
+        }
+      } catch {}
 
       const keys = await AsyncStorage.getAllKeys();
       const pId = profileStatus?.id || profileStatus?.pendingClubOwnerId || user?.id || user?.email;
@@ -884,6 +896,14 @@ const ClubProfileScreen = () => {
                   : undefined
             }
             onPress={() => router.push('/clubServices')}
+          />
+          <LineGradient />
+
+          <MenuOption
+            icon={BadgePercent}
+            title="Membership Plans & Pricing"
+            value={plansCount !== null ? `${plansCount} Active Plans` : 'Configure Fees'}
+            onPress={() => router.push('/MembershipPlansScreen')}
           />
           <LineGradient />
 

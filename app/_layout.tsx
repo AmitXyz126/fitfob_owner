@@ -55,6 +55,7 @@ export default function Layout() {
           <Stack.Screen name="verificationStatus" />
           <Stack.Screen name="clubTimings" />
           <Stack.Screen name="holidays" />
+          <Stack.Screen name="MembershipPlansScreen" />
         </Stack>
         <Toast />
       </QueryClientProvider>

@@ -16,21 +16,66 @@ export interface TodayCheckinsResponse {
   data: CheckinItemData[];
 }
 
+export interface CheckinQueryParams {
+  date?: string;
+  startDate?: string;
+  endDate?: string;
+  from?: string;
+  to?: string;
+}
+
 export const checkinApi = {
   /**
-   * Fetch today's check-ins for the club owner
+   * Fetch check-ins for the club owner with optional date/range filter
    * Endpoint: /club-owners/today-checkins
    */
-  getTodayCheckins: async (): Promise<CheckinItemData[]> => {
+  getTodayCheckins: async (params?: CheckinQueryParams): Promise<CheckinItemData[]> => {
     try {
-      const response = await api.get(ENDPOINTS.TODAY_CHECKINS);
+      // 1. If params are provided, clean them so date does not conflict with range
+      const cleanParams: any = {};
+      if (params) {
+        if (params.startDate) cleanParams.startDate = params.startDate;
+        if (params.endDate) cleanParams.endDate = params.endDate;
+        if (params.from) cleanParams.from = params.from;
+        if (params.to) cleanParams.to = params.to;
+        if (params.date && (!params.startDate || params.startDate === params.endDate)) {
+          cleanParams.date = params.date;
+        }
+      }
+
+      const hasParams = Object.keys(cleanParams).length > 0;
+      let response;
+      try {
+        response = await api.get(ENDPOINTS.TODAY_CHECKINS, hasParams ? { params: cleanParams } : undefined);
+      } catch (paramErr) {
+        // If query with params failed, fallback to base endpoint
+        console.warn('API error with params, falling back to base checkins:', paramErr);
+        response = await api.get(ENDPOINTS.TODAY_CHECKINS);
+      }
+
+      let list: CheckinItemData[] = [];
       if (Array.isArray(response.data)) {
-        return response.data;
+        list = response.data;
+      } else if (response.data && Array.isArray(response.data.data)) {
+        list = response.data.data;
       }
-      if (response.data && Array.isArray(response.data.data)) {
-        return response.data.data;
+
+      // If param response was unexpectedly empty, try base endpoint as safety fallback
+      if (list.length === 0 && hasParams) {
+        try {
+          const fallbackRes = await api.get(ENDPOINTS.TODAY_CHECKINS);
+          const fallbackList = Array.isArray(fallbackRes.data)
+            ? fallbackRes.data
+            : fallbackRes.data && Array.isArray(fallbackRes.data.data)
+            ? fallbackRes.data.data
+            : [];
+          if (fallbackList.length > 0) {
+            return fallbackList;
+          }
+        } catch {}
       }
-      return [];
+
+      return list;
     } catch (error) {
       console.error('Error fetching today checkins:', error);
       throw error;
