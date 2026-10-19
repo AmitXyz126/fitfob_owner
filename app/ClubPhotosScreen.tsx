@@ -58,7 +58,7 @@ const ClubPhotosScreen = () => {
     deleteClubPhoto,
     // Legacy pending hooks
     profileStatus,
-  } = useUserDetail();
+  } = useUserDetail({ fetchPhotos: true });
 
 
   // Unified list of photos (server + instant optimistic local photos)

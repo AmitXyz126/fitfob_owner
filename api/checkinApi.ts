@@ -44,19 +44,24 @@ export const checkinApi = {
       }
 
       const hasParams = Object.keys(cleanParams).length > 0;
-      let response;
+      let response: any = null;
       try {
         response = await api.get(ENDPOINTS.TODAY_CHECKINS, hasParams ? { params: cleanParams } : undefined);
-      } catch (paramErr) {
+      } catch (paramErr: any) {
         // If query with params failed, fallback to base endpoint
-        console.warn('API error with params, falling back to base checkins:', paramErr);
-        response = await api.get(ENDPOINTS.TODAY_CHECKINS);
+        console.warn('API error with params, falling back to base checkins:', paramErr?.message || paramErr);
+        try {
+          response = await api.get(ENDPOINTS.TODAY_CHECKINS);
+        } catch (baseErr: any) {
+          console.warn('Base checkins request failed or forbidden:', baseErr?.message || baseErr);
+          return [];
+        }
       }
 
       let list: CheckinItemData[] = [];
-      if (Array.isArray(response.data)) {
+      if (response && Array.isArray(response.data)) {
         list = response.data;
-      } else if (response.data && Array.isArray(response.data.data)) {
+      } else if (response && response.data && Array.isArray(response.data.data)) {
         list = response.data.data;
       }
 
@@ -64,9 +69,9 @@ export const checkinApi = {
       if (list.length === 0 && hasParams) {
         try {
           const fallbackRes = await api.get(ENDPOINTS.TODAY_CHECKINS);
-          const fallbackList = Array.isArray(fallbackRes.data)
+          const fallbackList = Array.isArray(fallbackRes?.data)
             ? fallbackRes.data
-            : fallbackRes.data && Array.isArray(fallbackRes.data.data)
+            : fallbackRes?.data && Array.isArray(fallbackRes.data.data)
             ? fallbackRes.data.data
             : [];
           if (fallbackList.length > 0) {
@@ -78,7 +83,7 @@ export const checkinApi = {
       return list;
     } catch (error) {
       console.error('Error fetching today checkins:', error);
-      throw error;
+      return [];
     }
   },
 };

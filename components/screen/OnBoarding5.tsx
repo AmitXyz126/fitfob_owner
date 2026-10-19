@@ -117,7 +117,7 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
     uploadSingleClubPhoto,
     deleteClubPhoto,
     confirmOnboarding,
-  } = useUserDetail();
+  } = useUserDetail({ fetchPhotos: true });
 
   // Unified list of photos (server + instant optimistic local photos)
   const [localPhotos, setLocalPhotos] = useState<any[]>([]);

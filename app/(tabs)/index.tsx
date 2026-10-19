@@ -156,16 +156,16 @@ const CheckinItem = ({ item, index, scrollY, onSelect }: any) => {
 
         <View
           style={{
-            backgroundColor: `${item.color}15`,
-            borderColor: `${item.color}30`,
+            backgroundColor: `${item?.color || '#94A3B8'}15`,
+            borderColor: `${item?.color || '#94A3B8'}30`,
             width: 95,
           }}
           className="flex-row items-center justify-center gap-1 rounded-full border py-1.5">
           <Image
             source={
-              item.type === 'Luxury'
+              item?.type === 'Luxury'
                 ? require('../../assets/images/luxury.png')
-                : item.type === 'Premium'
+                : item?.type === 'Premium'
                   ? require('../../assets/images/premium.png')
                   : require('../../assets/images/standardicon.png')
             }
@@ -174,10 +174,10 @@ const CheckinItem = ({ item, index, scrollY, onSelect }: any) => {
           />
 
           <Text
-            style={{ color: item.color }}
+            style={{ color: item?.color || '#94A3B8' }}
             className="text-[12px] font-normal "
             numberOfLines={1}>
-            {item.type}
+            {item?.type || 'Standard'}
           </Text>
         </View>
       </TouchableOpacity>

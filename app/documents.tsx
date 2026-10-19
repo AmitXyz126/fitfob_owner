@@ -50,7 +50,7 @@ const DOCUMENT_TYPES = [
 export default function DocumentsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { documents, isDocsLoading, refetchDocs, uploadDoc } = useUserDetail();
+  const { documents, isDocsLoading, refetchDocs, uploadDoc } = useUserDetail({ fetchDocs: true });
 
   const [selectedDoc, setSelectedDoc] = useState<DocumentItem | null>(null);
   const [popupVisible, setPopupVisible] = useState(false);

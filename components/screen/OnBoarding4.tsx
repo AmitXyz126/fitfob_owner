@@ -45,7 +45,7 @@ interface Props {
 
 const OnBoarding4 = forwardRef<OnBoarding4Handle, Props>((props, ref) => {
   const { onUploadSuccess, onUploadDone, onBack } = props;
-  const { uploadDoc, verifyGovtDoc, refetch, documents, refetchDocs } = useUserDetail();
+  const { uploadDoc, verifyGovtDoc, refetch, documents, refetchDocs } = useUserDetail({ fetchDocs: true });
   const { user } = useAuthStore();
   const insets = useSafeAreaInsets();
 

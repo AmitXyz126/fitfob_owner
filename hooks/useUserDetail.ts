@@ -20,10 +20,17 @@ export const useClubOwnerMe = (enabled: boolean = true) => {
   });
 };
 
-export const useUserDetail = () => {
+export interface UseUserDetailOptions {
+  fetchDocs?: boolean;
+  fetchPhotos?: boolean;
+}
+
+export const useUserDetail = (options?: UseUserDetailOptions) => {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const userKey = user?.id || user?.email || 'guest';
+  const shouldFetchDocs = Boolean(options?.fetchDocs);
+  const shouldFetchPhotos = Boolean(options?.fetchPhotos);
 
   const {
     data: profileStatus,
@@ -88,7 +95,7 @@ export const useUserDetail = () => {
       }
       return [];
     },
-    enabled: !!user,
+    enabled: !!user && shouldFetchDocs,
     retry: 1,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
@@ -288,7 +295,7 @@ export const useUserDetail = () => {
       }
       return { photos: [] };
     },
-    enabled: !!user,
+    enabled: !!user && shouldFetchPhotos,
     retry: 1,
     staleTime: 5 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
@@ -424,7 +431,7 @@ export const useUserDetail = () => {
       const list = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
       return list;
     },
-    enabled: !!user,
+    enabled: !!user && shouldFetchPhotos,
     retry: 1,
     staleTime: 3 * 60 * 1000,
     gcTime: 10 * 60 * 1000,

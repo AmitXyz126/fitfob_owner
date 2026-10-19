@@ -1,9 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { SplashScreen, Stack } from 'expo-router';
+import { SplashScreen, Stack, ErrorBoundaryProps } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import '../global.css';
 import { useFonts } from 'expo-font';
 import { useEffect } from 'react';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
@@ -11,6 +12,26 @@ const queryClient = new QueryClient();
 
 // Keep the splash screen visible while loading fonts and assets to avoid white screen flash
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <SafeAreaProvider>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: '#FFFFFF' }}>
+        <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#0F172A', marginBottom: 8 }}>
+          Something went wrong
+        </Text>
+        <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center', marginBottom: 24, lineHeight: 18 }}>
+          {error?.message || 'An unexpected error occurred.'}
+        </Text>
+        <TouchableOpacity
+          onPress={retry}
+          style={{ backgroundColor: '#F6163C', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 14 }}>
+          <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 }}>Try Again</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaProvider>
+  );
+}
 
 export default function Layout() {
 
@@ -62,4 +83,5 @@ export default function Layout() {
     </SafeAreaProvider>
   );
 }
+
  

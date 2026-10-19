@@ -26,7 +26,7 @@ interface Props {
 }
 
 export default function OnBoarding4_List({ onAddMore, onNext }: Props) {
-  const { documents, isDocsLoading, isDocsFetching, refetchDocs } = useUserDetail();
+  const { documents, isDocsLoading, isDocsFetching, refetchDocs } = useUserDetail({ fetchDocs: true });
   const { user } = useAuthStore();
   const userKey = user?.id || user?.email || 'guest';
   const STORAGE_KEY = `@onboarding_documents_cache_${userKey}`;

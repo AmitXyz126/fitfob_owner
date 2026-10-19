@@ -299,8 +299,8 @@ export const userDetailsApi = {
           }
           result = response.data;
         }
-      } catch (e) {
-        console.log('MY_DOCUMENTS endpoint error, using pending-club-owner fallback:', e);
+      } catch (e: any) {
+        console.warn('MY_DOCUMENTS endpoint error, checking pending documents fallback:', e?.response?.status || e?.message);
       }
     }
 
@@ -314,21 +314,8 @@ export const userDetailsApi = {
         }
         if (!result) result = response.data;
       }
-    } catch (e) {
-      console.log('ENDPOINTS.Get (/api/pending-club-owner/documents) error:', e);
-    }
-
-    // Fallback: check /api/my-documents if not tried yet
-    if (!isApprovedOwner) {
-      try {
-        const response = await api.get(ENDPOINTS.MY_DOCUMENTS);
-        if (response.data) {
-          const list = response.data?.documents || response.data?.data || (Array.isArray(response.data) ? response.data : []);
-          if (Array.isArray(list) && list.length > 0) {
-            return response.data;
-          }
-        }
-      } catch (e) {}
+    } catch (e: any) {
+      console.warn('ENDPOINTS.Get (/api/pending-club-owner/documents) error:', e?.response?.status || e?.message);
     }
 
     // Fallback: check if GET_ONBOARDING_STATUS has documents embedded
