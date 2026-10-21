@@ -228,7 +228,10 @@ export default function OtpScreen() {
                 onKeyPress={(e) => handleKeyPress(e, index)}
                 autoFocus={index === 0}
                 editable={!isPending && !isResending}
+                
+                
               />
+
             ))}
           </View>
 

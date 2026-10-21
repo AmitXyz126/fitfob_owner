@@ -144,9 +144,22 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
       setAiResult(res);
       if (res?.area && res.area !== 'Other') {
         setPhotoCaption(res.area);
+      } else {
+        Toast.show({
+          type: 'info',
+          text1: 'Select Area Caption 🏷️',
+          text2: 'Could not auto-detect zone. Please pick a category below.',
+          visibilityTime: 3000,
+        });
       }
-    } catch (e) {
-      console.log('AI Area Analysis error:', e);
+    } catch (e: any) {
+      console.warn('AI Area Analysis error:', e?.message || e);
+      Toast.show({
+        type: 'info',
+        text1: 'AI Scan Skipped',
+        text2: 'Please select a quick category below or enter caption.',
+        visibilityTime: 3000,
+      });
     } finally {
       setIsAnalyzingAi(false);
     }

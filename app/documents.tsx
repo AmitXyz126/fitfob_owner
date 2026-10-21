@@ -520,7 +520,7 @@ export default function DocumentsScreen() {
           <View className="flex-1 p-2 bg-slate-900">
             {selectedDoc?.url ? (
               selectedDoc.url.toLowerCase().match(/\.(jpg|jpeg|png|webp)/) ||
-              selectedDoc.url.startsWith('data:image') ? (
+                selectedDoc.url.startsWith('data:image') ? (
                 <View className="flex-1 items-center justify-center p-2">
                   <Image
                     source={{ uri: selectedDoc.url }}

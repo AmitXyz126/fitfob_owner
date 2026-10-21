@@ -22,19 +22,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUserDetail } from '@/hooks/useUserDetail';
 import { useAuthStore } from '@/store/useAuthStore';
 
+import {
+  analyzeGymImage,
+  GYM_AREA_CATEGORIES,
+  GymAreaAnalysisResult,
+} from '@/services/gymAreaAiService';
+
 const MAX_PHOTOS = 20;
 const INITIAL_SLOTS_COUNT = 5;
-
-const SUGGESTED_TAGS = [
-  'Cardio Zone',
-  'Free Weights',
-  'Crossfit Area',
-  'Reception & Entry',
-  'Locker & Showers',
-  'Steam & Sauna',
-  'Zumba / Yoga Studio',
-  'Strength Machines',
-];
 
 const ClubPhotosScreen = () => {
   const router = useRouter();
@@ -73,6 +68,38 @@ const ClubPhotosScreen = () => {
   );
   const [photoCaption, setPhotoCaption] = useState('');
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
+  const [isAnalyzingAi, setIsAnalyzingAi] = useState(false);
+  const [aiResult, setAiResult] = useState<GymAreaAnalysisResult | null>(null);
+
+  // Automatically classify gym area using Gemini Vision
+  const runAiAnalysis = async (uri: string) => {
+    setIsAnalyzingAi(true);
+    setAiResult(null);
+    try {
+      const res = await analyzeGymImage(uri);
+      setAiResult(res);
+      if (res?.area && res.area !== 'Other') {
+        setPhotoCaption(res.area);
+      } else {
+        Toast.show({
+          type: 'info',
+          text1: 'Select Area Caption 🏷️',
+          text2: 'Could not auto-detect zone. Please pick a category below.',
+          visibilityTime: 3000,
+        });
+      }
+    } catch (e: any) {
+      console.warn('AI Area Analysis error:', e?.message || e);
+      Toast.show({
+        type: 'info',
+        text1: 'AI Scan Skipped',
+        text2: 'Please select a quick category below or enter caption.',
+        visibilityTime: 3000,
+      });
+    } finally {
+      setIsAnalyzingAi(false);
+    }
+  };
 
   // Normalize image URL robustly across all Strapi/Express/Cloudinary payload formats
   const normalizeUrl = (item: any): string => {
@@ -279,7 +306,9 @@ const ClubPhotosScreen = () => {
         type: asset.mimeType || 'image/jpeg',
       });
       setPhotoCaption('');
+      setAiResult(null);
       setUploadModalVisible(true);
+      runAiAnalysis(asset.uri);
     }
   };
 
@@ -305,7 +334,9 @@ const ClubPhotosScreen = () => {
         type: 'image/jpeg',
       });
       setPhotoCaption('');
+      setAiResult(null);
       setUploadModalVisible(true);
+      runAiAnalysis(asset.uri);
     }
   };
 
@@ -370,6 +401,8 @@ const ClubPhotosScreen = () => {
     setUploadModalVisible(false);
     setPickedPhoto(null);
     setPhotoCaption('');
+    setAiResult(null);
+    setIsAnalyzingAi(false);
 
     // 2. RUN NETWORK UPLOAD IN BACKGROUND
     try {
@@ -780,7 +813,15 @@ const ClubPhotosScreen = () => {
                 <Text className="text-xs text-slate-400">Add a caption for this facility</Text>
               </View>
               <TouchableOpacity
-                onPress={() => setUploadModalVisible(false)}
+                onPress={() => {
+                  if (!isUploading) {
+                    setUploadModalVisible(false);
+                    setPickedPhoto(null);
+                    setPhotoCaption('');
+                    setAiResult(null);
+                    setIsAnalyzingAi(false);
+                  }
+                }}
                 disabled={isUploading}
                 className="h-9 w-9 items-center justify-center rounded-full bg-slate-100">
                 <Ionicons name="close" size={20} color="#64748B" />
@@ -806,46 +847,134 @@ const ClubPhotosScreen = () => {
                 </View>
               )}
 
+              {/* AI Detection Loading Banner */}
+              {isAnalyzingAi && (
+                <View className="mb-4 flex-row items-center rounded-2xl border border-rose-200 bg-rose-50/70 p-3">
+                  <ActivityIndicator size="small" color="#F6163C" />
+                  <View className="ml-3 flex-1">
+                    <Text className="text-xs font-bold text-rose-800">
+                      Analyzing gym area with AI...
+                    </Text>
+                    <Text className="text-[11px] text-rose-600 mt-0.5">
+                      Identifying equipment & specific facility zone
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {/* AI Detection Result Card */}
+              {!isAnalyzingAi && aiResult && (
+                <View className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3.5">
+                  <View className="flex-row items-center justify-between">
+                    <View className="flex-row items-center flex-1 mr-2">
+                      <View className="h-6 w-6 items-center justify-center rounded-full bg-emerald-100 mr-2">
+                        <Ionicons name="sparkles" size={13} color="#059669" />
+                      </View>
+                      <View className="flex-1">
+                        <View className="flex-row items-center flex-wrap gap-1.5">
+                          <Text className="text-xs font-bold text-emerald-950">
+                            {aiResult.area}
+                          </Text>
+                          <View className="rounded-full bg-emerald-200/80 px-2 py-0.5">
+                            <Text className="text-[10px] font-bold text-emerald-800">
+                              {Math.round(aiResult.confidence * 100)}% match
+                            </Text>
+                          </View>
+                        </View>
+                        {aiResult.reason ? (
+                          <Text className="text-[11px] text-emerald-700 mt-1 leading-4">
+                            {aiResult.reason}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
+                    {photoCaption !== aiResult.area && (
+                      <TouchableOpacity
+                        onPress={() => setPhotoCaption(aiResult.area)}
+                        disabled={isUploading}
+                        className="rounded-xl bg-emerald-600 px-3 py-1.5">
+                        <Text className="text-xs font-bold text-white">Apply</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              )}
+
               {/* Caption Input */}
               <View className="mb-3">
-                <Text className="mb-2 text-xs font-bold text-slate-700">
-                  Facility Description / Caption <Text className="text-rose-500">*</Text>
-                </Text>
+                <View className="flex-row items-center justify-between mb-2">
+                  <Text className="text-xs font-bold text-slate-700">
+                    Facility Area / Caption <Text className="text-rose-500">*</Text>
+                  </Text>
+                  {pickedPhoto?.uri && !isAnalyzingAi && (
+                    <TouchableOpacity
+                      onPress={() => runAiAnalysis(pickedPhoto.uri)}
+                      disabled={isUploading}
+                      className="flex-row items-center">
+                      <Ionicons name="sparkles" size={12} color="#F6163C" />
+                      <Text className="ml-1 text-[11px] font-bold text-[#F6163C]">
+                        Re-scan with AI
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
                 <View className="flex-row items-center rounded-2xl border border-slate-200 bg-[#F8FAFC] px-4 py-3">
                   <Ionicons name="create-outline" size={18} color="#F6163C" />
                   <TextInput
                     value={photoCaption}
                     onChangeText={setPhotoCaption}
-                    placeholder="e.g. Cardio Zone, Free Weights Section"
+                    placeholder="e.g. Cardio Area, Free Weights Area"
                     placeholderTextColor="#94A3B8"
                     maxLength={60}
                     editable={!isUploading}
                     className="ml-2.5 flex-1 font-semibold text-sm text-slate-900 p-0"
                   />
+                  {photoCaption ? (
+                    <TouchableOpacity onPress={() => setPhotoCaption('')} disabled={isUploading}>
+                      <Ionicons name="close-circle" size={16} color="#94A3B8" />
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               </View>
 
               {/* Suggested Quick Tags */}
               <View className="mb-5">
                 <Text className="mb-2 text-[11px] font-semibold text-slate-400">
-                  Quick suggestions (tap to use):
+                  Quick categories (tap to select):
                 </Text>
                 <View className="flex-row flex-wrap gap-2">
-                  {SUGGESTED_TAGS.map((tag) => {
+                  {GYM_AREA_CATEGORIES.map((tag) => {
                     const isSelected = photoCaption.toLowerCase() === tag.toLowerCase();
+                    const isAiSuggested = aiResult?.area?.toLowerCase() === tag.toLowerCase();
                     return (
                       <TouchableOpacity
                         key={tag}
                         onPress={() => setPhotoCaption(tag)}
                         disabled={isUploading}
                         activeOpacity={0.7}
-                        className={`rounded-full px-3 py-1.5 border ${isSelected
+                        className={`rounded-full px-3 py-1.5 border flex-row items-center ${
+                          isSelected
                             ? 'bg-rose-50 border-[#F6163C]'
+                            : isAiSuggested
+                            ? 'bg-emerald-50 border-emerald-300'
                             : 'bg-slate-100 border-slate-200/60'
-                          }`}>
+                        }`}>
+                        {isAiSuggested && (
+                          <Ionicons
+                            name="sparkles"
+                            size={10}
+                            color={isSelected ? '#F6163C' : '#059669'}
+                            style={{ marginRight: 4 }}
+                          />
+                        )}
                         <Text
-                          className={`text-xs font-semibold ${isSelected ? 'text-[#F6163C]' : 'text-slate-600'
-                            }`}>
+                          className={`text-xs font-semibold ${
+                            isSelected
+                              ? 'text-[#F6163C]'
+                              : isAiSuggested
+                              ? 'text-emerald-800'
+                              : 'text-slate-600'
+                          }`}>
                           {tag}
                         </Text>
                       </TouchableOpacity>

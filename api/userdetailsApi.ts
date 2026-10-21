@@ -175,9 +175,9 @@ export const userDetailsApi = {
   verifyPendingOtp: async (
     payload:
       | {
-          otp: string;
-          [key: string]: any;
-        }
+        otp: string;
+        [key: string]: any;
+      }
       | string
   ) => {
     const otpValue = typeof payload === 'string' ? payload.trim() : String(payload?.otp || '').trim();
@@ -224,7 +224,7 @@ export const userDetailsApi = {
       services: data.services,
       facilities: data.facilities,
       weekdayScheduling: data.weekdayScheduling,
-     
+
     };
     const response = await api.post(ENDPOINTS.STEP_4, payload);
     return response.data;
@@ -331,7 +331,7 @@ export const userDetailsApi = {
       if (Array.isArray(embeddedDocs) && embeddedDocs.length > 0) {
         return { documents: embeddedDocs };
       }
-    } catch (e) {}
+    } catch (e) { }
 
     return result || [];
   },
@@ -609,9 +609,9 @@ export const userDetailsApi = {
                 ...(currentUser.clubOwnerDetail || {}),
                 ...ownerData,
               },
-            }, true).catch(() => {});
+            }, true).catch(() => { });
           }
-        } catch (e) {}
+        } catch (e) { }
 
         return ownerData;
       }
@@ -628,10 +628,10 @@ export const userDetailsApi = {
       const list = Array.isArray(raw)
         ? raw
         : Array.isArray(raw?.services)
-        ? raw.services
-        : Array.isArray(raw?.data)
-        ? raw.data
-        : [];
+          ? raw.services
+          : Array.isArray(raw?.data)
+            ? raw.data
+            : [];
       return list.map((item: any) =>
         typeof item === 'string' ? item : item?.name || item?.title || item?.label || String(item)
       );
@@ -648,10 +648,10 @@ export const userDetailsApi = {
       const list = Array.isArray(raw)
         ? raw
         : Array.isArray(raw?.facilities)
-        ? raw.facilities
-        : Array.isArray(raw?.data)
-        ? raw.data
-        : [];
+          ? raw.facilities
+          : Array.isArray(raw?.data)
+            ? raw.data
+            : [];
       return list.map((item: any) =>
         typeof item === 'string' ? item : item?.name || item?.title || item?.label || String(item)
       );
