@@ -80,7 +80,7 @@ const ClubPhotosScreen = () => {
       setAiResult(res);
       if (res?.area && res.area !== 'Other') {
         setPhotoCaption(res.area);
-      } else {
+      } else if (res) {
         Toast.show({
           type: 'info',
           text1: 'Select Area Caption 🏷️',
