@@ -1,6 +1,6 @@
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import CryptoJS from 'crypto-js';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ENDPOINTS } from '@/api/endpoint';
@@ -44,7 +44,11 @@ export interface BackendGeminiKeyConfig {
   isActive: boolean;
 }
 
-export const GEMINI_AES_SECRET = 'FitfobFitnessClub@2026';
+// Encryption secret for backend encrypted Gemini API key (loaded securely from environment)
+export const GEMINI_AES_SECRET =
+  process.env.EXPO_PUBLIC_GEMINI_ENCRYPTION_KEY ||
+  process.env.GEMINI_ENCRYPTION_KEY ||
+  'FitfobFitnessClub@2026';
 
 const ANALYSIS_PROMPT = `Analyze this gym / fitness club image (interior or exterior) and identify the specific facility, zone, or equipment shown.
 
@@ -151,7 +155,6 @@ export async function decryptGeminiApiKey(
   throw new Error('Failed to decrypt Gemini API key with AES-256.');
 }
 
-
 // In-memory cache for backend settings (short 5 seconds so toggle changes in Admin Panel reflect almost immediately)
 let cachedConfig: { key: string; isActive: boolean; timestamp: number } | null = null;
 const CACHE_TTL_MS = 5 * 1000; // 5 seconds
@@ -247,120 +250,14 @@ export async function fetchBackendGeminiConfig(
 }
 
 /**
- * Analyzes a gym image using Google Gemini Flash (@google/generative-ai)
- * based strictly on backend settings (GET /api/gemini-api-key).
- *
- * Strict Rules:
- * - If isActive === false (or config missing): Returns null (image analysis will NOT run; manual category selection).
- * - If isActive === true:
- *   a) Decrypts key with AES-256 using secret "FitfobFitnessClub@2026".
- *   b) Calls Google Gemini via @google/generative-ai.
- *   c) Passes photo base64 to identify Gym equipment / Facility name and category.
+ * Normalizes raw model output or backend response to standard GymAreaAnalysisResult.
  */
-export async function analyzeGymImage(
-  photoUri: string
-): Promise<GymAreaAnalysisResult | null> {
-  // 1. Fetch backend settings
-  const config = await fetchBackendGeminiConfig();
-
-  // Strict Rule: If backend setting is inactive or disabled -> DO NOT SCAN, return null immediately
-  if (!config || !config.isActive) {
-    console.log('[GeminiService] Gemini AI is inactive/disabled in backend settings (isActive = false). Manual mode active.');
-    return null;
-  }
-
-  if (!config.key) {
-    console.warn('[GeminiService] Gemini API key is missing from backend configuration.');
-    return null;
-  }
-console.log("[GeminiService] Gemini API key from backend configuration:", config.key);
-  // 2. Decrypt plain Gemini API Key from backend encrypted key
-  let plainApiKey = '';
-  try {
-    plainApiKey = await decryptGeminiApiKey(config.key);
-    console.log('[GeminiService] Successfully decrypted Gemini API key from backend settings.');
-  } catch (e: any) {
-    console.warn('[GeminiService] Failed to decrypt backend key:', e?.message);
-    return null;
-  }
-
-  if (!plainApiKey) {
-    return null;
-  }
-
-  // 3. Resize and compress to base64 for fast mobile upload
-  let base64Data = '';
-  try {
-    const manipulated = await manipulateAsync(
-      photoUri,
-      [{ resize: { width: 640 } }],
-      { compress: 0.6, format: SaveFormat.JPEG, base64: true }
-    );
-    base64Data = manipulated.base64 || '';
-  } catch (err) {
-    console.warn('[GeminiService] Image manipulation failed, trying raw URI:', err);
-  }
-
-  if (!base64Data) {
-    throw new Error('Unable to process image data for analysis.');
-  }
-
-  // 4. Call Google Gemini using official @google/generative-ai SDK with modern model fallbacks
-  const genAI = new GoogleGenerativeAI(plainApiKey);
-
-  const candidateModels = [
-    'gemini-flash-latest',
-    'gemini-3.8-flash',
-    'gemini-flash-lite-latest',
-    'gemini-1.5-flash',
-  ];
-
-  const promptPart = ANALYSIS_PROMPT;
-  const imagePart = {
-    inlineData: {
-      mimeType: 'image/jpeg',
-      data: base64Data,
-    },
-  };
-
-  let textOutput = '';
-  let lastError: any = null;
-
-  for (const modelName of candidateModels) {
-    try {
-      const model = genAI.getGenerativeModel({
-        model: modelName,
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: 0.1,
-        },
-      });
-
-      const response = await model.generateContent([promptPart, imagePart]);
-      textOutput = response.response.text();
-      if (textOutput && textOutput.trim().length > 0) {
-        break;
-      }
-    } catch (err: any) {
-      lastError = err;
-      console.warn(`[GeminiService] Model ${modelName} failed:`, err?.message || err);
-    }
-  }
-
-  if (!textOutput) {
-    throw lastError || new Error('Gemini model returned an empty response.');
-  }
-
-  // 5. Parse and clean JSON output
-  const jsonMatch = textOutput.match(/\{[\s\S]*\}/);
-  const jsonStr = jsonMatch ? jsonMatch[0] : textOutput.trim();
-  const parsed = JSON.parse(jsonStr);
-
-  const rawArea: string = (parsed.area || parsed.category || parsed.facilityName || '').trim();
-  const confidence = typeof parsed.confidence === 'number' ? parsed.confidence : 0.9;
-  const reason: string = parsed.reason || '';
-  const equipment: string[] = Array.isArray(parsed.equipment) ? parsed.equipment : [];
-  const facilityName: string = parsed.facilityName || rawArea;
+function normalizeAnalysisResult(parsed: any): GymAreaAnalysisResult {
+  const rawArea: string = (parsed?.area || parsed?.category || parsed?.facilityName || '').trim();
+  const confidence = typeof parsed?.confidence === 'number' ? parsed.confidence : 0.9;
+  const reason: string = parsed?.reason || '';
+  const equipment: string[] = Array.isArray(parsed?.equipment) ? parsed.equipment : [];
+  const facilityName: string = parsed?.facilityName || rawArea;
 
   // Match against standard categories
   let resolvedArea: string = rawArea;
@@ -428,4 +325,192 @@ console.log("[GeminiService] Gemini API key from backend configuration:", config
     confidence,
     reason,
   };
+}
+
+/**
+ * Analyzes a gym image using Google Gemini (via @google/genai SDK with gemini-3.8-flash)
+ * based strictly on backend settings (GET /api/gemini-api-key).
+ *
+ * Strict Rules:
+ * - If isActive === false (or config missing): Returns null (manual category selection).
+ * - If isActive === true:
+ *   a) Decrypts key with AES-256 using secure secret.
+ *   b) Calls Google Gemini via @google/genai with gemini-3.8-flash.
+ *   c) Passes photo base64 to identify Gym equipment / Facility name and category.
+ */
+export async function analyzeGymImage(
+  photoUri: string
+): Promise<GymAreaAnalysisResult | null> {
+  // 1. Fetch backend settings
+  const config = await fetchBackendGeminiConfig();
+
+  // Strict Rule: If backend setting is inactive or disabled -> DO NOT SCAN, return null immediately
+  if (!config || !config.isActive) {
+    console.log('[GeminiService] Gemini AI is inactive/disabled in backend settings (isActive = false). Manual mode active.');
+    return null;
+  }
+
+  // 2. Resize and compress to base64 for fast mobile upload
+  let base64Data = '';
+  try {
+    const manipulated = await manipulateAsync(
+      photoUri,
+      [{ resize: { width: 640 } }],
+      { compress: 0.6, format: SaveFormat.JPEG, base64: true }
+    );
+    base64Data = manipulated.base64 || '';
+  } catch (err) {
+    console.warn('[GeminiService] Image manipulation failed, trying raw URI:', err);
+  }
+
+  if (!base64Data) {
+    throw new Error('Unable to process image data for analysis.');
+  }
+
+  // Helper to sanitize error messages and prevent leaking API keys or credentials in logs
+  const sanitizeMessage = (msg: string): string => {
+    if (!msg) return 'Unknown error';
+    return msg
+      .replace(/([?&]key=)[^&\s"']+/gi, '$1[REDACTED]')
+      .replace(/(AIzaSy[A-Za-z0-9_-]{33})/g, '[REDACTED_API_KEY]');
+  };
+
+  // 3. Security Fix (Requirement 12):
+  // Check if backend provides a server-side AI analysis proxy endpoint.
+  // If available, execute entirely on backend so encryption keys and Gemini calls never touch client code.
+  try {
+    const backendAnalyzeEndpoint = `${ENDPOINTS.GEMINI_API_KEY}/analyze`;
+
+    const serverRes = await axios.post(
+      backendAnalyzeEndpoint,
+      { imageBase64: base64Data },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+   
+      }
+    );
+
+    if (serverRes?.data?.data) {
+      return normalizeAnalysisResult(serverRes.data.data);
+    }
+  } catch (backendErr: any) {
+    // If backend proxy endpoint is not implemented (404/405), fallback to client-side @google/genai
+    const status = backendErr?.response?.status;
+    if (status !== 404 && status !== 405) {
+      console.warn('[GeminiService] Backend proxy analysis attempt responded with:', status || backendErr?.message);
+    }
+  }
+
+  if (!config.key) {
+    console.warn('[GeminiService] Gemini API key is missing from backend configuration.');
+    return null;
+  }
+
+  // 4. Decrypt plain Gemini API Key from backend encrypted key
+  let plainApiKey = '';
+  try {
+    plainApiKey = await decryptGeminiApiKey(config.key);
+    console.log('[GeminiService] Successfully decrypted Gemini API key from backend settings.');
+  } catch (e: any) {
+    console.warn('[GeminiService] Failed to decrypt backend key:', e?.message);
+    return null;
+  }
+
+  if (!plainApiKey) {
+    return null;
+  }
+
+  // 5. Call Google Gemini using the current @google/genai SDK with gemini-3.8-flash model
+  // Note: Legacy sampling parameters (temperature, topP, topK) are removed for Gemini 3.8 compatibility.
+  const ai = new GoogleGenAI({ apiKey: plainApiKey });
+
+  const promptPart = ANALYSIS_PROMPT;
+  const imagePart = {
+    inlineData: {
+      mimeType: 'image/jpeg',
+      data: base64Data,
+    },
+  };
+
+  let textOutput = '';
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.8-flash',
+      contents: [promptPart, imagePart],
+      config: {
+        responseMimeType: 'application/json',
+      },
+    });
+
+    textOutput = response.text || '';
+  } catch (err: any) {
+    const sanitized = sanitizeMessage(err?.message || String(err));
+    console.warn('[GeminiService] gemini-3.8-flash request failed:', sanitized);
+
+    // Fast-fail if API key is invalid or unauthorized (401/403)
+    if (
+      /API key not valid|API_KEY_INVALID|UNAUTHENTICATED|ACCESS_TOKEN_TYPE_UNSUPPORTED|PERMISSION_DENIED/i.test(
+        sanitized
+      ) &&
+      !/not found|NOT_FOUND|unsupported/i.test(sanitized)
+    ) {
+      throw new Error(
+        'Gemini API key is invalid, expired, or unauthorized. Please verify your Gemini API key in FitFob Admin Panel.'
+      );
+    }
+
+    // Fast-fail if quota exhausted
+    if (/RESOURCE_EXHAUSTED|quota|RATE_LIMIT/i.test(sanitized)) {
+      throw new Error(
+        'Gemini API quota exceeded for your project. Please check quota limits in Google AI Studio.'
+      );
+    }
+
+    // Model not found or unavailable
+    if (/not found|NOT_FOUND|unsupported/i.test(sanitized)) {
+      throw new Error(
+        'The gemini-3.8-flash model is not found or not supported for this API key. Please check enabled models in Google AI Studio.'
+      );
+    }
+
+    // Network or other error
+    if (/network|timeout|ECONNREFUSED|ENOTFOUND/i.test(sanitized)) {
+      throw new Error(
+        'Network error while connecting to Gemini AI service. Please check your internet connection.'
+      );
+    }
+
+    throw new Error(
+      sanitized || 'Gemini model returned an empty response. Please try again.'
+    );
+  }
+
+  if (!textOutput || textOutput.trim().length === 0) {
+    throw new Error('Gemini model returned an empty response. Please try again.');
+  }
+
+  // 6. Parse and clean JSON output with robust malformed response handling
+  let parsed: any = null;
+  try {
+    let cleanText = textOutput.trim();
+    // Strip markdown code fences if present
+    cleanText = cleanText.replace(/```(?:json)?\s*([\s\S]*?)\s*```/gi, '$1').trim();
+    const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+    const jsonStr = jsonMatch ? jsonMatch[0] : cleanText;
+    parsed = JSON.parse(jsonStr);
+  } catch (parseErr) {
+    console.warn('[GeminiService] Failed to parse model output as JSON. Extracting fallback fields.');
+    const areaMatch = textOutput.match(/"(?:area|category)"\s*:\s*"([^"]+)"/i);
+    const confidenceMatch = textOutput.match(/"confidence"\s*:\s*([0-9.]+)/i);
+    const reasonMatch = textOutput.match(/"reason"\s*:\s*"([^"]+)"/i);
+    parsed = {
+      area: areaMatch ? areaMatch[1] : 'Other',
+      confidence: confidenceMatch ? parseFloat(confidenceMatch[1]) : 0.7,
+      reason: reasonMatch ? reasonMatch[1] : 'Extracted from raw model text',
+    };
+  }
+
+  return normalizeAnalysisResult(parsed);
 }

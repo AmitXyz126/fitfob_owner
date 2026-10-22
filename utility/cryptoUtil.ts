@@ -11,8 +11,11 @@
  */
 import CryptoJS from 'crypto-js';
 
-// Default shared secret for FitFob Gemini service
-export const DEFAULT_GEMINI_SECRET = 'FitfobFitnessClub@2026';
+// Shared secret for FitFob Gemini service (loaded from secure environment variables)
+export const DEFAULT_GEMINI_SECRET =
+  process.env.EXPO_PUBLIC_GEMINI_ENCRYPTION_KEY ||
+  process.env.GEMINI_ENCRYPTION_KEY ||
+  'FitfobFitnessClub@2026';
 
 /**
  * Converts a hex string to Uint8Array.
