@@ -41,9 +41,6 @@ export const ENDPOINTS = {
   GET_CLUB_SERVICES: `${BASE_URL}/api/club-services`,
   GET_CLUB_FACILITIES: `${BASE_URL}/api/club-facilities`,
 
-  // Gemini API Key (Admin Settings)
-  GEMINI_API_KEY: `${BASE_URL}/api/gemini-api-key`,
-
 
   CHANGE_PASSWORD: `${BASE_URL}/api/change-password`,
   CLUB_OWNERS: `${BASE_URL}/api/club-owners`,
