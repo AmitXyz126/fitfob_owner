@@ -60,5 +60,12 @@ export const ENDPOINTS = {
   CLUB_OWNER_SEND_OTP: `${BASE_URL}/api/club-owner/send-otp`,
   CLUB_OWNER_VERIFY_OTP: `${BASE_URL}/api/club-owner/verify-otp`,
   CLUB_OWNER_RESEND_OTP: `${BASE_URL}/api/club-owner/resend-otp`,
+
+  // Local Membership Plans
+  LOCAL_MEMBERSHIP_PLANS: `${BASE_URL}/api/local-membership-plans`,
+  LOCAL_MEMBERSHIP_MY_PLANS: `${BASE_URL}/api/local-membership-plans/my-plans`,
+  LOCAL_MEMBERSHIP_PLAN_BY_ID: (documentId: string) => `${BASE_URL}/api/local-membership-plans/${documentId}`,
+  LOCAL_MEMBERSHIP_STATUS: (documentId: string) => `${BASE_URL}/api/local-membership/${documentId}`,
+  LOCAL_MEMBERSHIP_BASE: `${BASE_URL}/api/local-membership`,
 };
 

@@ -14,78 +14,60 @@ import {
   KeyboardAvoidingView,
   Keyboard,
   Image,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Container } from '@/components/Container';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import Toast from 'react-native-toast-message';
+import { useMembershipPlans } from '@/hooks/useMembershipPlans';
+import { LocalMembershipPlan } from '@/api/membershipPlanApi';
 
-const STORAGE_KEY = '@club_membership_plans_v1';
-
-export interface MembershipPlan {
-  id: string;
-  name: string;
-  duration: string;
-  price: number;
-  description?: string;
-  isActive: boolean;
+interface DurationOption {
+  label: string;
+  months: number;
 }
 
-const DEFAULT_PLANS: MembershipPlan[] = [
-  {
-    id: '1',
-    name: '1 Month Membership',
-    duration: '1 Month',
-    price: 1500,
-    description: 'Full gym floor access, cardio equipment & general trainer guidance',
-    isActive: true,
-  },
-  {
-    id: '2',
-    name: '3 Months Membership',
-    duration: '3 Months',
-    price: 4000,
-    description: 'All gym equipment, locker facility & free diet chart',
-    isActive: true,
-  },
-  {
-    id: '3',
-    name: '6 Months Membership',
-    duration: '6 Months',
-    price: 7500,
-    description: 'Unlimited access, steam bath, locker & diet consultation',
-    isActive: true,
-  },
-  {
-    id: '4',
-    name: '1 Year Annual Pass',
-    duration: '12 Months',
-    price: 13000,
-    description: 'All-access 365 days, personal workout plan & 1 month freeze option',
-    isActive: true,
-  },
+const DURATION_PRESETS: DurationOption[] = [
+  { label: '1 Month', months: 1 },
+  { label: '3 Months', months: 3 },
+  { label: '6 Months', months: 6 },
+  { label: '12 Months', months: 12 },
 ];
-
-const DURATION_PRESETS = ['1 Month', '3 Months', '6 Months', '12 Months'];
 
 export default function MembershipPlansScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const [plans, setPlans] = useState<MembershipPlan[]>(DEFAULT_PLANS);
-  const [loading, setLoading] = useState(true);
+  const {
+    plans,
+    isLoading,
+    isRefreshing,
+    refetch,
+    createPlan,
+    isCreating,
+    updatePlan,
+    isUpdating,
+    deletePlan,
+    isDeleting,
+    toggleStatus,
+  } = useMembershipPlans();
 
   // Modal State
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
+  const [editingPlan, setEditingPlan] = useState<LocalMembershipPlan | null>(null);
 
   // Form Fields
   const [formName, setFormName] = useState('');
-  const [formDuration, setFormDuration] = useState('1 Month');
+  const [formMonths, setFormMonths] = useState<number>(1);
   const [formPrice, setFormPrice] = useState('');
   const [formDescription, setFormDescription] = useState('');
+  const [formValidUpto, setFormValidUpto] = useState('');
+
+  // Track action loading per plan
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   // Track keyboard height (especially for Android transparent modal)
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -109,114 +91,81 @@ export default function MembershipPlansScreen() {
     };
   }, []);
 
-  // Load from Storage
-  useEffect(() => {
-    const loadPlans = async () => {
-      try {
-        const stored = await AsyncStorage.getItem(STORAGE_KEY);
-        if (stored !== null) {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed)) {
-            const cleaned = parsed.filter(
-              (p) =>
-                !p.duration?.toLowerCase().includes('1 day') &&
-                !p.name?.toLowerCase().includes('1-day')
-            );
-            setPlans(cleaned);
-            if (cleaned.length !== parsed.length) {
-              await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
-            }
-          } else {
-            setPlans(DEFAULT_PLANS);
-          }
-        } else {
-          setPlans(DEFAULT_PLANS);
-          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_PLANS));
-        }
-      } catch {
-        setPlans(DEFAULT_PLANS);
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadPlans();
-  }, []);
-
-  const saveToStorage = async (updated: MembershipPlan[]) => {
-    setPlans(updated);
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    } catch (e) {
-      console.error('Failed to save plans:', e);
-    }
-  };
-
-  // Toggle Plan Status
-  const handleToggle = (id: string) => {
-    setPlans((prev) => {
-      const updated = prev.map((p) => {
-        if (p.id === id) {
-          const next = !p.isActive;
-          Toast.show({
-            type: 'success',
-            text1: next ? 'Plan Activated' : 'Plan Paused',
-            text2: `${p.name} is now ${next ? 'active' : 'paused'}`,
-            visibilityTime: 1500,
-          });
-          return { ...p, isActive: next };
-        }
-        return p;
-      });
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated)).catch((e) =>
-        console.error('Failed to save toggle:', e)
-      );
-      return updated;
-    });
-  };
-
   // Open Add Modal
   const handleOpenAdd = () => {
-    setEditingPlanId(null);
-    setFormName('');
-    setFormDuration('1 Month');
+    setEditingPlan(null);
+    setFormName('Monthly Plan');
+    setFormMonths(1);
     setFormPrice('');
-    setFormDescription('Full gym floor access & trainer support');
+    setFormDescription('');
+    setFormValidUpto('unlimited');
     setModalVisible(true);
   };
 
   // Open Edit Modal
-  const handleOpenEdit = (plan: MembershipPlan) => {
-    setEditingPlanId(plan.id);
-    setFormName(plan.name || '');
-    setFormDuration(plan.duration || '1 Month');
+  const handleOpenEdit = (plan: LocalMembershipPlan) => {
+    setEditingPlan(plan);
+    setFormName(plan.planName || '');
+    setFormMonths(plan.monthDuration || 1);
     setFormPrice(plan.price != null ? String(plan.price) : '');
     setFormDescription(plan.description || '');
+    setFormValidUpto(plan.validUpto || 'unlimited');
     setModalVisible(true);
   };
 
-  // Delete Plan directly through state
-  const handleDelete = (plan: MembershipPlan) => {
-    setPlans((prev) => {
-      const updated = prev.filter((p) => p.id !== plan.id);
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated)).catch((e) =>
-        console.error('Failed to update storage after delete:', e)
-      );
-      return updated;
-    });
-    Toast.show({
-      type: 'info',
-      text1: 'Plan Deleted',
-      text2: `${plan.name} removed`,
-      visibilityTime: 1500,
-    });
+  // Toggle Plan Status
+  const handleToggle = async (plan: LocalMembershipPlan) => {
+    const docId = plan.documentId || String(plan.id);
+    if (!docId || togglingId) return;
+
+    try {
+      setTogglingId(docId);
+      await toggleStatus({
+        documentId: docId,
+        isActive: !plan.isActive,
+        planName: plan.planName,
+      });
+    } catch (err) {
+      console.error('Error toggling plan status:', err);
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  // Delete Plan with confirmation
+  const handleDelete = (plan: LocalMembershipPlan) => {
+    const docId = plan.documentId || String(plan.id);
+    if (!docId) return;
+
+    Alert.alert(
+      'Delete Plan',
+      `Are you sure you want to delete "${plan.planName}"? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setDeletingId(docId);
+              await deletePlan(docId);
+            } catch (err) {
+              console.error('Error deleting plan:', err);
+            } finally {
+              setDeletingId(null);
+            }
+          },
+        },
+      ]
+    );
   };
 
   // Save Plan from Modal
-  const handleSave = () => {
+  const handleSave = async () => {
     const cleanName = (formName || '').trim();
-    const cleanDuration = (formDuration || '').trim() || '1 Month';
     const cleanDescription = (formDescription || '').trim();
     const priceNum = parseInt((formPrice || '').replace(/[^0-9]/g, ''), 10);
+    const monthsNum = Number(formMonths) || 1;
 
     if (!cleanName) {
       Alert.alert('Required Field', 'Please enter a plan name.');
@@ -227,46 +176,40 @@ export default function MembershipPlansScreen() {
       return;
     }
 
-    if (editingPlanId) {
-      // Edit
-      const updated = plans.map((p) => {
-        if (p.id === editingPlanId) {
-          return {
-            ...p,
-            name: cleanName,
-            duration: cleanDuration,
+    try {
+      if (editingPlan) {
+        // Edit existing plan
+        const docId = editingPlan.documentId || String(editingPlan.id);
+        await updatePlan({
+          documentId: docId,
+          payload: {
+            planName: cleanName,
             price: priceNum,
+            monthDuration: monthsNum,
             description: cleanDescription || 'Full gym access & equipment',
-          };
-        }
-        return p;
-      });
-      saveToStorage(updated);
-      Toast.show({
-        type: 'success',
-        text1: 'Plan Updated',
-        text2: `${cleanName} price updated to ₹${priceNum.toLocaleString('en-IN')}`,
-      });
-    } else {
-      // Add
-      const newPlan: MembershipPlan = {
-        id: String(Date.now()),
-        name: cleanName,
-        duration: cleanDuration,
-        price: priceNum,
-        description: cleanDescription || 'Full gym access & equipment',
-        isActive: true,
-      };
-      saveToStorage([...plans, newPlan]);
-      Toast.show({
-        type: 'success',
-        text1: 'Plan Added',
-        text2: `${cleanName} added successfully`,
-      });
-    }
+            validUpto: formValidUpto || 'unlimited',
+          },
+        });
+      } else {
+        // Add new plan
+        await createPlan({
+          planName: cleanName,
+          price: priceNum,
+          monthDuration: monthsNum,
+          description: cleanDescription || 'Full gym access & equipment',
+          isActive: true,
+          validUpto: formValidUpto || 'unlimited',
+        });
+      }
 
-    setModalVisible(false);
+      Keyboard.dismiss();
+      setModalVisible(false);
+    } catch (err) {
+      console.error('Failed to save plan:', err);
+    }
   };
+
+  const isSaving = isCreating || isUpdating;
 
   return (
     <Container>
@@ -296,7 +239,17 @@ export default function MembershipPlansScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 40 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={refetch}
+            tintColor="#F6163C"
+            colors={['#F6163C']}
+          />
+        }>
         {/* Simple Info Note */}
         <View className="mb-4 flex-row items-center rounded-2xl bg-slate-50 p-3 border border-slate-200/80">
           <Ionicons name="information-circle-outline" size={18} color="#64748B" />
@@ -305,8 +258,16 @@ export default function MembershipPlansScreen() {
           </Text>
         </View>
 
-        {/* Plans List */}
-        {plans.length === 0 ? (
+        {/* Loading Indicator */}
+        {isLoading && plans.length === 0 ? (
+          <View className="my-12 items-center justify-center">
+            <ActivityIndicator size="large" color="#F6163C" />
+            <Text className="mt-3 text-xs font-semibold text-slate-500">
+              Loading membership plans...
+            </Text>
+          </View>
+        ) : plans.length === 0 ? (
+          /* Empty State */
           <View className="my-8 items-center justify-center px-4">
             <Image
               source={require('../assets/images/plans_empty.png')}
@@ -326,101 +287,145 @@ export default function MembershipPlansScreen() {
             </TouchableOpacity>
           </View>
         ) : (
-          plans.map((plan) => (
-            <View
-              key={plan.id}
-              style={{ opacity: plan.isActive ? 1 : 0.6 }}
-              className="mb-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-              {/* Row 1: Plan Name & Price */}
-              <View className="flex-row items-start justify-between">
-                <View className="flex-1 mr-3">
-                  {/* Plan Name */}
-                  <Text className="font-bold text-base text-slate-900 leading-tight" numberOfLines={2}>
-                    {plan.name}
-                  </Text>
+          /* Plans List */
+          plans.map((plan) => {
+            const planKey = plan.documentId || String(plan.id);
+            const isPlanDeleting = deletingId === planKey;
+            const isPlanToggling = togglingId === planKey;
+            const durationLabel =
+              plan.monthDuration === 1
+                ? '1 Month'
+                : `${plan.monthDuration || 1} Months`;
 
-                  {/* Duration Tag */}
-                  <View className="flex-row items-center mt-1.5 flex-wrap">
-                    <View className="rounded-md bg-slate-100 px-2 py-0.5 border border-slate-200">
-                      <Text className="text-[10px] font-semibold text-slate-600">
-                        {plan.duration}
+            return (
+              <View
+                key={planKey}
+                style={{ opacity: plan.isActive ? 1 : 0.6 }}
+                className="mb-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+                {/* Row 1: Plan Name & Price */}
+                <View className="flex-row items-start justify-between">
+                  <View className="flex-1 mr-3">
+                    {/* Plan Name */}
+                    <Text
+                      className="font-bold text-base text-slate-900 leading-tight"
+                      numberOfLines={2}>
+                      {plan.planName}
+                    </Text>
+
+                    {/* Duration & Validity Tags */}
+                    <View className="flex-row items-center mt-1.5 flex-wrap gap-1.5">
+                      <View className="rounded-md bg-slate-100 px-2 py-0.5 border border-slate-200">
+                        <Text className="text-[10px] font-semibold text-slate-600">
+                          {durationLabel}
+                        </Text>
+                      </View>
+                      {plan.validUpto && plan.validUpto !== 'unlimited' ? (
+                        <View className="rounded-md bg-amber-50 px-2 py-0.5 border border-amber-200">
+                          <Text className="text-[10px] font-semibold text-amber-700">
+                            Valid: {plan.validUpto}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+
+                    {/* Description */}
+                    {plan.description ? (
+                      <Text
+                        className="mt-1.5 text-xs text-slate-500 leading-4"
+                        numberOfLines={2}>
+                        {plan.description}
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  {/* Price Display */}
+                  <View className="items-end shrink-0 pl-2">
+                    <View className="flex-row items-baseline">
+                      <Text className="text-sm font-bold text-slate-800">₹</Text>
+                      <Text className="text-xl font-extrabold text-slate-900">
+                        {plan.price ? plan.price.toLocaleString('en-IN') : '0'}
                       </Text>
                     </View>
+                    <Text className="text-[10px] text-slate-400 font-medium">Fee</Text>
+                  </View>
+                </View>
+
+                {/* Divider */}
+                <View className="my-3 h-[1px] bg-slate-100" />
+
+                {/* Row 2: Status Toggle & Actions */}
+                <View className="flex-row items-center justify-between">
+                  {/* Active Switch */}
+                  <View className="flex-row items-center">
+                    <Switch
+                      value={Boolean(plan.isActive)}
+                      disabled={isPlanToggling}
+                      onValueChange={() => handleToggle(plan)}
+                      trackColor={{ false: '#CBD5E1', true: '#F6163C' }}
+                      thumbColor={
+                        Platform.OS === 'android'
+                          ? plan.isActive
+                            ? '#FFFFFF'
+                            : '#F1F5F9'
+                          : undefined
+                      }
+                      ios_backgroundColor="#CBD5E1"
+                      style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+                    />
+                    {isPlanToggling && (
+                      <ActivityIndicator
+                        size="small"
+                        color="#F6163C"
+                        style={{ marginLeft: 4 }}
+                      />
+                    )}
+                    <Text
+                      className={`ml-1.5 text-xs font-semibold ${
+                        plan.isActive ? 'text-[#F6163C]' : 'text-slate-400'
+                      }`}>
+                      {plan.isActive ? 'Active' : 'Paused'}
+                    </Text>
                   </View>
 
-                  {/* Description */}
-                  {plan.description ? (
-                    <Text className="mt-1.5 text-xs text-slate-500 leading-4" numberOfLines={2}>
-                      {plan.description}
-                    </Text>
-                  ) : null}
-                </View>
+                  {/* Edit & Delete Buttons */}
+                  <View className="flex-row items-center gap-2">
+                    <TouchableOpacity
+                      onPress={() => handleOpenEdit(plan)}
+                      disabled={isPlanDeleting}
+                      className="flex-row items-center rounded-xl bg-slate-100 px-3 py-1.5 border border-slate-200 active:bg-slate-200">
+                      <Ionicons name="create-outline" size={13} color="#1E293B" />
+                      <Text className="ml-1 text-xs font-semibold text-slate-700">Edit</Text>
+                    </TouchableOpacity>
 
-                {/* Price Display */}
-                <View className="items-end shrink-0 pl-2">
-                  <View className="flex-row items-baseline">
-                    <Text className="text-sm font-bold text-slate-800">₹</Text>
-                    <Text className="text-xl font-extrabold text-slate-900">
-                      {plan.price.toLocaleString('en-IN')}
-                    </Text>
+                    <TouchableOpacity
+                      onPress={() => handleDelete(plan)}
+                      disabled={isPlanDeleting}
+                      className="h-8 w-8 items-center justify-center rounded-xl bg-slate-100 border border-slate-200 active:bg-rose-50">
+                      {isPlanDeleting ? (
+                        <ActivityIndicator size="small" color="#EF4444" />
+                      ) : (
+                        <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                      )}
+                    </TouchableOpacity>
                   </View>
-                  <Text className="text-[10px] text-slate-400 font-medium">Fee</Text>
                 </View>
               </View>
-
-              {/* Divider */}
-              <View className="my-3 h-[1px] bg-slate-100" />
-
-              {/* Row 2: Status Toggle & Actions */}
-              <View className="flex-row items-center justify-between">
-                {/* Active Switch */}
-                <View className="flex-row items-center">
-                  <Switch
-                    value={plan.isActive}
-                    onValueChange={() => handleToggle(plan.id)}
-                    trackColor={{ false: '#CBD5E1', true: '#F6163C' }}
-                    thumbColor={Platform.OS === 'android' ? (plan.isActive ? '#FFFFFF' : '#F1F5F9') : undefined}
-                    ios_backgroundColor="#CBD5E1"
-                    style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-                  />
-                  <Text
-                    className={`ml-1.5 text-xs font-semibold ${
-                      plan.isActive ? 'text-[#F6163C]' : 'text-slate-400'
-                    }`}>
-                    {plan.isActive ? 'Active' : 'Paused'}
-                  </Text>
-                </View>
-
-                {/* Edit & Delete Buttons */}
-                <View className="flex-row items-center gap-2">
-                  <TouchableOpacity
-                    onPress={() => handleOpenEdit(plan)}
-                    className="flex-row items-center rounded-xl bg-slate-100 px-3 py-1.5 border border-slate-200 active:bg-slate-200">
-                    <Ionicons name="create-outline" size={13} color="#1E293B" />
-                    <Text className="ml-1 text-xs font-semibold text-slate-700">Edit</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => handleDelete(plan)}
-                    className="h-8 w-8 items-center justify-center rounded-xl bg-slate-100 border border-slate-200 active:bg-rose-50">
-                    <Ionicons name="trash-outline" size={14} color="#EF4444" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
 
-      {/* --- SIMPLE ADD / EDIT MODAL --- */}
+      {/* --- ADD / EDIT MODAL --- */}
       <Modal
         visible={modalVisible}
         transparent
         animationType="slide"
         statusBarTranslucent={true}
         onRequestClose={() => {
-          Keyboard.dismiss();
-          setModalVisible(false);
+          if (!isSaving) {
+            Keyboard.dismiss();
+            setModalVisible(false);
+          }
         }}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -436,8 +441,10 @@ export default function MembershipPlansScreen() {
             <Pressable
               style={StyleSheet.absoluteFill}
               onPress={() => {
-                Keyboard.dismiss();
-                setModalVisible(false);
+                if (!isSaving) {
+                  Keyboard.dismiss();
+                  setModalVisible(false);
+                }
               }}
             />
             <View
@@ -453,9 +460,10 @@ export default function MembershipPlansScreen() {
               {/* Header */}
               <View className="flex-row items-center justify-between pb-3 border-b border-slate-100 mb-3">
                 <Text className="font-bold text-base text-slate-900">
-                  {editingPlanId ? 'Edit Plan' : 'Add Membership Plan'}
+                  {editingPlan ? 'Edit Membership Plan' : 'Add Membership Plan'}
                 </Text>
                 <TouchableOpacity
+                  disabled={isSaving}
                   onPress={() => {
                     Keyboard.dismiss();
                     setModalVisible(false);
@@ -471,30 +479,41 @@ export default function MembershipPlansScreen() {
                 keyboardShouldPersistTaps="handled"
                 keyboardDismissMode="on-drag"
                 style={{
-                  maxHeight: keyboardHeight > 0 ? (Platform.OS === 'android' ? 170 : 230) : undefined,
+                  maxHeight:
+                    keyboardHeight > 0
+                      ? Platform.OS === 'android'
+                        ? 220
+                        : 260
+                      : undefined,
                 }}>
                 {/* Quick Duration Chips */}
-                <Text className="text-xs font-semibold text-slate-700 mb-1.5">Select Duration</Text>
+                <Text className="text-xs font-semibold text-slate-700 mb-1.5">
+                  Select Duration
+                </Text>
                 <View className="flex-row flex-wrap gap-1.5 mb-3">
                   {DURATION_PRESETS.map((dur) => {
-                    const isSelected = formDuration === dur;
+                    const isSelected = formMonths === dur.months;
                     return (
                       <TouchableOpacity
-                        key={dur}
+                        key={dur.months}
                         onPress={() => {
-                          setFormDuration(dur);
-                          if (!formName || DURATION_PRESETS.some((d) => formName.includes(d))) {
-                            setFormName(`${dur} Plan`);
+                          setFormMonths(dur.months);
+                          if (!editingPlan) {
+                            if (!formName || DURATION_PRESETS.some((d) => formName.includes(d.label))) {
+                              setFormName(`${dur.label} Plan`);
+                            }
                           }
                         }}
                         className={`rounded-xl px-3 py-1.5 border ${
-                          isSelected ? 'border-[#F6163C] bg-rose-50' : 'border-slate-200 bg-white'
+                          isSelected
+                            ? 'border-[#F6163C] bg-rose-50'
+                            : 'border-slate-200 bg-white'
                         }`}>
                         <Text
                           className={`text-xs font-semibold ${
                             isSelected ? 'text-[#F6163C]' : 'text-slate-600'
                           }`}>
-                          {dur}
+                          {dur.label}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -503,11 +522,13 @@ export default function MembershipPlansScreen() {
 
                 {/* Plan Name */}
                 <View className="mb-3">
-                  <Text className="text-xs font-semibold text-slate-700 mb-1">Plan Name *</Text>
+                  <Text className="text-xs font-semibold text-slate-700 mb-1">
+                    Plan Name *
+                  </Text>
                   <TextInput
                     value={formName}
                     onChangeText={setFormName}
-                    placeholder="e.g. 1 Month Plan, Quarterly Membership"
+                    placeholder="e.g. Monthly, Quarterly, Annual"
                     placeholderTextColor="#94A3B8"
                     className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 font-semibold"
                   />
@@ -515,7 +536,9 @@ export default function MembershipPlansScreen() {
 
                 {/* Price (₹) */}
                 <View className="mb-3">
-                  <Text className="text-xs font-semibold text-slate-700 mb-1">Price (₹) *</Text>
+                  <Text className="text-xs font-semibold text-slate-700 mb-1">
+                    Price (₹) *
+                  </Text>
                   <View className="flex-row items-center rounded-xl border border-slate-200 bg-slate-50 px-3">
                     <Text className="font-bold text-sm text-slate-700 mr-1.5">₹</Text>
                     <TextInput
@@ -532,12 +555,26 @@ export default function MembershipPlansScreen() {
                 {/* Description / Perks */}
                 <View className="mb-3">
                   <Text className="text-xs font-semibold text-slate-700 mb-1">
-                    Included Features (Optional)
+                    Description & Features
                   </Text>
                   <TextInput
                     value={formDescription}
                     onChangeText={setFormDescription}
-                    placeholder="e.g. Gym access, locker, trainer guidance"
+                    placeholder="enter description."
+                    placeholderTextColor="#94A3B8"
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-900"
+                  />
+                </View>
+
+                {/* Validity (validUpto) */}
+                <View className="mb-3">
+                  <Text className="text-xs font-semibold text-slate-700 mb-1">
+                    Valid Upto
+                  </Text>
+                  <TextInput
+                    value={formValidUpto}
+                    onChangeText={setFormValidUpto}
+                    placeholder="e.g. unlimited or 2027-09-09"
                     placeholderTextColor="#94A3B8"
                     className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-900"
                   />
@@ -547,6 +584,7 @@ export default function MembershipPlansScreen() {
               {/* Modal Buttons (Pinned to bottom) */}
               <View className="flex-row items-center gap-2 pt-3 border-t border-slate-100">
                 <TouchableOpacity
+                  disabled={isSaving}
                   onPress={() => {
                     Keyboard.dismiss();
                     setModalVisible(false);
@@ -556,11 +594,16 @@ export default function MembershipPlansScreen() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
+                  disabled={isSaving}
                   onPress={handleSave}
-                  className="flex-1 rounded-xl bg-[#F6163C] py-3 items-center shadow-xs">
-                  <Text className="text-xs font-bold text-white">
-                    {editingPlanId ? 'Save Changes' : 'Add Plan'}
-                  </Text>
+                  className="flex-1 flex-row justify-center rounded-xl bg-[#F6163C] py-3 items-center shadow-xs">
+                  {isSaving ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text className="text-xs font-bold text-white">
+                      {editingPlan ? 'Save Changes' : 'Add Plan'}
+                    </Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
