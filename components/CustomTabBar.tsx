@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Scan, Wallet } from 'lucide-react-native';
 import Svg, { Path } from 'react-native-svg';
+import { useRouter } from 'expo-router';
 
 export interface CustomTabBarProps {
   state: {
@@ -18,14 +19,34 @@ export interface CustomTabBarProps {
     index: number;
   };
   descriptors: Record<string, { options: any }>;
-  navigation: any;
+  navigation?: any;
+  emitter?: any;
+  navigateToTab?: (routeKey: string) => void;
 }
 
-export function CustomTabBar({ state, descriptors, navigation }: CustomTabBarProps) {
+export function CustomTabBar({
+  state,
+  descriptors,
+  navigation,
+  emitter,
+  navigateToTab,
+}: CustomTabBarProps) {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   // Position tab bar near bottom (lifted higher on Android)
   const bottomInset =
     Platform.OS === 'ios' ? Math.max(insets.bottom - 10, 6) : Math.max(insets.bottom + 12, 18);
+
+  const navigateTo = (route: { key: string; name: string }) => {
+    if (typeof navigateToTab === 'function') {
+      navigateToTab(route.key);
+    } else if (navigation?.navigate) {
+      navigation.navigate(route.name);
+    } else {
+      router.navigate(`/(tabs)/${route.name}` as any);
+    }
+   
+  };
 
   // Filter visible tabs
   const visibleRoutes = state.routes.filter((route) => {
@@ -57,7 +78,7 @@ export function CustomTabBar({ state, descriptors, navigation }: CustomTabBarPro
     }
 
     if (visibleRoutes[targetIndex] && activeVisibleIndex !== targetIndex) {
-      navigation.navigate(visibleRoutes[targetIndex].name);
+      navigateTo(visibleRoutes[targetIndex]);
     }
   };
 
@@ -122,19 +143,19 @@ export function CustomTabBar({ state, descriptors, navigation }: CustomTabBarPro
           const isFocused = state.routes[state.index]?.key === route.key;
 
           const onPress = () => {
-            const event = navigation.emit({
+            const event = (emitter || navigation)?.emit?.({
               type: 'tabPress',
               target: route.key,
               canPreventDefault: true,
             });
 
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
+            if (!isFocused && !event?.defaultPrevented) {
+              navigateTo(route);
             }
           };
 
           const onLongPress = () => {
-            navigation.emit({
+            (emitter || navigation)?.emit?.({
               type: 'tabLongPress',
               target: route.key,
             });
