@@ -96,10 +96,10 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
   const STORAGE_KEY = `@onboarding_step3_data_${userId || user?.id || user?.email || 'guest'}`;
 
   // --- CLUB CATEGORY ---
-  const [clubCategory, setClubCategory] = useState('Luxury');
+  const [clubCategory, setClubCategory] = useState('Basic');
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showCategoryInfoModal, setShowCategoryInfoModal] = useState(true);
-  const categoryOptions = ['Luxury', 'Premium'];
+  const categoryOptions = ['Basic', 'Premium', 'Luxury'];
 
   const [fitnessTypes, setFitnessTypes] = useState(['Gym']);
   const [amenities, setAmenities] = useState(['Parking', 'Wi-Fi']);
@@ -206,7 +206,7 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
           return arr.map((item: any) => (typeof item === 'string' ? item : item.name || item.title || item.label || ''));
         };
 
-        const resolvedCategory = data.clubCategory || data.category || 'Luxury';
+        const resolvedCategory = data.clubCategory || data.category || 'Basic';
         const resolvedServices = extractNames(data.services || data.clubServices || data.fitnessTypes || []);
         const resolvedFacilities = extractNames(data.facilities || data.clubFacilities || data.amenities || []);
 
@@ -677,57 +677,80 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
               backgroundColor: isEverydayMode ? '#FFF1F2' : '#FFFFFF',
             }}>
             <View className="flex-row items-center justify-between">
-              <View className="flex-1 flex-row items-center space-x-2.5 pr-2 shrink">
+              <View className="flex-1 flex-row items-center pr-2">
                 <Switch
                   value={isEverydayMode}
                   onValueChange={toggleEverydayMode}
                   trackColor={{ false: '#CBD5E1', true: '#F6163C' }}
                   thumbColor="#FFFFFF"
                   ios_backgroundColor="#CBD5E1"
+                  style={{
+                    transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }],
+                  }}
                 />
                 <TouchableOpacity
                   onPress={() => toggleEverydayMode(!isEverydayMode)}
                   activeOpacity={0.7}
-                  className="flex-1 shrink ml-2">
-                  <Text numberOfLines={1} className="font-bold text-[15px] text-slate-900">
-                    Everyday (Same timing for all days)
+                  className="flex-1 ml-1.5">
+                  <Text className="font-bold text-[15px] text-slate-900">
+                    Everyday Schedule
                   </Text>
-                  <Text numberOfLines={1} className="text-[11px] text-slate-500 mt-0.5">
-                    {isEverydayMode ? 'Set timing once for all 7 days' : 'Turn ON to set single timing for all days'}
+                  <Text className="text-[11px] text-slate-500 mt-0.5">
+                    {isEverydayMode ? 'Single timing applied to all 7 days' : 'Turn ON to apply same timing for all days'}
                   </Text>
                 </TouchableOpacity>
               </View>
             </View>
 
-            {/* Time Pickers for Everyday Mode */}
+            {/* Time Pickers for Everyday Mode (50/50 Equal Responsive Cards) */}
             {isEverydayMode && (
               <View
-                className="mt-3 pt-3 flex-row items-center justify-between border-t"
+                className="mt-3 pt-3 border-t"
                 style={{ borderColor: '#FFE4E6' }}>
-                <Text className="font-bold text-[12px] text-slate-700">Everyday Timing:</Text>
-                <View className="flex-row items-center space-x-1.5">
+                <View className="mb-2 flex-row items-center justify-between">
+                  <View className="flex-row items-center">
+                    <Ionicons name="time" size={13} color="#F6163C" style={{ marginRight: 4 }} />
+                    <Text className="font-bold text-[12px] text-slate-700">Everyday Timing</Text>
+                  </View>
+                  <View className="rounded-full bg-rose-100/80 px-2 py-0.5">
+                    <Text className="text-[10px] font-bold text-[#F6163C]">Tap to change</Text>
+                  </View>
+                </View>
+
+                <View className="flex-row items-center justify-between">
                   {/* Open Time Pill */}
                   <TouchableOpacity
                     onPress={() =>
                       setActivePicker(isEverydayOpenPickerActive ? null : { dayKey: 'everyday', type: 'openTime' })
                     }
                     activeOpacity={0.7}
-                    className="flex-row items-center rounded-xl border px-2.5 py-1.5"
+                    className="flex-1 flex-row items-center justify-between rounded-xl border py-2 px-3"
                     style={{
                       borderColor: isEverydayOpenPickerActive ? '#F6163C' : '#FECDD3',
-                      backgroundColor: '#FFFFFF',
+                      backgroundColor: isEverydayOpenPickerActive ? '#FFF1F2' : '#FFFFFF',
                     }}>
-                    <Ionicons
-                      name="time-outline"
-                      size={13}
-                      color="#F6163C"
-                      style={{ marginRight: 4 }}
-                    />
-                    <Text className="font-bold text-[13px] text-slate-900">{everydayOpenParts.time}</Text>
-                    <Text className="ml-1 text-[9px] font-bold text-[#F6163C]">{everydayOpenParts.ampm}</Text>
+                    <View>
+                      <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Open</Text>
+                      <Text className="font-bold text-[14px] text-slate-900 mt-0.5">
+                        {everydayOpenParts.time}{' '}
+                        <Text className="text-[11px] font-bold text-[#F6163C]">{everydayOpenParts.ampm}</Text>
+                      </Text>
+                    </View>
+                    <View
+                      className="h-6 w-6 rounded-full items-center justify-center"
+                      style={{ backgroundColor: isEverydayOpenPickerActive ? '#F6163C' : '#FFF1F2' }}>
+                      <Ionicons
+                        name="pencil"
+                        size={11}
+                        color={isEverydayOpenPickerActive ? '#FFFFFF' : '#F6163C'}
+                      />
+                    </View>
                   </TouchableOpacity>
 
-                  <Text className="font-bold text-[12px] text-slate-400 mx-1">-</Text>
+                  {/* Arrow Separator */}
+                  <View className="px-2 items-center justify-center">
+                    <Ionicons name="arrow-forward" size={14} color="#CBD5E1" />
+                  </View>
 
                   {/* Close Time Pill */}
                   <TouchableOpacity
@@ -735,19 +758,27 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
                       setActivePicker(isEverydayClosePickerActive ? null : { dayKey: 'everyday', type: 'closeTime' })
                     }
                     activeOpacity={0.7}
-                    className="flex-row items-center rounded-xl border px-2.5 py-1.5"
+                    className="flex-1 flex-row items-center justify-between rounded-xl border py-2 px-3"
                     style={{
                       borderColor: isEverydayClosePickerActive ? '#F6163C' : '#FECDD3',
-                      backgroundColor: '#FFFFFF',
+                      backgroundColor: isEverydayClosePickerActive ? '#FFF1F2' : '#FFFFFF',
                     }}>
-                    <Ionicons
-                      name="time-outline"
-                      size={13}
-                      color="#F6163C"
-                      style={{ marginRight: 4 }}
-                    />
-                    <Text className="font-bold text-[13px] text-slate-900">{everydayCloseParts.time}</Text>
-                    <Text className="ml-1 text-[9px] font-bold text-[#F6163C]">{everydayCloseParts.ampm}</Text>
+                    <View>
+                      <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Close</Text>
+                      <Text className="font-bold text-[14px] text-slate-900 mt-0.5">
+                        {everydayCloseParts.time}{' '}
+                        <Text className="text-[11px] font-bold text-[#F6163C]">{everydayCloseParts.ampm}</Text>
+                      </Text>
+                    </View>
+                    <View
+                      className="h-6 w-6 rounded-full items-center justify-center"
+                      style={{ backgroundColor: isEverydayClosePickerActive ? '#F6163C' : '#FFF1F2' }}>
+                      <Ionicons
+                        name="pencil"
+                        size={11}
+                        color={isEverydayClosePickerActive ? '#FFFFFF' : '#F6163C'}
+                      />
+                    </View>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -758,8 +789,8 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
           <View
             className="mb-2 flex-row items-center justify-between border-b pb-2 px-1"
             style={{ borderColor: '#E2E8F0' }}>
-            <Text className="w-[34%] font-bold text-[11px] uppercase tracking-wider text-slate-400">Day</Text>
-            <Text className="w-[60%] text-right font-bold text-[11px] uppercase tracking-wider text-slate-400">
+            <Text className="font-bold text-[11px] uppercase tracking-wider text-slate-400">Day</Text>
+            <Text className="text-right font-bold text-[11px] uppercase tracking-wider text-slate-400">
               {isEverydayMode ? 'Operating Schedule' : 'Open - Close Timings'}
             </Text>
           </View>
@@ -786,8 +817,8 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
                     borderColor: isEverydayMode ? '#E2E8F0' : dayData.isOpen ? '#CBD5E1' : '#F1F5F9',
                     backgroundColor: isEverydayMode || dayData.isOpen ? '#FFFFFF' : '#F8FAFC',
                   }}>
-                  {/* Day Column + Toggle */}
-                  <View className="w-[38%] shrink-0 flex-row items-center">
+                  {/* Day Column + Toggle (flex-1 so Day names NEVER truncate) */}
+                  <View className="flex-1 flex-row items-center pr-2">
                     <Switch
                       value={isEverydayMode ? true : dayData.isOpen}
                       disabled={isEverydayMode}
@@ -795,13 +826,16 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
                       trackColor={{ false: '#CBD5E1', true: '#F6163C' }}
                       thumbColor="#FFFFFF"
                       ios_backgroundColor="#CBD5E1"
-                      style={{ opacity: isEverydayMode ? 0.6 : 1 }}
+                      style={{
+                        transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }],
+                        opacity: isEverydayMode ? 0.6 : 1,
+                      }}
                     />
                     <TouchableOpacity
                       onPress={() => toggleDayOpen(key)}
                       disabled={isEverydayMode}
                       activeOpacity={isEverydayMode ? 1 : 0.7}
-                      className="flex-1 shrink ml-2">
+                      className="ml-1 flex-1">
                       <Text
                         numberOfLines={1}
                         className="font-bold text-[13px]"
@@ -815,20 +849,18 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
 
                   {/* Open & Close Timings */}
                   {isEverydayMode ? (
-                    // In Everyday Mode: Timings are synced automatically
-                    <View className="flex-1 flex-row items-center justify-end">
-                      <View
-                        className="rounded-xl border px-2.5 py-1.5 flex-row items-center"
-                        style={{ borderColor: '#F1F5F9', backgroundColor: '#F8FAFC' }}>
-                        <Ionicons name="time-outline" size={12} color="#64748B" style={{ marginRight: 4 }} />
-                        <Text className="font-bold text-[12px] text-slate-800">
-                          {openParts.time} {openParts.ampm} - {closeParts.time} {closeParts.ampm}
-                        </Text>
-                      </View>
+                    // In Everyday Mode: Clean synchronized badge
+                    <View
+                      className="rounded-xl border px-2.5 py-1.5 flex-row items-center shrink-0"
+                      style={{ borderColor: '#F1F5F9', backgroundColor: '#F8FAFC' }}>
+                      <Ionicons name="time-outline" size={12} color="#64748B" style={{ marginRight: 4 }} />
+                      <Text className="font-bold text-[12px] text-slate-800">
+                        {openParts.time} {openParts.ampm} - {closeParts.time} {closeParts.ampm}
+                      </Text>
                     </View>
                   ) : dayData.isOpen ? (
                     // Custom Days Mode: Per-Day Pickers
-                    <View className="flex-1 flex-row items-center justify-end space-x-1">
+                    <View className="flex-row items-center space-x-1 shrink-0">
                       {/* Open Time Pill */}
                       <TouchableOpacity
                         onPress={() =>
@@ -874,14 +906,13 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
                       </TouchableOpacity>
                     </View>
                   ) : (
-                    <View className="flex-1 items-end pr-1">
+                    <View className="items-end pr-1 shrink-0">
                       <View className="rounded-full bg-slate-200 px-2.5 py-0.5">
                         <Text className="font-semibold text-[11px] text-slate-500">Closed</Text>
                       </View>
                     </View>
                   )}
                 </View>
-
               </View>
             );
           })}
@@ -955,7 +986,7 @@ const OnBoarding3 = forwardRef((props: OnBoarding3Props, ref) => {
               className="mt-4 flex-row items-center justify-center rounded-2xl border border-rose-100 bg-rose-50/50 py-3">
               <Ionicons name="information-circle" size={16} color="#F6163C" />
               <Text className="ml-1.5 text-xs font-semibold text-[#F6163C]">
-                Need help? View Luxury vs Premium criteria
+                Need help? View Club Category criteria
               </Text>
             </TouchableOpacity>
           </View>

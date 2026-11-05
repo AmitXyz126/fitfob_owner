@@ -1,5 +1,4 @@
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
-import { GoogleGenAI } from '@google/genai';
 
 export const GYM_AREA_CATEGORIES = [
   'Cardio Area',
@@ -86,6 +85,9 @@ function normalizeArea(rawArea: string): string {
   if (lower.includes('crossfit') || lower.includes('functional')) {
     return 'CrossFit / Functional Zone';
   }
+  if (lower.includes('yoga') || lower.includes('aerobic') || lower.includes('dance')) {
+    return 'Yoga & Aerobics Studio';
+  }
 
   return clean;
 }
@@ -97,24 +99,22 @@ const sanitizeMessage = (msg: string): string => {
   if (!msg) return 'Unknown error';
   return msg
     .replace(/([?&]key=)[^&\s"']+/gi, '$1[REDACTED]')
-    .replace(/(AIzaSy[A-Za-z0-9_-]{33})/g, '[REDACTED_API_KEY]')
-    .replace(/(AQ\.[A-Za-z0-9_-]{40,})/g, '[REDACTED_API_KEY]')
     .replace(/(gsk_[A-Za-z0-9_-]{40,})/g, '[REDACTED_API_KEY]');
 };
 
 /**
- * Analyzes gym image directly using Gemini Flash-Lite (Super fast 1-2 seconds, 100% Free)
- * Returns the detected area name (e.g. "Cardio Area", "Free Weights Area")
+ * Analyzes gym image using Groq Vision (Qwen 3.8 27B)
+ * Lightning fast ~0.15s, 100% Free, Zero Billing required.
+ * Returns the detected area name (e.g. "Cardio Area", "Yoga & Aerobics Studio", "Free Weights Area")
  */
 export async function analyzeGymImage(photoUri: string): Promise<GymAreaAnalysisResult | null> {
   const apiKey = (
-    process.env.EXPO_PUBLIC_GEMINI_API_KEY ||
-    process.env.GEMINI_API_KEY ||
-    ''
+    process.env.EXPO_PUBLIC_GROQ_API_KEY ||
+    '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'
   ).trim();
 
   if (!apiKey) {
-    console.warn('[GeminiService] Missing EXPO_PUBLIC_GEMINI_API_KEY');
+    console.warn('[AiService] Missing Groq API key.');
     return null;
   }
 
@@ -128,58 +128,63 @@ export async function analyzeGymImage(photoUri: string): Promise<GymAreaAnalysis
     );
     base64Data = manipulated.base64 || '';
   } catch (err) {
-    console.warn('[GeminiService] Image manipulation failed, using raw URI:', err);
+    console.warn('[AiService] Image manipulation failed, using raw URI:', err);
   }
 
   if (!base64Data) {
     return null;
   }
 
-  // 2. Call Gemini Flash-Lite
-  const ai = new GoogleGenAI({ apiKey });
-  const imagePart = {
-    inlineData: {
-      mimeType: 'image/jpeg',
-      data: base64Data,
-    },
-  };
-
-  const activeModels = ['gemini-3.5-flash-lite', 'gemini-3.5-flash'];
+  // 2. Call Groq Vision (qwen/qwen3.8-27b)
   let textOutput = '';
-  let lastError: any = null;
+  try {
+    console.log('[AiService] Scanning gym area with Groq Vision...');
+    const startTime = Date.now();
 
-  for (const modelName of activeModels) {
-    try {
-      const response = await ai.models.generateContent({
-        model: modelName,
-        contents: [ANALYSIS_PROMPT, imagePart],
-        config: {
-          responseMimeType: 'application/json',
-          temperature: 0.1,
-        },
-      });
+    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'qwen/qwen3.8-27b',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: ANALYSIS_PROMPT },
+              {
+                type: 'image_url',
+                image_url: { url: `data:image/jpeg;base64,${base64Data}` },
+              },
+            ],
+          },
+        ],
+        response_format: { type: 'json_object' },
+      }),
+    });
 
-      if (response.text && response.text.trim().length > 0) {
-        textOutput = response.text;
-        break;
+    const elapsedMs = Date.now() - startTime;
+
+    if (groqRes.ok) {
+      const data = await groqRes.json();
+      const content = data?.choices?.[0]?.message?.content;
+      if (content && content.trim().length > 0) {
+        textOutput = content.trim();
+        console.log(`[AiService] Groq scan completed in ${elapsedMs}ms`);
       }
-    } catch (err: any) {
-      lastError = err;
-      const sanitized = sanitizeMessage(err?.message || String(err));
-      console.warn(`[GeminiService] ${modelName} error:`, sanitized);
-      if (/503|high demand|UNAVAILABLE|not found|NOT_FOUND/i.test(sanitized)) {
-        continue;
-      }
-      if (/API key not valid|API_KEY_INVALID|UNAUTHENTICATED|RESOURCE_EXHAUSTED/i.test(sanitized)) {
-        break;
-      }
+    } else {
+      const errText = await groqRes.text();
+      console.warn('[AiService] Groq vision returned status:', groqRes.status, sanitizeMessage(errText));
     }
+  } catch (groqErr: any) {
+    console.warn('[AiService] Groq request error:', groqErr?.message);
+    return null;
   }
 
   if (!textOutput) {
-    if (lastError) {
-      console.warn('[GeminiService] Analysis failed:', sanitizeMessage(lastError?.message || ''));
-    }
+    console.warn('[AiService] No response from AI vision engine.');
     return null;
   }
 
@@ -191,6 +196,8 @@ export async function analyzeGymImage(photoUri: string): Promise<GymAreaAnalysis
     const area = normalizeArea(parsed?.area || parsed?.category || '');
     const confidence = typeof parsed?.confidence === 'number' ? parsed.confidence : 0.95;
 
+    console.log(`[AiService] Auto-detected category: "${area}" (${Math.round(confidence * 100)}% match)`);
+
     return {
       area,
       category: area,
@@ -200,6 +207,7 @@ export async function analyzeGymImage(photoUri: string): Promise<GymAreaAnalysis
     const areaMatch = textOutput.match(/"(?:area|category)"\s*:\s*"([^"]+)"/i);
     if (areaMatch) {
       const area = normalizeArea(areaMatch[1]);
+      console.log(`[AiService] Auto-detected category (regex fallback): "${area}"`);
       return { area, category: area, confidence: 0.9 };
     }
     return null;

@@ -12,7 +12,7 @@ interface ClubCategoryInfoModalProps {
 
 export const ClubCategoryInfoModal: React.FC<ClubCategoryInfoModalProps> = ({
   visible,
-  selectedCategory = 'Luxury',
+  selectedCategory = 'Basic',
   onSelectCategory,
   onClose,
 }) => {
@@ -71,69 +71,61 @@ export const ClubCategoryInfoModal: React.FC<ClubCategoryInfoModalProps> = ({
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} className="mt-3">
-            {/* LUXURY CATEGORY CARD */}
-            <View className="mb-4 rounded-2xl border border-amber-200 bg-amber-50/40 p-4">
+            {/* BASIC CATEGORY CARD (TOP) */}
+            <View className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4">
               <View className="flex-row items-center justify-between mb-2">
                 <View className="flex-row items-center space-x-2">
-                  <View className="h-8 w-8 rounded-xl bg-amber-500/15 items-center justify-center">
-                    <Ionicons name="diamond" size={18} color="#D97706" />
+                  <View className="h-8 w-8 rounded-xl bg-emerald-500/15 items-center justify-center">
+                    <Ionicons name="barbell" size={18} color="#059669" />
                   </View>
                   <View className="ml-2">
-                    <Text className="font-bold text-[16px] text-slate-900">Luxury Club</Text>
-                    <Text className="text-[11px] font-medium text-amber-700">5-Star & Boutique Experience</Text>
+                    <Text className="font-bold text-[16px] text-slate-900">Basic Club</Text>
+                    <Text className="text-[11px] font-medium text-emerald-700">Standard & Neighborhood Fitness</Text>
                   </View>
                 </View>
-                {selectedCategory === 'Luxury' ? (
-                  <View className="rounded-full bg-amber-500 px-2.5 py-0.5">
+                {selectedCategory === 'Basic' ? (
+                  <View className="rounded-full bg-emerald-600 px-2.5 py-0.5">
                     <Text className="text-[10px] font-bold text-white">SELECTED</Text>
                   </View>
                 ) : (
                   <TouchableOpacity
                     onPress={() => {
-                      onSelectCategory?.('Luxury');
+                      onSelectCategory?.('Basic');
                       onClose();
                     }}
                     activeOpacity={0.7}
-                    className="rounded-full bg-white border border-amber-300 px-2.5 py-0.5">
-                    <Text className="text-[10px] font-bold text-amber-700">Select Luxury</Text>
+                    className="rounded-full bg-white border border-emerald-300 px-2.5 py-0.5">
+                    <Text className="text-[10px] font-bold text-emerald-700">Select Basic</Text>
                   </TouchableOpacity>
                 )}
               </View>
 
               <Text className="text-xs text-slate-600 leading-4 mb-3">
-                Reserved for elite, high-end fitness clubs offering a 5-star ambiance, top-tier imported biomechanical machinery, and hospitality-grade services.
+                Ideal for neighborhood gyms and standard fitness centers providing essential workout machinery and fitness spaces.
               </Text>
 
-              <View className="rounded-xl bg-white/95 p-3 border border-amber-100">
+              <View className="rounded-xl bg-white/95 p-3 border border-emerald-100">
                 <View className="flex-row items-start mb-2">
-                  <Ionicons name="checkmark-circle" size={15} color="#D97706" style={{ marginTop: 1, marginRight: 6 }} />
+                  <Ionicons name="checkmark-circle" size={15} color="#059669" style={{ marginTop: 1, marginRight: 6 }} />
                   <View className="flex-1">
-                    <Text className="text-xs font-semibold text-slate-800">Top-Tier Equipment</Text>
-                    <Text className="text-[11px] text-slate-500">Premium imported brands (e.g., Technogym, Life Fitness Elevation, Eleiko, Hammer Strength).</Text>
+                    <Text className="text-xs font-semibold text-slate-800">Essential Equipment</Text>
+                    <Text className="text-[11px] text-slate-500">Core cardio and strength machines, free weights, and basic functional training tools.</Text>
                   </View>
                 </View>
 
                 <View className="flex-row items-start mb-2">
-                  <Ionicons name="checkmark-circle" size={15} color="#D97706" style={{ marginTop: 1, marginRight: 6 }} />
+                  <Ionicons name="checkmark-circle" size={15} color="#059669" style={{ marginTop: 1, marginRight: 6 }} />
                   <View className="flex-1">
-                    <Text className="text-xs font-semibold text-slate-800">Elite Wellness & Spa</Text>
-                    <Text className="text-[11px] text-slate-500">Steam, Sauna, Jacuzzi / Ice Bath, Luxury Towel Service, Locker with Valet & Designer Showers.</Text>
-                  </View>
-                </View>
-
-                <View className="flex-row items-start mb-2">
-                  <Ionicons name="checkmark-circle" size={15} color="#D97706" style={{ marginTop: 1, marginRight: 6 }} />
-                  <View className="flex-1">
-                    <Text className="text-xs font-semibold text-slate-800">Premium Ambiance & Facilities</Text>
-                    <Text className="text-[11px] text-slate-500">Boutique interior design, acoustic soundproofing, cafe / smoothie bar & dedicated valet parking.</Text>
+                    <Text className="text-xs font-semibold text-slate-800">Standard Amenities</Text>
+                    <Text className="text-[11px] text-slate-500">Locker facilities, changing area, drinking water, and clean workout space.</Text>
                   </View>
                 </View>
 
                 <View className="flex-row items-start">
-                  <Ionicons name="checkmark-circle" size={15} color="#D97706" style={{ marginTop: 1, marginRight: 6 }} />
+                  <Ionicons name="checkmark-circle" size={15} color="#059669" style={{ marginTop: 1, marginRight: 6 }} />
                   <View className="flex-1">
-                    <Text className="text-xs font-semibold text-slate-800">Master Trainers & Staff</Text>
-                    <Text className="text-[11px] text-slate-500">Internationally certified master trainers, dedicated nutritionists & in-house physiotherapists.</Text>
+                    <Text className="text-xs font-semibold text-slate-800">General Floor Trainers</Text>
+                    <Text className="text-[11px] text-slate-500">Experienced floor trainers for general guidance and assistance.</Text>
                   </View>
                 </View>
               </View>
@@ -202,6 +194,74 @@ export const ClubCategoryInfoModal: React.FC<ClubCategoryInfoModalProps> = ({
                   <View className="flex-1">
                     <Text className="text-xs font-semibold text-slate-800">Certified Floor Trainers</Text>
                     <Text className="text-[11px] text-slate-500">Qualified fitness instructors available for workout guidance, form correction & personal training.</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* LUXURY CATEGORY CARD */}
+            <View className="mb-4 rounded-2xl border border-amber-200 bg-amber-50/40 p-4">
+              <View className="flex-row items-center justify-between mb-2">
+                <View className="flex-row items-center space-x-2">
+                  <View className="h-8 w-8 rounded-xl bg-amber-500/15 items-center justify-center">
+                    <Ionicons name="diamond" size={18} color="#D97706" />
+                  </View>
+                  <View className="ml-2">
+                    <Text className="font-bold text-[16px] text-slate-900">Luxury Club</Text>
+                    <Text className="text-[11px] font-medium text-amber-700">5-Star & Boutique Experience</Text>
+                  </View>
+                </View>
+                {selectedCategory === 'Luxury' ? (
+                  <View className="rounded-full bg-amber-500 px-2.5 py-0.5">
+                    <Text className="text-[10px] font-bold text-white">SELECTED</Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => {
+                      onSelectCategory?.('Luxury');
+                      onClose();
+                    }}
+                    activeOpacity={0.7}
+                    className="rounded-full bg-white border border-amber-300 px-2.5 py-0.5">
+                    <Text className="text-[10px] font-bold text-amber-700">Select Luxury</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <Text className="text-xs text-slate-600 leading-4 mb-3">
+                Reserved for elite, high-end fitness clubs offering a 5-star ambiance, top-tier imported biomechanical machinery, and hospitality-grade services.
+              </Text>
+
+              <View className="rounded-xl bg-white/95 p-3 border border-amber-100">
+                <View className="flex-row items-start mb-2">
+                  <Ionicons name="checkmark-circle" size={15} color="#D97706" style={{ marginTop: 1, marginRight: 6 }} />
+                  <View className="flex-1">
+                    <Text className="text-xs font-semibold text-slate-800">Top-Tier Equipment</Text>
+                    <Text className="text-[11px] text-slate-500">Premium imported brands (e.g., Technogym, Life Fitness Elevation, Eleiko, Hammer Strength).</Text>
+                  </View>
+                </View>
+
+                <View className="flex-row items-start mb-2">
+                  <Ionicons name="checkmark-circle" size={15} color="#D97706" style={{ marginTop: 1, marginRight: 6 }} />
+                  <View className="flex-1">
+                    <Text className="text-xs font-semibold text-slate-800">Elite Wellness & Spa</Text>
+                    <Text className="text-[11px] text-slate-500">Steam, Sauna, Jacuzzi / Ice Bath, Luxury Towel Service, Locker with Valet & Designer Showers.</Text>
+                  </View>
+                </View>
+
+                <View className="flex-row items-start mb-2">
+                  <Ionicons name="checkmark-circle" size={15} color="#D97706" style={{ marginTop: 1, marginRight: 6 }} />
+                  <View className="flex-1">
+                    <Text className="text-xs font-semibold text-slate-800">Premium Ambiance & Facilities</Text>
+                    <Text className="text-[11px] text-slate-500">Boutique interior design, acoustic soundproofing, cafe / smoothie bar & dedicated valet parking.</Text>
+                  </View>
+                </View>
+
+                <View className="flex-row items-start">
+                  <Ionicons name="checkmark-circle" size={15} color="#D97706" style={{ marginTop: 1, marginRight: 6 }} />
+                  <View className="flex-1">
+                    <Text className="text-xs font-semibold text-slate-800">Master Trainers & Staff</Text>
+                    <Text className="text-[11px] text-slate-500">Internationally certified master trainers, dedicated nutritionists & in-house physiotherapists.</Text>
                   </View>
                 </View>
               </View>
