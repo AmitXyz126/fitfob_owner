@@ -901,8 +901,8 @@ const ClubProfileScreen = () => {
 
           <MenuOption
             icon={BadgePercent}
-            title="Membership Plans & Pricing"
-             onPress={() => router.push('/MembershipPlansScreen')}
+            title="Gym Contracts & Plans"
+            onPress={() => router.push('/gym-contracts')}
           />
           <LineGradient />
 

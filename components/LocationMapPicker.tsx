@@ -134,12 +134,7 @@ export const LocationMapPicker = forwardRef<LocationMapPickerHandle, LocationMap
 
             <div class="floating-controls">
               <div class="btn-float" id="satBtn" onclick="toggleSatellite()" title="Toggle Satellite">
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F6163C" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M4 10a7.31 7.31 0 0 0 10 10Z" fill="#FEE2E2"/>
-                  <path d="m9 15 3-3"/>
-                  <path d="M17 13a6 6 0 0 0-6-6"/>
-                  <path d="M21 13A10 10 0 0 0 11 3"/>
-                </svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F6163C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2" fill="#FEE2E2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
               </div>
               <div class="btn-float" onclick="map.zoomIn()" title="Zoom In">+</div>
               <div class="btn-float" onclick="map.zoomOut()" title="Zoom Out">−</div>
@@ -149,7 +144,7 @@ export const LocationMapPicker = forwardRef<LocationMapPickerHandle, LocationMap
               var lat = ${lat};
               var lng = ${lng};
 
-              var SATELLITE_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F6163C" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10a7.31 7.31 0 0 0 10 10Z" fill="#FEE2E2"/><path d="m9 15 3-3"/><path d="M17 13a6 6 0 0 0-6-6"/><path d="M21 13A10 10 0 0 0 11 3"/></svg>';
+              var SATELLITE_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F6163C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2" fill="#FEE2E2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>';
               var MAP_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F6163C" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21" fill="#FEE2E2"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/></svg>';
 
               var map = L.map('map', {

@@ -41,7 +41,6 @@ export const ENDPOINTS = {
   GET_CLUB_SERVICES: `${BASE_URL}/api/club-services`,
   GET_CLUB_FACILITIES: `${BASE_URL}/api/club-facilities`,
 
-
   CHANGE_PASSWORD: `${BASE_URL}/api/change-password`,
   CLUB_OWNERS: `${BASE_URL}/api/club-owners`,
   MY_CLUB_OWNER: `${BASE_URL}/api/club-owner/me`,
@@ -67,5 +66,7 @@ export const ENDPOINTS = {
   LOCAL_MEMBERSHIP_PLAN_BY_ID: (documentId: string) => `${BASE_URL}/api/local-membership-plans/${documentId}`,
   LOCAL_MEMBERSHIP_STATUS: (documentId: string) => `${BASE_URL}/api/local-membership/${documentId}`,
   LOCAL_MEMBERSHIP_BASE: `${BASE_URL}/api/local-membership`,
-};
 
+  // Gym Contracts
+  GYM_CONTRACTS_MY_CONTRACT: `${BASE_URL}/api/gym-contracts/my-contract`,
+};

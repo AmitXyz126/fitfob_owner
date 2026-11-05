@@ -77,6 +77,7 @@ export default function Layout() {
           <Stack.Screen name="clubTimings" />
           <Stack.Screen name="holidays" />
           <Stack.Screen name="MembershipPlansScreen" />
+          <Stack.Screen name="gym-contracts" />
         </Stack>
         <Toast />
       </QueryClientProvider>
