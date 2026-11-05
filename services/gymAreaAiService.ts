@@ -25,113 +25,69 @@ export const GYM_AREA_CATEGORIES = [
 export type GymAreaCategory = (typeof GYM_AREA_CATEGORIES)[number];
 
 export interface GymAreaAnalysisResult {
-  area: GymAreaCategory | string;
+  area: string;
   category?: string;
-  equipment?: string[];
-  facilityName?: string;
   confidence: number;
-  reason: string;
+  reason?: string;
 }
 
-const ANALYSIS_PROMPT = `Analyze this gym / fitness club image (interior or exterior) and identify the specific facility, zone, or equipment shown.
-
-Categories to match from:
+const ANALYSIS_PROMPT = `You are a gym and fitness club photo classifier.
+Analyze this gym photo and select the single best matching area name from this list:
 ${GYM_AREA_CATEGORIES.filter((c) => c !== 'Other').join(', ')}
 
 Rules:
-- Identify any visible gym equipment (e.g. Treadmill, Dumbbells, Squat Rack, Cable Machine, Punching Bag, Smith Machine, Leg Press, Barbell, Elliptical) or facility elements (Reception Desk, Swimming Pool, Lockers, Turf, Yoga Mats, Sauna, Entrance).
-- Select the best matching primary category from the list above for the photo caption.
-- Provide a concise name for the facility/equipment (e.g. "Cardio Area - Treadmills", "Free Weights Area - Dumbbells", "Reception & Waiting").
-- Confidence must be a float between 0 and 1.
-- Do not identify people.
-- Only return "Other" if the image is completely unrelated to a gym or fitness facility.
-
-Return ONLY a valid JSON object matching this schema:
+1. Return ONLY valid JSON in this exact format:
 {
   "area": "Cardio Area",
-  "category": "Cardio Area",
-  "equipment": ["Treadmill", "Elliptical"],
-  "facilityName": "Cardio Area",
-  "confidence": 0.95,
-  "reason": "Clear view of treadmill rows and cardio equipment."
-}`;
+  "confidence": 0.95
+}
+2. "area" MUST be one of the categories listed above.
+3. If treadmills, bikes, or ellipticals are visible, return "Cardio Area".
+4. If dumbbells, barbells, or weight plates are visible, return "Free Weights Area".
+5. If machines/cables/squat racks are visible, return "Weight Training Area".
+6. If reception counter or lobby is visible, return "Reception & Waiting".
+7. Only return "Other" if the photo is completely unrelated to a gym or fitness facility.`;
 
 /**
- * Normalizes raw model output to standard GymAreaAnalysisResult.
+ * Normalizes raw model output to standard category
  */
-function normalizeAnalysisResult(parsed: any): GymAreaAnalysisResult {
-  const rawArea: string = (parsed?.area || parsed?.category || parsed?.facilityName || '').trim();
-  const confidence = typeof parsed?.confidence === 'number' ? parsed.confidence : 0.9;
-  const reason: string = parsed?.reason || '';
-  const equipment: string[] = Array.isArray(parsed?.equipment) ? parsed.equipment : [];
-  const facilityName: string = parsed?.facilityName || rawArea;
+function normalizeArea(rawArea: string): string {
+  const clean = (rawArea || '').trim();
+  if (!clean) return 'Other';
 
-  // Match against standard categories
-  let resolvedArea: string = rawArea;
-  const matchedCategory = GYM_AREA_CATEGORIES.find(
+  const matched = GYM_AREA_CATEGORIES.find(
     (c) =>
-      c.toLowerCase() === rawArea.toLowerCase() ||
+      c.toLowerCase() === clean.toLowerCase() ||
       c.toLowerCase().replace(/ area| zone| room| studio/g, '').trim() ===
-        rawArea.toLowerCase().replace(/ area| zone| room| studio/g, '').trim()
+        clean.toLowerCase().replace(/ area| zone| room| studio/g, '').trim()
   );
 
-  if (matchedCategory && matchedCategory !== 'Other') {
-    resolvedArea = matchedCategory;
-  } else if (
-    resolvedArea &&
-    resolvedArea.toLowerCase() !== 'other' &&
-    resolvedArea.toLowerCase() !== 'unknown'
-  ) {
-    resolvedArea = resolvedArea
-      .split(' ')
-      .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-      .join(' ');
-  } else {
-    // If area was Other or Unknown, check if equipment or reason mentions specific keywords
-    const lowerReason = (reason + ' ' + equipment.join(' ')).toLowerCase();
-    if (
-      lowerReason.includes('treadmill') ||
-      lowerReason.includes('cardio') ||
-      lowerReason.includes('cycle') ||
-      lowerReason.includes('elliptical')
-    ) {
-      resolvedArea = 'Cardio Area';
-    } else if (
-      lowerReason.includes('dumbbell') ||
-      lowerReason.includes('barbell') ||
-      lowerReason.includes('free weight')
-    ) {
-      resolvedArea = 'Free Weights Area';
-    } else if (
-      lowerReason.includes('bench') ||
-      lowerReason.includes('weight') ||
-      lowerReason.includes('machine') ||
-      lowerReason.includes('squat rack')
-    ) {
-      resolvedArea = 'Weight Training Area';
-    } else if (
-      lowerReason.includes('reception') ||
-      lowerReason.includes('desk') ||
-      lowerReason.includes('counter')
-    ) {
-      resolvedArea = 'Reception & Waiting';
-    } else if (lowerReason.includes('pool') || lowerReason.includes('swim')) {
-      resolvedArea = 'Swimming Pool';
-    } else if (lowerReason.includes('park')) {
-      resolvedArea = 'Parking Area';
-    } else {
-      resolvedArea = 'Other';
-    }
+  if (matched && matched !== 'Other') {
+    return matched;
   }
 
-  return {
-    area: resolvedArea,
-    category: resolvedArea,
-    equipment,
-    facilityName,
-    confidence,
-    reason,
-  };
+  // Fallback keyword check
+  const lower = clean.toLowerCase();
+  if (lower.includes('cardio') || lower.includes('treadmill') || lower.includes('cycle')) {
+    return 'Cardio Area';
+  }
+  if (lower.includes('free weight') || lower.includes('dumbbell') || lower.includes('barbell')) {
+    return 'Free Weights Area';
+  }
+  if (lower.includes('weight') || lower.includes('machine') || lower.includes('squat')) {
+    return 'Weight Training Area';
+  }
+  if (lower.includes('reception') || lower.includes('waiting') || lower.includes('lobby')) {
+    return 'Reception & Waiting';
+  }
+  if (lower.includes('pool') || lower.includes('swim')) {
+    return 'Swimming Pool';
+  }
+  if (lower.includes('crossfit') || lower.includes('functional')) {
+    return 'CrossFit / Functional Zone';
+  }
+
+  return clean;
 }
 
 /**
@@ -142,17 +98,15 @@ const sanitizeMessage = (msg: string): string => {
   return msg
     .replace(/([?&]key=)[^&\s"']+/gi, '$1[REDACTED]')
     .replace(/(AIzaSy[A-Za-z0-9_-]{33})/g, '[REDACTED_API_KEY]')
-    .replace(/(AQ\.[A-Za-z0-9_-]{40,})/g, '[REDACTED_API_KEY]');
+    .replace(/(AQ\.[A-Za-z0-9_-]{40,})/g, '[REDACTED_API_KEY]')
+    .replace(/(gsk_[A-Za-z0-9_-]{40,})/g, '[REDACTED_API_KEY]');
 };
 
 /**
- * Analyzes a gym image directly on the frontend using Google Gemini (via @google/genai SDK with gemini-3.8-flash)
- * using EXPO_PUBLIC_GEMINI_API_KEY from environment variables (.env.local).
+ * Analyzes gym image directly using Gemini Flash-Lite (Super fast 1-2 seconds, 100% Free)
+ * Returns the detected area name (e.g. "Cardio Area", "Free Weights Area")
  */
-export async function analyzeGymImage(
-  photoUri: string
-): Promise<GymAreaAnalysisResult | null> {
-  // 1. Get API key from environment variable
+export async function analyzeGymImage(photoUri: string): Promise<GymAreaAnalysisResult | null> {
   const apiKey = (
     process.env.EXPO_PUBLIC_GEMINI_API_KEY ||
     process.env.GEMINI_API_KEY ||
@@ -160,31 +114,29 @@ export async function analyzeGymImage(
   ).trim();
 
   if (!apiKey) {
-    console.warn('[GeminiService] Missing EXPO_PUBLIC_GEMINI_API_KEY in environment variables.');
-    throw new Error('Missing EXPO_PUBLIC_GEMINI_API_KEY in environment variables.');
+    console.warn('[GeminiService] Missing EXPO_PUBLIC_GEMINI_API_KEY');
+    return null;
   }
 
-  // 2. Resize and compress to base64 for fast mobile upload
+  // 1. Resize and compress to base64 (512px, 0.5 quality = ~30KB for lightning speed)
   let base64Data = '';
   try {
     const manipulated = await manipulateAsync(
       photoUri,
-      [{ resize: { width: 640 } }],
-      { compress: 0.6, format: SaveFormat.JPEG, base64: true }
+      [{ resize: { width: 512 } }],
+      { compress: 0.5, format: SaveFormat.JPEG, base64: true }
     );
     base64Data = manipulated.base64 || '';
   } catch (err) {
-    console.warn('[GeminiService] Image manipulation failed, trying raw URI:', err);
+    console.warn('[GeminiService] Image manipulation failed, using raw URI:', err);
   }
 
   if (!base64Data) {
-    throw new Error('Unable to process image data for analysis.');
+    return null;
   }
 
-  // 3. Call Google Gemini directly via @google/genai SDK with gemini-3.8-flash
+  // 2. Call Gemini Flash-Lite
   const ai = new GoogleGenAI({ apiKey });
-
-  const promptPart = ANALYSIS_PROMPT;
   const imagePart = {
     inlineData: {
       mimeType: 'image/jpeg',
@@ -192,90 +144,64 @@ export async function analyzeGymImage(
     },
   };
 
+  const activeModels = ['gemini-3.5-flash-lite', 'gemini-3.5-flash'];
   let textOutput = '';
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: [promptPart, imagePart],
-      config: {
-        responseMimeType: 'application/json',
-      },
-    });
+  let lastError: any = null;
 
-    textOutput = response.text || '';
-  } catch (err: any) {
-    const sanitized = sanitizeMessage(err?.message || String(err));
-    console.warn('[GeminiService] gemini-3.8-flash request failed:', sanitized);
+  for (const modelName of activeModels) {
+    try {
+      const response = await ai.models.generateContent({
+        model: modelName,
+        contents: [ANALYSIS_PROMPT, imagePart],
+        config: {
+          responseMimeType: 'application/json',
+          temperature: 0.1,
+        },
+      });
 
-    // Google project restricted/denied access (403 PERMISSION_DENIED)
-    if (/denied access|Your project has been denied access/i.test(sanitized)) {
-      throw new Error(
-        'Your Google AI Studio project is marked as "Restricted" by Google. Please create/import an active Google Cloud project in Google AI Studio.'
-      );
+      if (response.text && response.text.trim().length > 0) {
+        textOutput = response.text;
+        break;
+      }
+    } catch (err: any) {
+      lastError = err;
+      const sanitized = sanitizeMessage(err?.message || String(err));
+      console.warn(`[GeminiService] ${modelName} error:`, sanitized);
+      if (/503|high demand|UNAVAILABLE|not found|NOT_FOUND/i.test(sanitized)) {
+        continue;
+      }
+      if (/API key not valid|API_KEY_INVALID|UNAUTHENTICATED|RESOURCE_EXHAUSTED/i.test(sanitized)) {
+        break;
+      }
     }
-
-    // Fast-fail if API key is invalid or unauthorized
-    if (
-      /API key not valid|API_KEY_INVALID|UNAUTHENTICATED|ACCESS_TOKEN_TYPE_UNSUPPORTED|PERMISSION_DENIED/i.test(
-        sanitized
-      ) &&
-      !/not found|NOT_FOUND|unsupported/i.test(sanitized)
-    ) {
-      throw new Error(
-        'Gemini API key is invalid, expired, or unauthorized. Please verify your Gemini API key in .env.local.'
-      );
-    }
-
-    // Fast-fail if quota exhausted
-    if (/RESOURCE_EXHAUSTED|quota|RATE_LIMIT/i.test(sanitized)) {
-      throw new Error(
-        'Gemini API quota exceeded for your project. Please check quota limits in Google AI Studio.'
-      );
-    }
-
-    // Model not found or unavailable
-    if (/not found|NOT_FOUND|unsupported/i.test(sanitized)) {
-      throw new Error(
-        'The gemini-3.8-flash model is not found or not supported for this API key. Please check enabled models in Google AI Studio.'
-      );
-    }
-
-    // Network or other error
-    if (/network|timeout|ECONNREFUSED|ENOTFOUND/i.test(sanitized)) {
-      throw new Error(
-        'Network error while connecting to Gemini AI service. Please check your internet connection.'
-      );
-    }
-
-    throw new Error(
-      sanitized || 'Gemini model returned an empty response. Please try again.'
-    );
   }
 
-  if (!textOutput || textOutput.trim().length === 0) {
-    throw new Error('Gemini model returned an empty response. Please try again.');
+  if (!textOutput) {
+    if (lastError) {
+      console.warn('[GeminiService] Analysis failed:', sanitizeMessage(lastError?.message || ''));
+    }
+    return null;
   }
 
-  // 4. Parse and clean JSON output with robust malformed response handling
-  let parsed: any = null;
+  // 3. Parse JSON output
   try {
-    let cleanText = textOutput.trim();
-    // Strip markdown code fences if present
-    cleanText = cleanText.replace(/```(?:json)?\s*([\s\S]*?)\s*```/gi, '$1').trim();
+    let cleanText = textOutput.trim().replace(/```(?:json)?\s*([\s\S]*?)\s*```/gi, '$1').trim();
     const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
-    const jsonStr = jsonMatch ? jsonMatch[0] : cleanText;
-    parsed = JSON.parse(jsonStr);
-  } catch (parseErr) {
-    console.warn('[GeminiService] Failed to parse model output as JSON. Extracting fallback fields.');
-    const areaMatch = textOutput.match(/"(?:area|category)"\s*:\s*"([^"]+)"/i);
-    const confidenceMatch = textOutput.match(/"confidence"\s*:\s*([0-9.]+)/i);
-    const reasonMatch = textOutput.match(/"reason"\s*:\s*"([^"]+)"/i);
-    parsed = {
-      area: areaMatch ? areaMatch[1] : 'Other',
-      confidence: confidenceMatch ? parseFloat(confidenceMatch[1]) : 0.7,
-      reason: reasonMatch ? reasonMatch[1] : 'Extracted from raw model text',
-    };
-  }
+    const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : cleanText);
+    const area = normalizeArea(parsed?.area || parsed?.category || '');
+    const confidence = typeof parsed?.confidence === 'number' ? parsed.confidence : 0.95;
 
-  return normalizeAnalysisResult(parsed);
+    return {
+      area,
+      category: area,
+      confidence,
+    };
+  } catch (parseErr) {
+    const areaMatch = textOutput.match(/"(?:area|category)"\s*:\s*"([^"]+)"/i);
+    if (areaMatch) {
+      const area = normalizeArea(areaMatch[1]);
+      return { area, category: area, confidence: 0.9 };
+    }
+    return null;
+  }
 }

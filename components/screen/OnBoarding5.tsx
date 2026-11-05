@@ -11,10 +11,16 @@ import {
   Modal,
   Platform,
   KeyboardAvoidingView,
+  Pressable,
+  StyleSheet,
+  BackHandler,
+  Animated,
+  Easing,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useUserDetail } from '@/hooks/useUserDetail';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { LinearGradient } from 'expo-linear-gradient';
 import GymLoader from '@/components/GymLoader';
@@ -29,6 +35,90 @@ import {
 interface Props {
   initialData?: any;
 }
+
+
+const CATEGORY_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  'Cardio Area': 'speedometer-outline',
+  'Free Weights Area': 'barbell-outline',
+  'Weight Training Area': 'fitness-outline',
+  'CrossFit / Functional Zone': 'flash-outline',
+  'Yoga & Aerobics Studio': 'body-outline',
+  'Personal Training Area': 'people-outline',
+  'Stretching Area': 'walk-outline',
+  'Boxing / Combat Zone': 'shield-outline',
+  'Reception & Waiting': 'business-outline',
+  'Gym Exterior / Entrance': 'storefront-outline',
+  'Swimming Pool': 'water-outline',
+  'Steam & Sauna': 'flame-outline',
+  'Locker Room': 'lock-closed-outline',
+  'Shower & Washroom': 'water-outline',
+  'Cafeteria / Juice Bar': 'cafe-outline',
+  'Parking Area': 'car-outline',
+  'Office': 'briefcase-outline',
+  'Other': 'grid-outline',
+};
+
+// Shimmer Skeleton with smooth left-to-right light sweep animation over images
+const PhotoShimmerCard = ({ isHero }: { isHero?: boolean }) => {
+  const animatedValue = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(animatedValue, {
+        toValue: 1,
+        duration: 1300,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [animatedValue]);
+
+  const translateX = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-350, 350],
+  });
+
+  return (
+    <View
+      className={`mb-4 ${isHero ? 'w-full' : 'w-[48%]'} overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm`}>
+      {/* Image Skeleton Box */}
+      <View className={`${isHero ? 'h-52' : 'h-36'} w-full overflow-hidden bg-slate-200 relative`}>
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { transform: [{ translateX }], width: '100%' },
+          ]}>
+          <LinearGradient
+            colors={['transparent', 'rgba(255, 255, 255, 0.5)', 'transparent']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={{ width: '100%', height: '100%' }}
+          />
+        </Animated.View>
+      </View>
+
+      {/* Caption Skeleton Bar */}
+      <View className="flex-row items-center border-t border-slate-100 bg-white px-3 py-2.5">
+        <View className="h-3 w-28 rounded bg-slate-200 overflow-hidden relative">
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { transform: [{ translateX }] },
+            ]}>
+            <LinearGradient
+              colors={['transparent', 'rgba(255, 255, 255, 0.55)', 'transparent']}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={{ width: '100%', height: '100%' }}
+            />
+          </Animated.View>
+        </View>
+      </View>
+    </View>
+  );
+};
 
 const MAX_PHOTOS = 17;
 const MIN_REQUIRED_PHOTOS = 2;
@@ -105,6 +195,8 @@ const normalizePhotoUrl = (item: any): string => {
 };
 
 const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
+  const insets = useSafeAreaInsets();
+  const [showAllCategories, setShowAllCategories] = useState(false);
   const { user } = useAuthStore();
   const userKey = user?.id || user?.email || 'guest';
   const CACHE_KEY = `@club_photos_cache_${userKey}`;
@@ -135,31 +227,24 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
   const [isAnalyzingAi, setIsAnalyzingAi] = useState(false);
   const [aiResult, setAiResult] = useState<GymAreaAnalysisResult | null>(null);
 
-  // Automatically classify gym area using Gemini Vision
+  // Automatically detect gym area (e.g. Cardio Area, Free Weights Area)
   const runAiAnalysis = async (uri: string) => {
     setIsAnalyzingAi(true);
     setAiResult(null);
     try {
       const res = await analyzeGymImage(uri);
-      setAiResult(res);
-      if (res?.area && res.area !== 'Other') {
+      if (res && res.area && res.area !== 'Other') {
+        setAiResult(res);
         setPhotoCaption(res.area);
-      } else if (res) {
         Toast.show({
-          type: 'info',
-          text1: 'Select Area Caption 🏷️',
-          text2: 'Could not auto-detect zone. Please pick a category below.',
-          visibilityTime: 3000,
+          type: 'success',
+          text1: ` Detected: ${res.area}`,
+          text2: 'Tap upload or select another category below',
+          visibilityTime: 2500,
         });
       }
     } catch (e: any) {
       console.warn('AI Area Analysis error:', e?.message || e);
-      Toast.show({
-        type: 'info',
-        text1: 'AI Scan Skipped',
-        text2: 'Please select a quick category below or enter caption.',
-        visibilityTime: 3000,
-      });
     } finally {
       setIsAnalyzingAi(false);
     }
@@ -510,6 +595,44 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
   const isUploading = uploadSingleClubPhoto.isPending;
   const isConfirming = confirmOnboarding.isPending || isSubmittingVerification;
 
+    const displayedCategories = React.useMemo(() => {
+    if (showAllCategories) {
+      return GYM_AREA_CATEGORIES;
+    }
+    const top8 = GYM_AREA_CATEGORIES.slice(0, 8);
+    if (aiResult?.area && !top8.includes(aiResult.area as any)) {
+      return [...top8.slice(0, 7), aiResult.area as any];
+    }
+    return top8;
+  }, [showAllCategories, aiResult]);
+
+  const categoryRows = React.useMemo(() => {
+    const rows: (typeof GYM_AREA_CATEGORIES[number])[][] = [];
+    for (let i = 0; i < displayedCategories.length; i += 2) {
+      rows.push(displayedCategories.slice(i, i + 2));
+    }
+    return rows;
+  }, [displayedCategories]);
+
+  // Hardware back press on Android to dismiss bottom sheet
+  useEffect(() => {
+    if (!uploadModalVisible) return;
+    const onBackPress = () => {
+      if (!isUploading) {
+        setUploadModalVisible(false);
+        setPickedPhoto(null);
+        setPhotoCaption('');
+        setAiResult(null);
+        setIsAnalyzingAi(false);
+        setShowAllCategories(false);
+        return true;
+      }
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [uploadModalVisible, isUploading]);
+
   // Compute visible slots: INITIAL_SLOTS_COUNT initially, expands to MAX_PHOTOS (17) on showMore
   const visibleSlotsCount = showMore ? MAX_PHOTOS : INITIAL_SLOTS_COUNT;
   const slots = Array.from({ length: visibleSlotsCount }, (_, idx) => localPhotos[idx] || null);
@@ -547,18 +670,15 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
           </Text>
         </View>
 
-        {/* Initial Loading Indicator */}
-        {isClubPhotosLoading && localPhotos.length === 0 && (
-          <View className="items-center py-8">
-            <ActivityIndicator size="small" color="#F6163C" />
-            <Text className="mt-2 text-xs font-medium text-slate-400">
-              Loading club photos...
-            </Text>
+        {/* Shimmer Swipe Loading over Images */}
+        {isClubPhotosLoading && localPhotos.length === 0 ? (
+          <View className="flex-row flex-wrap justify-between">
+            <PhotoShimmerCard isHero={true} />
+            <PhotoShimmerCard isHero={false} />
+            <PhotoShimmerCard isHero={false} />
           </View>
-        )}
-
-        {/* Boxes Initially (Expands to 17 on Show More) */}
-        <View className="flex-row flex-wrap justify-between">
+        ) : (
+          <View className="flex-row flex-wrap justify-between">
           {slots.map((photo, index) => {
             const isHero = index === 0;
             const isDeletingThis =
@@ -678,6 +798,7 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
             );
           })}
         </View>
+      )}
 
         {/* Show More / Show Less Toggle Button */}
         {!showMore ? (
@@ -814,36 +935,83 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
         </View>
       </ScrollView>
 
-      {/* UPLOAD MODAL (Single Photo + Caption) */}
-      <Modal
-        visible={uploadModalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => {
-          if (!isUploading) setUploadModalVisible(false);
-        }}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          className="flex-1 justify-end bg-black/60">
-          <View className="rounded-t-[32px] bg-white p-6 max-h-[90%]">
+      {/* IN-TREE BULLETPROOF BOTTOM SHEET (Anchored at bottom: 0, 100% gap-free across all devices) */}
+      {uploadModalVisible && (
+        <View style={[StyleSheet.absoluteFill, { zIndex: 9999, elevation: 9999 }]}>
+          {/* Dark Backdrop (tap to dismiss) */}
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+              if (!isUploading) {
+                setUploadModalVisible(false);
+                setPickedPhoto(null);
+                setPhotoCaption('');
+                setAiResult(null);
+                setIsAnalyzingAi(false);
+                setShowAllCategories(false);
+              }
+            }}>
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0, 0, 0, 0.65)' }]} />
+          </Pressable>
+
+          {/* Bottom Sheet Card - Sits Flush at the bottom of the device */}
+          <View
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              backgroundColor: '#FFFFFF',
+              borderTopLeftRadius: 32,
+              borderTopRightRadius: 32,
+              borderBottomLeftRadius: 0,
+              borderBottomRightRadius: 0,
+              maxHeight: '90%',
+              paddingHorizontal: 20,
+              paddingTop: 12,
+              paddingBottom: Math.max(insets.bottom, 24),
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: -4 },
+              shadowOpacity: 0.2,
+              shadowRadius: 16,
+              elevation: 32,
+            }}>
+            {/* Drag Handle Indicator */}
+            <View className="items-center pb-2 pt-1">
+              <View className="w-12 h-1.5 rounded-full bg-slate-200" />
+            </View>
+
             {/* Modal Header */}
-            <View className="flex-row items-center justify-between pb-4 border-b border-slate-100">
+            <View className="flex-row items-center justify-between pb-3.5 border-b border-slate-100">
               <View>
                 <Text className="font-bold text-lg text-slate-900">Upload Club Photo</Text>
                 <Text className="text-xs text-slate-400">Add a caption for this facility</Text>
               </View>
               <TouchableOpacity
-                onPress={() => setUploadModalVisible(false)}
+                onPress={() => {
+                  if (!isUploading) {
+                    setUploadModalVisible(false);
+                    setPickedPhoto(null);
+                    setPhotoCaption('');
+                    setAiResult(null);
+                    setIsAnalyzingAi(false);
+                    setShowAllCategories(false);
+                  }
+                }}
                 disabled={isUploading}
                 className="h-9 w-9 items-center justify-center rounded-full bg-slate-100">
                 <Ionicons name="close" size={20} color="#64748B" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} className="mt-4">
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={{ flexShrink: 1 }}
+              className="mt-3.5"
+              contentContainerStyle={{ paddingBottom: 16 }}>
               {/* Image Preview Box */}
               {pickedPhoto?.uri && (
-                <View className="h-44 w-full overflow-hidden rounded-2xl bg-slate-100 relative mb-4">
+                <View className="h-44 w-full overflow-hidden rounded-2xl bg-slate-100 relative mb-3.5 shadow-sm">
                   <Image
                     source={{ uri: pickedPhoto.uri }}
                     className="h-full w-full"
@@ -852,7 +1020,7 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
                   <TouchableOpacity
                     onPress={handleSelectSource}
                     disabled={isUploading}
-                    className="absolute bottom-2 right-2 flex-row items-center rounded-full bg-black/70 px-3 py-1.5">
+                    className="absolute bottom-2.5 right-2.5 flex-row items-center rounded-full bg-black/75 px-3 py-1.5">
                     <Ionicons name="camera-reverse" size={14} color="white" />
                     <Text className="ml-1 text-[11px] font-bold text-white">Change</Text>
                   </TouchableOpacity>
@@ -861,59 +1029,47 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
 
               {/* AI Detection Loading Banner */}
               {isAnalyzingAi && (
-                <View className="mb-4 flex-row items-center rounded-2xl border border-rose-200 bg-rose-50/70 p-3">
+                <View className="mb-3.5 flex-row items-center rounded-2xl border border-rose-200 bg-rose-50/80 p-3">
                   <ActivityIndicator size="small" color="#F6163C" />
                   <View className="ml-3 flex-1">
                     <Text className="text-xs font-bold text-rose-800">
-                      Analyzing gym area with AI...
+                       AI Detecting Gym Area...
                     </Text>
                     <Text className="text-[11px] text-rose-600 mt-0.5">
-                      Identifying equipment & specific facility zone
+                      Classifying zone (Cardio, Free Weights, etc.)
                     </Text>
                   </View>
                 </View>
               )}
 
-              {/* AI Detection Result Card */}
+              {/* AI Detection Result Badge */}
               {!isAnalyzingAi && aiResult && (
-                <View className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3.5">
-                  <View className="flex-row items-center justify-between">
-                    <View className="flex-row items-center flex-1 mr-2">
-                      <View className="h-6 w-6 items-center justify-center rounded-full bg-emerald-100 mr-2">
-                        <Ionicons name="sparkles" size={13} color="#059669" />
-                      </View>
-                      <View className="flex-1">
-                        <View className="flex-row items-center flex-wrap gap-1.5">
-                          <Text className="text-xs font-bold text-emerald-950">
-                            {aiResult.area}
-                          </Text>
-                          <View className="rounded-full bg-emerald-200/80 px-2 py-0.5">
-                            <Text className="text-[10px] font-bold text-emerald-800">
-                              {Math.round(aiResult.confidence * 100)}% match
-                            </Text>
-                          </View>
-                        </View>
-                        {aiResult.reason ? (
-                          <Text className="text-[11px] text-emerald-700 mt-1 leading-4">
-                            {aiResult.reason}
-                          </Text>
-                        ) : null}
-                      </View>
+                <View className="mb-3.5 flex-row items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50/90 px-3.5 py-2.5">
+                  <View className="flex-row items-center flex-1 mr-2">
+                    <View className="h-6 w-6 items-center justify-center rounded-full bg-emerald-100 mr-2">
+                      <Ionicons name="sparkles" size={13} color="#059669" />
                     </View>
-                    {photoCaption !== aiResult.area && (
-                      <TouchableOpacity
-                        onPress={() => setPhotoCaption(aiResult.area)}
-                        disabled={isUploading}
-                        className="rounded-xl bg-emerald-600 px-3 py-1.5">
-                        <Text className="text-xs font-bold text-white">Apply</Text>
-                      </TouchableOpacity>
-                    )}
+                    <View>
+                      <Text className="text-xs font-bold text-emerald-950">
+                        {aiResult.area}
+                      </Text>
+                      <Text className="text-[10px] text-emerald-700">
+                        Auto-detected with {Math.round(aiResult.confidence * 100)}% match
+                      </Text>
+                    </View>
                   </View>
+                  {photoCaption !== aiResult.area && (
+                    <TouchableOpacity
+                      onPress={() => setPhotoCaption(aiResult.area)}
+                      className="rounded-full bg-emerald-600 px-3 py-1">
+                      <Text className="text-[11px] font-bold text-white">Apply</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               )}
 
-              {/* Caption Input */}
-              <View className="mb-3">
+              {/* Area Name / Caption Input */}
+              <View className="mb-4">
                 <View className="flex-row items-center justify-between mb-2">
                   <Text className="text-xs font-bold text-slate-700">
                     Facility Area / Caption <Text className="text-rose-500">*</Text>
@@ -922,97 +1078,152 @@ const OnBoarding5 = forwardRef<any, Props>((props, ref) => {
                     <TouchableOpacity
                       onPress={() => runAiAnalysis(pickedPhoto.uri)}
                       disabled={isUploading}
-                      className="flex-row items-center">
-                      <Ionicons name="sparkles" size={12} color="#F6163C" />
-                      <Text className="ml-1 text-[11px] font-bold text-[#F6163C]">
-                        Re-scan with AI
+                      className="flex-row items-center bg-rose-50 px-2.5 py-1 rounded-full border border-rose-200">
+                      <Ionicons name="sparkles" size={11} color="#F6163C" />
+                      <Text className="ml-1 text-[10px] font-bold text-[#F6163C]">
+                        Re-detect
                       </Text>
                     </TouchableOpacity>
                   )}
                 </View>
-                <View className="flex-row items-center rounded-2xl border border-slate-200 bg-[#F8FAFC] px-4 py-3">
-                  <Ionicons name="create-outline" size={18} color="#F6163C" />
-                  <TextInput
-                    value={photoCaption}
-                    onChangeText={setPhotoCaption}
-                    placeholder="e.g. Cardio Area, Free Weights Area"
-                    placeholderTextColor="#94A3B8"
-                    maxLength={60}
-                    editable={!isUploading}
-                    className="ml-2.5 flex-1 font-semibold text-sm text-slate-900 p-0"
-                  />
-                  {photoCaption ? (
-                    <TouchableOpacity onPress={() => setPhotoCaption('')} disabled={isUploading}>
-                      <Ionicons name="close-circle" size={16} color="#94A3B8" />
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
-              </View>
-
-              {/* Suggested Quick Tags */}
-              <View className="mb-5">
-                <Text className="mb-2 text-[11px] font-semibold text-slate-400">
-                  Quick categories (tap to select):
-                </Text>
-                <View className="flex-row flex-wrap gap-2">
-                  {GYM_AREA_CATEGORIES.map((tag) => {
-                    const isSelected = photoCaption.toLowerCase() === tag.toLowerCase();
-                    const isAiSuggested = aiResult?.area.toLowerCase() === tag.toLowerCase();
-                    return (
-                      <TouchableOpacity
-                        key={tag}
-                        onPress={() => setPhotoCaption(tag)}
-                        disabled={isUploading}
-                        activeOpacity={0.7}
-                        className={`rounded-full px-3 py-1.5 border flex-row items-center ${
-                          isSelected
-                            ? 'bg-rose-50 border-[#F6163C]'
-                            : isAiSuggested
-                            ? 'bg-emerald-50 border-emerald-300'
-                            : 'bg-slate-100 border-slate-200/60'
-                        }`}>
-                        {isAiSuggested && (
-                          <Ionicons
-                            name="sparkles"
-                            size={10}
-                            color={isSelected ? '#F6163C' : '#059669'}
-                            style={{ marginRight: 4 }}
-                          />
-                        )}
-                        <Text
-                          className={`text-xs font-semibold ${
-                            isSelected
-                              ? 'text-[#F6163C]'
-                              : isAiSuggested
-                              ? 'text-emerald-800'
-                              : 'text-slate-600'
-                          }`}>
-                          {tag}
-                        </Text>
+                <View className="rounded-2xl border border-slate-200 bg-[#F8FAFC] px-3.5 py-3">
+                  <View className="flex-row items-center">
+                    <Ionicons name="pricetag-outline" size={18} color="#F6163C" />
+                    <TextInput
+                      value={photoCaption}
+                      onChangeText={setPhotoCaption}
+                      placeholder="e.g. Cardio Area, Free Weights Area"
+                      placeholderTextColor="#94A3B8"
+                      maxLength={60}
+                      editable={!isUploading}
+                      className="ml-2.5 flex-1 font-semibold text-xs text-slate-900 p-0"
+                    />
+                    {photoCaption ? (
+                      <TouchableOpacity onPress={() => setPhotoCaption('')} disabled={isUploading}>
+                        <Ionicons name="close-circle" size={16} color="#94A3B8" />
                       </TouchableOpacity>
-                    );
-                  })}
+                    ) : null}
+                  </View>
                 </View>
               </View>
 
-              {/* Upload Button */}
-              <TouchableOpacity
-                onPress={handleUploadSinglePhoto}
-                disabled={!photoCaption.trim()}
-                activeOpacity={0.8}
-                className={`h-14 w-full flex-row items-center justify-center rounded-2xl ${!photoCaption.trim() ? 'bg-slate-300' : 'bg-[#F6163C]'
-                  }`}>
-                <View className="flex-row items-center">
-                  <Ionicons name="cloud-upload" size={18} color="white" />
-                  <Text className="ml-2 font-bold text-[15px] text-white">
-                    Upload Club Photo
+              {/* Enhanced 2-Column Balanced Quick Categories Grid */}
+              <View className="mb-2">
+                <View className="flex-row items-center justify-between mb-2.5">
+                  <Text className="text-xs font-bold text-slate-700">
+                    Quick Categories
+                  </Text>
+                  <Text className="text-[11px] font-medium text-slate-400">
+                    Tap any to apply
                   </Text>
                 </View>
-              </TouchableOpacity>
+
+                <View className="gap-2">
+                  {categoryRows.map((row, rowIdx) => (
+                    <View key={rowIdx} className="flex-row gap-2">
+                      {row.map((tag) => {
+                        const isSelected = photoCaption.toLowerCase() === tag.toLowerCase();
+                        const isAiSuggested = aiResult?.area?.toLowerCase() === tag.toLowerCase();
+                        const iconName = CATEGORY_ICONS[tag] || 'fitness-outline';
+
+                        return (
+                          <TouchableOpacity
+                            key={tag}
+                            onPress={() => setPhotoCaption(tag)}
+                            disabled={isUploading}
+                            activeOpacity={0.7}
+                            className={`flex-1 flex-row items-center justify-between rounded-xl px-2.5 py-2.5 border ${
+                              isSelected
+                                ? 'bg-rose-50 border-[#F6163C]'
+                                : isAiSuggested
+                                ? 'bg-emerald-50/90 border-emerald-400'
+                                : 'bg-[#F8FAFC] border-slate-200/80'
+                            }`}>
+                            <View className="flex-row items-center flex-1 mr-1">
+                              <View
+                                className={`h-7 w-7 items-center justify-center rounded-lg mr-2 ${
+                                  isSelected
+                                    ? 'bg-[#F6163C]'
+                                    : isAiSuggested
+                                    ? 'bg-emerald-500'
+                                    : 'bg-white border border-slate-200/70'
+                                }`}>
+                                <Ionicons
+                                  name={iconName}
+                                  size={14}
+                                  color={isSelected || isAiSuggested ? '#FFFFFF' : '#64748B'}
+                                />
+                              </View>
+                              <Text
+                                numberOfLines={1}
+                                className={`text-[11px] flex-1 ${
+                                  isSelected
+                                    ? 'text-[#F6163C] font-bold'
+                                    : isAiSuggested
+                                    ? 'text-emerald-900 font-bold'
+                                    : 'text-slate-700 font-medium'
+                                }`}>
+                                {tag}
+                              </Text>
+                            </View>
+
+                            {isSelected && (
+                              <Ionicons name="checkmark-circle" size={15} color="#F6163C" />
+                            )}
+                            {!isSelected && isAiSuggested && (
+                              <Ionicons name="sparkles" size={13} color="#059669" />
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                      {row.length === 1 && <View className="flex-1" />}
+                    </View>
+                  ))}
+                </View>
+
+                {/* Expand / Collapse All Categories Toggle */}
+                <TouchableOpacity
+                  onPress={() => setShowAllCategories((prev) => !prev)}
+                  activeOpacity={0.7}
+                  className="mt-2.5 flex-row items-center justify-center py-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                  <Ionicons
+                    name={showAllCategories ? 'chevron-up' : 'chevron-down'}
+                    size={14}
+                    color="#475569"
+                  />
+                  <Text className="ml-1.5 text-xs font-semibold text-slate-700">
+                    {showAllCategories
+                      ? 'Show Fewer Categories'
+                      : `View All Categories (${GYM_AREA_CATEGORIES.length})`}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </ScrollView>
+
+            {/* Upload Button Pinned At Bottom */}
+            <View className="pt-2 border-t border-slate-100">
+              <TouchableOpacity
+                onPress={handleUploadSinglePhoto}
+                disabled={!photoCaption.trim() || isUploading}
+                activeOpacity={0.8}
+                className={`h-14 w-full flex-row items-center justify-center rounded-2xl ${
+                  !photoCaption.trim() || isUploading ? 'bg-slate-300' : 'bg-[#F6163C]'
+                }`}>
+                {isUploading ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <View className="flex-row items-center">
+                    <Ionicons name="cloud-upload" size={18} color="white" />
+                    <Text className="ml-2 font-bold text-[15px] text-white">
+                      Upload Club Photo
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
-        </KeyboardAvoidingView>
-      </Modal>
+        </View>
+      )}
 
       {/* Motivational GymLoader while submitting for verification */}
       <GymLoader visible={isConfirming} />
