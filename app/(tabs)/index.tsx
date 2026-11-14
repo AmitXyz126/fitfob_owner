@@ -7,10 +7,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import { useUserDetail, useClubOwnerMe } from '@/hooks/useUserDetail';
 import { useTodayCheckins } from '@/hooks/useTodayCheckins';
+import { useMemberList } from '@/hooks/useMembers';
 import { useAuthStore } from '@/store/useAuthStore';
 import { RefreshSoundPlayer, RefreshSoundPlayerRef } from '@/components/RefreshSoundPlayer';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Toast from 'react-native-toast-message';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -215,6 +215,7 @@ const HomeScreen = () => {
     isLoading: isCheckinsLoading,
     refetch: refetchTodayCheckins,
   } = useTodayCheckins();
+  const { activeCount, refetch: refetchMembers } = useMemberList();
   const { user } = useAuthStore();
   const [selectedMember, setSelectedMember] = useState<any>(null);
   const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
@@ -231,6 +232,7 @@ const HomeScreen = () => {
         refetch(),
         refetchOwner(),
         refetchTodayCheckins(),
+        refetchMembers(),
       ]);
       // Play delightful refresh sound and haptics
       refreshSoundRef.current?.playSound();
@@ -584,7 +586,7 @@ const HomeScreen = () => {
             {/* Active Members Card */}
             <TouchableOpacity
               activeOpacity={0.85}
-              onPress={() => router.push('/')}
+              onPress={() => router.push('/members')}
               style={styles.statsCardPurple}
               className="flex-1 rounded-[24px] overflow-hidden border border-purple-100/80 bg-white">
               <LinearGradient
@@ -608,7 +610,9 @@ const HomeScreen = () => {
                 </View>
 
                 <View className="mt-1 flex-row items-end justify-between">
-                  <Text className="font-extrabold text-3xl text-slate-900">0</Text>
+                  <Text className="font-extrabold text-3xl text-slate-900">
+                    {formatIndianNumber(activeCount)}
+                  </Text>
                 </View>
               </View>
             </TouchableOpacity>

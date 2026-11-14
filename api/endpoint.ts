@@ -69,4 +69,8 @@ export const ENDPOINTS = {
 
   // Gym Contracts
   GYM_CONTRACTS_MY_CONTRACT: `${BASE_URL}/api/gym-contracts/my-contract`,
+
+  // Members
+  MEMBER_LIST: `${BASE_URL}/api/member-list`,
+  MEMBER_DETAILS: (docId: string) => `${BASE_URL}/api/member-list/${docId}`,
 };
