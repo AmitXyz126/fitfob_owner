@@ -73,4 +73,7 @@ export const ENDPOINTS = {
   // Members
   MEMBER_LIST: `${BASE_URL}/api/member-list`,
   MEMBER_DETAILS: (docId: string) => `${BASE_URL}/api/member-list/${docId}`,
+
+  // Trial Settings
+  TRIAL_SETTINGS: `${BASE_URL}/api/club-owner/trial-settings`,
 };

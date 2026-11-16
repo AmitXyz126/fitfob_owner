@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useRef, memo, useCallback } from 'react';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable react-hooks/set-state-in-effect */
+import React, { useState, useEffect, memo, useCallback } from 'react';
 import { View, Text, Image, TouchableOpacity, ScrollView, ImageBackground, Dimensions, Animated, Easing, StyleSheet } from 'react-native';
 import {
   ChevronLeft,
@@ -16,6 +18,7 @@ import {
   Layers,
   Calendar,
   BadgePercent,
+  Sparkles,
 } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Container } from '@/components/Container';
@@ -24,7 +27,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useUserDetail, useClubOwnerMe } from '@/hooks/useUserDetail';
-import { userDetailsApi } from '@/api/userdetailsApi';
 
 const getServiceIcon = (name: string) => {
   const lower = String(name).toLowerCase();
@@ -41,7 +43,7 @@ const getServiceIcon = (name: string) => {
 };
 
 const FitnessServicePills = memo(({ services }: { services?: any }) => {
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const [pulseAnim] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
     const anim = Animated.loop(
@@ -116,7 +118,7 @@ const PREMIUM_COLORS = [
 ];
 
 const GymBackgroundAnimation = memo(() => {
-  const items = useRef(
+  const [items] = useState(() =>
     Array.from({ length: 15 }).map((_, i) => {
       const boxSize = Math.random() * 20 + 64; // Larger random size from 64 to 84
       return {
@@ -135,7 +137,7 @@ const GymBackgroundAnimation = memo(() => {
         delay: Math.random() * 5000,
       };
     })
-  ).current;
+  );
 
   useEffect(() => {
     items.forEach((item) => {
@@ -741,10 +743,6 @@ const ClubProfileScreen = () => {
     }
   }, [myOwnerData, profileStatus, user]);
 
-  useEffect(() => {
-    loadClubData();
-  }, [loadClubData]);
-
   useFocusEffect(
     useCallback(() => {
       loadClubData();
@@ -903,6 +901,14 @@ const ClubProfileScreen = () => {
             icon={BadgePercent}
             title="Gym Contracts & Plans"
             onPress={() => router.push('/gym-contracts')}
+          />
+          <LineGradient />
+
+          <MenuOption
+            icon={Sparkles}
+            title="Trial Manager"
+            showBadge={true}
+            onPress={() => router.push('/TrialManagerScreen')}
           />
           <LineGradient />
 

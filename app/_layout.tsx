@@ -8,7 +8,18 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: false, // Prevents duplicate requests on window/app focus
+      refetchOnReconnect: false,
+      refetchOnMount: false,
+      retry: 1,
+    },
+  },
+});
 
 // Keep the splash screen visible while loading fonts and assets to avoid white screen flash
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -68,7 +79,7 @@ export default function Layout() {
           <Stack.Screen name="addBankAccount" />
           <Stack.Screen name="bankSummary" />
           <Stack.Screen name="payoutHistory" />
-          <Stack.Screen name="ViewAllScreen" />
+          <Stack.Screen name="checkin-list" />
           <Stack.Screen name="notification" />
           <Stack.Screen name="chat" />
           <Stack.Screen name="documents" />
@@ -80,6 +91,7 @@ export default function Layout() {
           <Stack.Screen name="gym-contracts" />
           <Stack.Screen name="members" />
           <Stack.Screen name="member-details" />
+          <Stack.Screen name="TrialManagerScreen" />
         </Stack>
         <Toast />
       </QueryClientProvider>

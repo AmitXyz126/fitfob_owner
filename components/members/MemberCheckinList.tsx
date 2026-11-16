@@ -7,12 +7,121 @@ interface MemberCheckinListProps {
   totalCheckins: number;
 }
 
+interface FormattedCheckinDate {
+  day: string;
+  month: string;
+  time: string;
+  dayLabel: string;
+}
+
+const formatCheckinDateTime = (
+  dateStr?: string,
+  fallbackIndex = 0
+): FormattedCheckinDate => {
+  if (!dateStr) {
+    return {
+      day: '14',
+      month: 'Nov',
+      time: '07:12 AM',
+      dayLabel: fallbackIndex === 0 ? 'Today' : 'Recent',
+    };
+  }
+
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) {
+      return {
+        day: '--',
+        month: '--',
+        time: dateStr,
+        dayLabel: 'Recent',
+      };
+    }
+
+    const day = d.getDate().toString().padStart(2, '0');
+    const month = d.toLocaleString('en-US', { month: 'short' });
+    const time = d.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const diffDays = Math.round(
+      (today.getTime() - target.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    let dayLabel = '';
+    if (diffDays === 0) {
+      dayLabel = 'Today';
+    } else if (diffDays === 1) {
+      dayLabel = 'Yesterday';
+    } else if (diffDays > 1 && diffDays < 7) {
+      dayLabel = d.toLocaleString('en-US', { weekday: 'long' });
+    } else {
+      dayLabel = d.toLocaleString('en-US', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+      });
+    }
+
+    return { day, month, time, dayLabel };
+  } catch {
+    return {
+      day: '--',
+      month: '--',
+      time: dateStr || '--',
+      dayLabel: 'Recent',
+    };
+  }
+};
+
 export const MemberCheckinList: React.FC<MemberCheckinListProps> = ({
   checkins,
   totalCheckins,
 }) => {
-  // If checkins list is provided or we generate items based on total count
   const renderList = checkins && checkins.length > 0 ? checkins : [];
+
+  const renderCheckinTypeBadge = (type?: string) => {
+    if (!type) return null;
+
+    const normalized = type.toLowerCase().trim();
+    const isTrial = normalized === 'trial';
+    const isMembership = normalized === 'membership';
+
+    const label = isTrial
+      ? 'Trial'
+      : isMembership
+      ? 'Membership'
+      : type.charAt(0).toUpperCase() + type.slice(1);
+
+    return (
+      <View
+        style={[
+          styles.typeBadge,
+          isTrial
+            ? styles.trialBadge
+            : isMembership
+            ? styles.membershipBadge
+            : styles.defaultTypeBadge,
+        ]}>
+        <Text
+          style={[
+            styles.typeBadgeText,
+            isTrial
+              ? styles.trialBadgeText
+              : isMembership
+              ? styles.membershipBadgeText
+              : styles.defaultTypeBadgeText,
+          ]}>
+          {label}
+        </Text>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -35,21 +144,10 @@ export const MemberCheckinList: React.FC<MemberCheckinListProps> = ({
         </View>
       ) : (
         renderList.map((item, index) => {
-          // Parse date or fallback
-          let day = '14';
-          let month = 'Nov';
-          if (item.date) {
-            try {
-              const d = new Date(item.date);
-              if (!isNaN(d.getTime())) {
-                day = d.getDate().toString().padStart(2, '0');
-                month = d.toLocaleString('en-US', { month: 'short' });
-              }
-            } catch {}
-          }
-
-          const dayLabel = item.dayLabel || (index === 0 ? 'Today' : index === 1 ? 'Yesterday' : 'Recent');
-          const timeLabel = item.time || item.checkinTime || '07:12 AM';
+          const rawDate = item.checkinTime || item.createdAt || item.date;
+          const { day, month, time, dayLabel } = formatCheckinDateTime(rawDate, index);
+          const finalDayLabel = item.dayLabel || dayLabel;
+          const finalTimeLabel = item.time || time;
 
           return (
             <View key={item.id || index} style={styles.checkinCard}>
@@ -59,11 +157,14 @@ export const MemberCheckinList: React.FC<MemberCheckinListProps> = ({
                 <Text style={styles.dateMonthText}>{month}</Text>
               </View>
 
-              {/* Check-in Details (No duration or total time) */}
+              {/* Check-in Details: Day label and time (No duration or total time) */}
               <View style={styles.detailBox}>
-                <Text style={styles.dayLabelText}>{dayLabel}</Text>
-                <Text style={styles.timeText}>{timeLabel}</Text>
+                <Text style={styles.dayLabelText}>{finalDayLabel}</Text>
+                <Text style={styles.timeText}>{finalTimeLabel}</Text>
               </View>
+
+              {/* Checkin Type Badge (Trial / Membership) */}
+              {renderCheckinTypeBadge(item.checkinType)}
             </View>
           );
         })
@@ -151,6 +252,7 @@ const styles = StyleSheet.create({
   detailBox: {
     flex: 1,
     justifyContent: 'center',
+    marginRight: 8,
   },
   dayLabelText: {
     fontSize: 14,
@@ -163,6 +265,49 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     color: '#64748B',
     fontFamily: 'PlusJakartaSans-Regular',
+  },
+  typeBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  typeBadgeText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    fontFamily: 'PlusJakartaSans-Bold',
+  },
+  trialBadge: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A',
+  },
+  trialBadgeText: {
+    color: '#B45309',
+    fontSize: 11.5,
+    fontWeight: '700',
+    fontFamily: 'PlusJakartaSans-Bold',
+  },
+  membershipBadge: {
+    backgroundColor: '#EEF2FF',
+    borderColor: '#C7D2FE',
+  },
+  membershipBadgeText: {
+    color: '#4338CA',
+    fontSize: 11.5,
+    fontWeight: '700',
+    fontFamily: 'PlusJakartaSans-Bold',
+  },
+  defaultTypeBadge: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
+  },
+  defaultTypeBadgeText: {
+    color: '#475569',
+    fontSize: 11.5,
+    fontWeight: '600',
+    fontFamily: 'PlusJakartaSans-SemiBold',
   },
   emptyContainer: {
     padding: 24,

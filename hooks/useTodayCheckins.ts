@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/purity */
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { checkinApi, CheckinItemData, CheckinQueryParams } from '@/api/checkinApi';
@@ -19,6 +20,7 @@ export interface FormattedCheckinItem {
   color: string;
   verified: boolean;
   subscriptionType?: string;
+  checkinType?: 'trial' | 'membership' | string;
 }
 
 /**
@@ -176,9 +178,17 @@ export const resolveCheckinImage = (item: any): string => {
 };
 
 /**
- * Get tier type name and badge color based on subscriptionType
+ * Get tier type name and badge color based on subscriptionType and checkinType
  */
-export const getSubscriptionBadge = (subscriptionType?: string) => {
+export const getSubscriptionBadge = (subscriptionType?: string, checkinType?: string) => {
+  const cType = (checkinType || '').toLowerCase().trim();
+  if (cType === 'trial') {
+    return { type: 'Trial', color: '#D97706' };
+  }
+  if (cType === 'membership') {
+    return { type: 'Membership', color: '#4F46E5' };
+  }
+
   const type = (subscriptionType || 'standard').toLowerCase();
   if (type.includes('luxury')) {
     return { type: 'Luxury', color: '#F6163C' };
@@ -238,12 +248,12 @@ export const useTodayCheckins = (
     queryKey,
     queryFn: () => checkinApi.getTodayCheckins(normalizedParams),
     enabled: !!user && enabled,
-    staleTime: 0, // Always consider stale so fresh data is fetched instantly
-    refetchInterval: isTodayOnly ? 5000 : false, // Poll only for today's live checkins
+    staleTime: 30 * 1000,
+    refetchInterval: isTodayOnly ? 15000 : false, // Poll only for today's live checkins
     refetchIntervalInBackground: false,
-    gcTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     retry: 1,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 
   // Keep Zustand store in sync with Query data
@@ -257,8 +267,9 @@ export const useTodayCheckins = (
   const formattedCheckins: FormattedCheckinItem[] = useMemo(() => {
     const rawList = query.data || [];
     return rawList.map((item: any, index: number) => {
-      const subType = item.subscriptionType || item.attributes?.subscriptionType || 'local';
-      const { type, color } = getSubscriptionBadge(subType);
+      const checkinType = item.checkinType || item.attributes?.checkinType;
+      const subType = item.subscriptionType || item.attributes?.subscriptionType || (checkinType ? checkinType : 'local');
+      const { type, color } = getSubscriptionBadge(subType, checkinType);
       const name =
         item.clientName ||
         item.name ||
@@ -306,6 +317,7 @@ export const useTodayCheckins = (
         color,
         verified: true,
         subscriptionType: subType,
+        checkinType,
       };
     });
   }, [query.data, nowTicker]);

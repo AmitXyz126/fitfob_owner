@@ -47,7 +47,7 @@ export const MemberCard: React.FC<MemberCardProps> = ({ member, onPress }) => {
 
       {/* Member Info: Name and Plan only (No green verify tick, No last visit) */}
       <View style={styles.infoWrapper}>
-        <Text style={styles.nameText} numberOfLines={1}>
+        <Text style={[styles.nameText, { textTransform: 'capitalize' }]} numberOfLines={1}>
           {member.name || 'Unnamed Member'}
         </Text>
         <Text style={styles.planText} numberOfLines={1}>

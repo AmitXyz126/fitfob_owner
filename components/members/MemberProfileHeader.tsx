@@ -52,7 +52,7 @@ export const MemberProfileHeader: React.FC<MemberProfileHeaderProps> = ({
         {/* Info */}
         <View style={styles.infoWrapper}>
           <View style={styles.nameRow}>
-            <Text style={styles.nameText} numberOfLines={1}>
+            <Text style={[styles.nameText, { textTransform: 'capitalize' }]} numberOfLines={1}>
               {client?.name || 'Member Details'}
             </Text>
             {/* Gender icon instead of text */}

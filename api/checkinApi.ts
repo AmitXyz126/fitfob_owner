@@ -10,6 +10,7 @@ export interface CheckinItemData {
   selfieUploadUrl: string;
   checkinTime: string;
   subscriptionType?: string;
+  checkinType?: 'trial' | 'membership' | string;
 }
 
 export interface TodayCheckinsResponse {
@@ -63,21 +64,6 @@ export const checkinApi = {
         list = response.data;
       } else if (response && response.data && Array.isArray(response.data.data)) {
         list = response.data.data;
-      }
-
-      // If param response was unexpectedly empty, try base endpoint as safety fallback
-      if (list.length === 0 && hasParams) {
-        try {
-          const fallbackRes = await api.get(ENDPOINTS.TODAY_CHECKINS);
-          const fallbackList = Array.isArray(fallbackRes?.data)
-            ? fallbackRes.data
-            : fallbackRes?.data && Array.isArray(fallbackRes.data.data)
-            ? fallbackRes.data.data
-            : [];
-          if (fallbackList.length > 0) {
-            return fallbackList;
-          }
-        } catch {}
       }
 
       return list;

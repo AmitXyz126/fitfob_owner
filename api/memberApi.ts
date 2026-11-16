@@ -32,8 +32,12 @@ export interface MemberMembership {
 
 export interface MemberCheckinItem {
   id?: string | number;
+  checkinType?: 'trial' | 'membership' | string;
+  checkinTime: string;
+  checkoutTime?: string | null;
+  status?: string;
+  createdAt?: string;
   date?: string;
-  checkinTime?: string;
   time?: string;
   dayLabel?: string;
 }

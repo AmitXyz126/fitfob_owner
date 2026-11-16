@@ -1,6 +1,7 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useQuery } from '@tanstack/react-query';
 import { memberApi, MemberListItem, MemberDetailsResponse } from '@/api/memberApi';
-import { useMemberStore, MemberFilterType } from '@/store/useMemberStore';
+import { useMemberStore } from '@/store/useMemberStore';
 import { useEffect, useMemo } from 'react';
 
 /**
@@ -70,14 +71,8 @@ export const formatMemberDate = (dateString?: string): string => {
  * Hook to fetch and manage the member list
  */
 export const useMemberList = () => {
-  const {
-    members,
-    setMembers,
-    activeFilter,
-    setActiveFilter,
-    searchQuery,
-    setSearchQuery,
-  } = useMemberStore();
+  const { members, setMembers, activeFilter, setActiveFilter, searchQuery, setSearchQuery } =
+    useMemberStore();
 
   const query = useQuery<MemberListItem[]>({
     queryKey: ['member-list'],
@@ -168,9 +163,10 @@ export const useMemberDetails = (docId: string | undefined) => {
 
   // Active membership if any
   const activeMembership = useMemo(() => {
-    return details?.memberships?.find(
-      (m) => m.membershipStatus?.toLowerCase() === 'active'
-    ) || details?.memberships?.[0];
+    return (
+      details?.memberships?.find((m) => m.membershipStatus?.toLowerCase() === 'active') ||
+      details?.memberships?.[0]
+    );
   }, [details]);
 
   // Total checkins count calculation

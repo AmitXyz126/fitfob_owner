@@ -25,7 +25,6 @@ export default function MemberDetailsScreen() {
   const { docId } = useLocalSearchParams<{ docId: string }>();
 
   const {
-    details,
     client,
     memberships,
     activeMembership,

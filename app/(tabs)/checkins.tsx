@@ -13,8 +13,7 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   Animated as RNAnimated,
-  Platform,
-  Switch,
+  Platform
 } from 'react-native';
 import { Container } from '@/components/Container';
 import { Ionicons } from '@expo/vector-icons';
@@ -58,7 +57,7 @@ export default function CheckinsScreen() {
   const [manualId, setManualId] = useState('');
 
   // Scanning laser animation
-  const scanAnim = useRef(new RNAnimated.Value(0)).current;
+  const [scanAnim] = useState(() => new RNAnimated.Value(0));
 
   const snapPoints = useMemo(() => ['56%'], []);
 
@@ -581,9 +580,6 @@ export default function CheckinsScreen() {
         {/* Header */}
         <View className="z-50 flex-row items-center justify-center  py-2">
           <Text className="font-bold text-lg text-slate-800">Scan QR Code</Text>
-          {/* <TouchableOpacity className="h-10 w-10 items-center justify-center rounded-full border border-slate-200/60 bg-white/80 backdrop-blur-md">
-            <Ionicons name="notifications" size={20} color="#F6163C" />
-          </TouchableOpacity> */}
         </View>
 
         {/* KeyboardAwareScrollView */}

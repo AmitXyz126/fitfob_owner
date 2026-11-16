@@ -1,14 +1,19 @@
-import axios, { AxiosInstance } from 'axios';
+import { AxiosInstance, create } from 'axios';
 import { useAuthStore } from '@/store/useAuthStore';
 
 export const attachApiLogging = (instance: AxiosInstance, tag: string = 'API') => {
+  if ((instance as any).__loggingAttached) {
+    return;
+  }
+  (instance as any).__loggingAttached = true;
+
   instance.interceptors.request.use(
     (config) => {
       (config as any).__startTime = Date.now();
       const method = (config.method || 'GET').toUpperCase();
       const fullUrl = `${config.baseURL || ''}${config.url || ''}`;
 
-      console.log(`\n🚀 [${tag} HIT] -----------------------------------------`);
+      console.log(`\n🚀 [${tag} HIT] ----------------------------------------- ${new Date().getTime()}`);
       console.log(`📡 URL:    ${method} ${fullUrl}`);
       if (config.params && Object.keys(config.params).length > 0) {
         console.log(`🔍 PARAMS:`, JSON.stringify(config.params, null, 2));
@@ -76,27 +81,30 @@ export const attachApiLogging = (instance: AxiosInstance, tag: string = 'API') =
   );
 };
 
-const apiInstance = axios.create({
+const apiInstance = create({
   headers: {
     'Content-Type': 'application/json',
     Accept: 'application/json',
   },
 });
 
-apiInstance.interceptors.request.use(
-  async (config) => {
-    const user = useAuthStore.getState().user;
-    const token = user?.token || user?.jwt;
+if (!(apiInstance as any).__authAttached) {
+  (apiInstance as any).__authAttached = true;
+  apiInstance.interceptors.request.use(
+    async (config) => {
+      const user = useAuthStore.getState().user;
+      const token = user?.token || user?.jwt;
 
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    },
+    (error) => {
+      return Promise.reject(error);
     }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+  );
+}
 
 attachApiLogging(apiInstance, 'API');
 

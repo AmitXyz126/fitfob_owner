@@ -14,7 +14,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  useAnimatedScrollHandler,
   interpolate,
   Extrapolation,
   withRepeat,
@@ -148,7 +147,7 @@ const CheckinItem = ({ item, index, scrollY, onSelect }: any) => {
 
         <View className="ml-4 flex-1 ">
           <View className="flex-row items-center gap-1 ">
-            <Text className="font-bold text-[15px] text-slate-900">{item.name}</Text>
+            <Text className="font-bold text-[15px] text-slate-900 capitalize">{item.name}</Text>{" "}
             <Image className="h-4 w-4" source={require('../../assets/images/tick.png')} />
           </View>
           <Text className="text-xs text-slate-400">{item.time}</Text>
@@ -161,18 +160,6 @@ const CheckinItem = ({ item, index, scrollY, onSelect }: any) => {
             width: 95,
           }}
           className="flex-row items-center justify-center gap-1 rounded-full border py-1.5">
-          <Image
-            source={
-              item?.type === 'Luxury'
-                ? require('../../assets/images/luxury.png')
-                : item?.type === 'Premium'
-                  ? require('../../assets/images/premium.png')
-                  : require('../../assets/images/standardicon.png')
-            }
-            style={{ width: 15, height: 15 }}
-            resizeMode="contain"
-          />
-
           <Text
             style={{ color: item?.color || '#94A3B8' }}
             className="text-[12px] font-normal "
@@ -243,9 +230,14 @@ const HomeScreen = () => {
     }
   };
 
-  // Auto-refresh checkins whenever the home screen comes into focus (e.g., returning from QR scan)
+  // Auto-refresh checkins only when returning to the home screen (skips initial mount)
+  const isInitialFocusRef = useRef(true);
   useFocusEffect(
     useCallback(() => {
+      if (isInitialFocusRef.current) {
+        isInitialFocusRef.current = false;
+        return;
+      }
       refetchTodayCheckins();
     }, [refetchTodayCheckins])
   );
@@ -359,12 +351,6 @@ const HomeScreen = () => {
 
   // Scroll Shared Value for Stacking Card Scroll Animation
   const scrollY = useSharedValue(0);
-
-  const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (event) => {
-      scrollY.value = event.contentOffset.y;
-    },
-  });
 
   const getDisplayName = () => {
     const pData = profileStatus?.data || profileStatus || {};
@@ -563,7 +549,7 @@ const HomeScreen = () => {
                   <View className="h-6 w-6 items-center justify-center rounded-full bg-red-500/10">
                     <Ionicons name="flame" size={14} color="#F6163C" />
                   </View>
-                  <Text className="font-semibold text-[12px] text-slate-600">Today's Check-ins</Text>
+                  <Text className="font-semibold text-[12px] text-slate-600">Today&apos;s Check-ins</Text>
                 </View>
 
                 <View className="mt-1 flex-row items-end justify-between">
@@ -621,7 +607,7 @@ const HomeScreen = () => {
           {/* Title */}
           <View className=" flex-row items-center justify-between">
             <Text className="font-bold text-lg text-slate-900">Recent Check-ins</Text>
-            <TouchableOpacity onPress={() => router.push('/ViewAllScreen')}>
+            <TouchableOpacity onPress={() => router.push('/checkin-list')}>
               <Text className="rounded-full bg-[#F6163C] px-4 py-2.5 font-normal leading-4 text-white">
                 View All
               </Text>
@@ -699,7 +685,7 @@ const HomeScreen = () => {
                   />
                   <View style={styles.profileMeta}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={styles.profileName}>{selectedMember?.name || 'Member'}</Text>
+                      <Text style={[styles.profileName, { textTransform: 'capitalize' }]}>{selectedMember?.name || 'Member'}</Text>
                       {selectedMember?.verified && (
                         <Image
                           style={styles.checkIcon}
@@ -708,35 +694,6 @@ const HomeScreen = () => {
                       )}
                     </View>
                     <Text style={styles.profileTime}>Checked in: {selectedMember?.time}</Text>
-
-                    {/* Badge */}
-                    <View
-                      style={[
-                        styles.badge,
-                        {
-                          backgroundColor: `${selectedMember?.color || '#F6163C'}15`,
-                          borderColor: `${selectedMember?.color || '#F6163C'}25`,
-                        },
-                      ]}>
-                      <Image
-                        source={
-                          selectedMember?.type === 'Luxury'
-                            ? require('../../assets/images/luxury.png')
-                            : selectedMember?.type === 'Premium'
-                              ? require('../../assets/images/premium.png')
-                              : require('../../assets/images/standardicon.png')
-                        }
-                        style={{ width: 12, height: 12 }}
-                        resizeMode="contain"
-                      />
-                      <Text
-                        style={[
-                          styles.badgeText,
-                          { color: selectedMember?.color || '#F6163C' },
-                        ]}>
-                        {selectedMember?.type} Member
-                      </Text>
-                    </View>
                   </View>
                 </View>
 
@@ -754,15 +711,18 @@ const HomeScreen = () => {
                     </Text>
                   </View>
 
-                  <View style={styles.detailRow}>
-                    <View style={styles.detailLeft}>
-                      <Ionicons name="ribbon-outline" size={18} color="#64748B" />
-                      <Text style={styles.detailLabel}>Subscription</Text>
+
+                  {selectedMember?.checkinType && (
+                    <View style={styles.detailRow}>
+                      <View style={styles.detailLeft}>
+                        <Ionicons name="fitness-outline" size={18} color="#64748B" />
+                        <Text style={styles.detailLabel}>Check-in Type</Text>
+                      </View>
+                      <Text style={[styles.detailValue, { textTransform: 'capitalize' }]}>
+                        {selectedMember.checkinType}
+                      </Text>
                     </View>
-                    <Text style={styles.detailValue}>
-                      {selectedMember?.subscriptionType || selectedMember?.type || 'Standard'}
-                    </Text>
-                  </View>
+                  )}
 
                   <View style={styles.detailRow}>
                     <View style={styles.detailLeft}>
