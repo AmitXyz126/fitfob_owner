@@ -62,7 +62,7 @@ export default function CheckinsScreen() {
   // Scanning laser animation
   const [scanAnim] = useState(() => new RNAnimated.Value(0));
 
-  const snapPoints = useMemo(() => ['55%'], []);
+  const snapPoints = useMemo(() => ['56.5%'], []);
 
   // Reanimated Shared Values for High-Level Background Animations
   const orb1X = useSharedValue(0);
