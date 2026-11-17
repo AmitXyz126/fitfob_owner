@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 interface TrialBannerProps {
   isTrialEnabled: boolean;
   dailyTrialLimit: number;
+  minLimit?: number;
   onToggle: () => void;
   onIncrement: () => void;
   onDecrement: () => void;
@@ -15,11 +16,14 @@ interface TrialBannerProps {
 export const TrialBanner: React.FC<TrialBannerProps> = ({
   isTrialEnabled,
   dailyTrialLimit,
+  minLimit = 0,
   onToggle,
   onIncrement,
   onDecrement,
   isUpdating = false,
 }) => {
+  const isDecrementDisabled = dailyTrialLimit <= minLimit || isUpdating;
+
   return (
     <View style={styles.cardWrapper}>
       <LinearGradient
@@ -40,9 +44,9 @@ export const TrialBanner: React.FC<TrialBannerProps> = ({
             value={isTrialEnabled}
             onValueChange={onToggle}
             disabled={isUpdating}
-            trackColor={{ false: '#FDA4AF', true: '#FFFFFF' }}
+            trackColor={{ false: 'rgba(255, 255, 255, 0.35)', true: '#FFFFFF' }}
             thumbColor={isTrialEnabled ? '#E23744' : '#FFFFFF'}
-            ios_backgroundColor="rgba(255,255,255,0.4)"
+            ios_backgroundColor="rgba(255, 255, 255, 0.35)"
           />
         </View>
 
@@ -52,12 +56,16 @@ export const TrialBanner: React.FC<TrialBannerProps> = ({
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={onDecrement}
-            disabled={dailyTrialLimit <= 0 || isUpdating}
+            disabled={isDecrementDisabled}
             style={[
               styles.counterButton,
-              dailyTrialLimit <= 0 && styles.disabledButton,
+              isDecrementDisabled && styles.disabledButton,
             ]}>
-            <Ionicons name="remove" size={20} color="#E23744" />
+            <Ionicons
+              name="remove"
+              size={20}
+              color={dailyTrialLimit <= minLimit ? '#CBD5E1' : '#E23744'}
+            />
           </TouchableOpacity>
 
           {/* Number & Label */}

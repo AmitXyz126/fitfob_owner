@@ -22,7 +22,10 @@ export interface TrialItem {
 export interface TrialSettingsResponse {
   isTrialEnabled: boolean;
   dailyTrialLimit: number;
-  trials: TrialItem[];
+  monthlyLeads?: number;
+  todayTrials?: TrialItem[];
+  tomorrowTrials?: TrialItem[];
+  trials?: TrialItem[];
   freeLeadsThisMonth?: number;
 }
 
@@ -43,8 +46,11 @@ export const trialApi = {
       return {
         isTrialEnabled: Boolean(raw?.isTrialEnabled),
         dailyTrialLimit: typeof raw?.dailyTrialLimit === 'number' ? raw.dailyTrialLimit : 5,
+        monthlyLeads: typeof raw?.monthlyLeads === 'number' ? raw.monthlyLeads : raw?.freeLeadsThisMonth,
+        todayTrials: Array.isArray(raw?.todayTrials) ? raw.todayTrials : undefined,
+        tomorrowTrials: Array.isArray(raw?.tomorrowTrials) ? raw.tomorrowTrials : undefined,
         trials: Array.isArray(raw?.trials) ? raw.trials : [],
-        freeLeadsThisMonth: raw?.freeLeadsThisMonth,
+        freeLeadsThisMonth: typeof raw?.monthlyLeads === 'number' ? raw.monthlyLeads : raw?.freeLeadsThisMonth,
       };
     } catch (error: any) {
       console.warn('Failed to fetch trial settings:', error);
@@ -63,8 +69,11 @@ export const trialApi = {
       return {
         isTrialEnabled: Boolean(raw?.isTrialEnabled ?? payload.isTrialEnabled),
         dailyTrialLimit: typeof raw?.dailyTrialLimit === 'number' ? raw.dailyTrialLimit : payload.dailyTrialLimit,
+        monthlyLeads: typeof raw?.monthlyLeads === 'number' ? raw.monthlyLeads : raw?.freeLeadsThisMonth,
+        todayTrials: Array.isArray(raw?.todayTrials) ? raw.todayTrials : undefined,
+        tomorrowTrials: Array.isArray(raw?.tomorrowTrials) ? raw.tomorrowTrials : undefined,
         trials: Array.isArray(raw?.trials) ? raw.trials : [],
-        freeLeadsThisMonth: raw?.freeLeadsThisMonth,
+        freeLeadsThisMonth: typeof raw?.monthlyLeads === 'number' ? raw.monthlyLeads : raw?.freeLeadsThisMonth,
       };
     } catch (error: any) {
       console.warn('Failed to update trial settings:', error);

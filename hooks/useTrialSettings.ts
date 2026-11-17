@@ -1,11 +1,6 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  trialApi,
-  TrialSettingsResponse,
-  TrialItem,
-  UpdateTrialSettingsPayload,
-} from '@/api/trialApi';
+import { trialApi, TrialSettingsResponse, UpdateTrialSettingsPayload } from '@/api/trialApi';
 import Toast from 'react-native-toast-message';
 
 export const getLocalDateString = (d: Date = new Date()): string => {
@@ -25,77 +20,8 @@ export const useTrialSettings = () => {
     retry: 1,
   });
 
-  // Optimistic local state for smooth interaction
-  const [isTrialEnabled, setIsTrialEnabled] = useState<boolean>(false);
-  const [dailyTrialLimit, setDailyTrialLimit] = useState<number>(5);
-
-  useEffect(() => {
-    if (query.data) {
-      setIsTrialEnabled(query.data.isTrialEnabled);
-      setDailyTrialLimit(query.data.dailyTrialLimit);
-    }
-  }, [query.data]);
-
-  const updateMutation = useMutation({
-    mutationFn: (payload: UpdateTrialSettingsPayload) =>
-      trialApi.updateTrialSettings(payload),
-    onSuccess: (updatedData) => {
-      queryClient.setQueryData(['trial-settings'], (old: TrialSettingsResponse | undefined) => {
-        if (!old) return updatedData;
-        return {
-          ...old,
-          isTrialEnabled: updatedData.isTrialEnabled,
-          dailyTrialLimit: updatedData.dailyTrialLimit,
-        };
-      });
-      Toast.show({
-        type: 'success',
-        text1: 'Settings Updated',
-        text2: `Trials ${updatedData.isTrialEnabled ? 'enabled' : 'disabled'} with ${updatedData.dailyTrialLimit} slots/day`,
-        visibilityTime: 2000,
-      });
-    },
-    onError: (err: any) => {
-      // Revert to query data on failure
-      if (query.data) {
-        setIsTrialEnabled(query.data.isTrialEnabled);
-        setDailyTrialLimit(query.data.dailyTrialLimit);
-      }
-      Toast.show({
-        type: 'error',
-        text1: 'Failed to update settings',
-        text2: err?.response?.data?.message || err?.message || 'Please try again',
-      });
-    },
-  });
-
-  const toggleTrialEnabled = useCallback(() => {
-    const nextVal = !isTrialEnabled;
-    setIsTrialEnabled(nextVal);
-    updateMutation.mutate({
-      isTrialEnabled: nextVal,
-      dailyTrialLimit,
-    });
-  }, [isTrialEnabled, dailyTrialLimit, updateMutation]);
-
-  const incrementLimit = useCallback(() => {
-    const nextLimit = dailyTrialLimit + 1;
-    setDailyTrialLimit(nextLimit);
-    updateMutation.mutate({
-      isTrialEnabled,
-      dailyTrialLimit: nextLimit,
-    });
-  }, [dailyTrialLimit, isTrialEnabled, updateMutation]);
-
-  const decrementLimit = useCallback(() => {
-    if (dailyTrialLimit <= 0) return;
-    const nextLimit = Math.max(0, dailyTrialLimit - 1);
-    setDailyTrialLimit(nextLimit);
-    updateMutation.mutate({
-      isTrialEnabled,
-      dailyTrialLimit: nextLimit,
-    });
-  }, [dailyTrialLimit, isTrialEnabled, updateMutation]);
+  const isTrialEnabled = query.data?.isTrialEnabled ?? false;
+  const dailyTrialLimit = query.data?.dailyTrialLimit ?? 5;
 
   // Categorize trials by date
   const todayStr = useMemo(() => getLocalDateString(new Date()), []);
@@ -112,40 +38,135 @@ export const useTrialSettings = () => {
     return `${y}-${m}`;
   }, []);
 
-  const allTrials = useMemo(() => query.data?.trials || [], [query.data?.trials]);
+  const { allTrials, todayTrials, tomorrowTrials, upcomingTrials, freeLeadsCount } = useMemo(() => {
+    const trials =
+      Array.isArray(query.data?.trials) && query.data.trials.length > 0
+        ? query.data.trials
+        : [
+            ...(Array.isArray(query.data?.todayTrials) ? query.data.todayTrials : []),
+            ...(Array.isArray(query.data?.tomorrowTrials) ? query.data.tomorrowTrials : []),
+          ];
 
-  const todayTrials = useMemo(() => {
-    return allTrials.filter((t) => {
-      const d = (t.trialDate || '').split('T')[0];
-      return d === todayStr;
-    });
-  }, [allTrials, todayStr]);
+    const today = Array.isArray(query.data?.todayTrials)
+      ? query.data.todayTrials
+      : trials.filter((t) => {
+          const d = (t.trialDate || '').split('T')[0];
+          return d === todayStr;
+        });
 
-  const tomorrowTrials = useMemo(() => {
-    return allTrials.filter((t) => {
-      const d = (t.trialDate || '').split('T')[0];
-      return d === tomorrowStr;
-    });
-  }, [allTrials, tomorrowStr]);
+    const tomorrow = Array.isArray(query.data?.tomorrowTrials)
+      ? query.data.tomorrowTrials
+      : trials.filter((t) => {
+          const d = (t.trialDate || '').split('T')[0];
+          return d === tomorrowStr;
+        });
 
-  const upcomingTrials = useMemo(() => {
-    return allTrials.filter((t) => {
+    const upcoming = trials.filter((t) => {
       const d = (t.trialDate || '').split('T')[0];
       return d > tomorrowStr;
     });
-  }, [allTrials, tomorrowStr]);
 
-  const freeLeadsCount = useMemo(() => {
-    if (typeof query.data?.freeLeadsThisMonth === 'number') {
-      return query.data.freeLeadsThisMonth;
+    let leads = 0;
+    if (typeof query.data?.monthlyLeads === 'number') {
+      leads = query.data.monthlyLeads;
+    } else if (typeof query.data?.freeLeadsThisMonth === 'number') {
+      leads = query.data.freeLeadsThisMonth;
+    } else {
+      const thisMonth = trials.filter((t) => {
+        const d = (t.trialDate || '').split('T')[0];
+        return d.startsWith(currentMonthPrefix);
+      });
+      leads = thisMonth.length > 0 ? thisMonth.length : trials.length;
     }
-    // Calculate trials registered this month
-    const thisMonthTrials = allTrials.filter((t) => {
-      const d = (t.trialDate || '').split('T')[0];
-      return d.startsWith(currentMonthPrefix);
+
+    return {
+      allTrials: trials,
+      todayTrials: today,
+      tomorrowTrials: tomorrow,
+      upcomingTrials: upcoming,
+      freeLeadsCount: leads,
+    };
+  }, [query.data, todayStr, tomorrowStr, currentMonthPrefix]);
+
+  // Minimum allowed slots cannot be less than today's booked/filled trial count
+  const minLimit = todayTrials.length;
+
+  const updateMutation = useMutation({
+    mutationFn: (payload: UpdateTrialSettingsPayload) => trialApi.updateTrialSettings(payload),
+    onMutate: async (newPayload: UpdateTrialSettingsPayload) => {
+      // Cancel outgoing refetches to avoid overwriting optimistic update
+      await queryClient.cancelQueries({ queryKey: ['trial-settings'] });
+
+      // Snapshot previous value for rollback
+      const previousSettings = queryClient.getQueryData<TrialSettingsResponse>(['trial-settings']);
+
+      // Optimistically update React Query cache immediately
+      queryClient.setQueryData<TrialSettingsResponse>(['trial-settings'], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          isTrialEnabled: newPayload.isTrialEnabled,
+          dailyTrialLimit: newPayload.dailyTrialLimit,
+        };
+      });
+
+      return { previousSettings };
+    },
+    onSuccess: (updatedData) => {
+      // Recall GET /api/club-owner/trial-settings to refetch fresh server state
+      queryClient.invalidateQueries({ queryKey: ['trial-settings'] });
+      Toast.show({
+        type: 'success',
+        text1: 'Settings Updated',
+        text2: `Trials ${updatedData.isTrialEnabled ? 'enabled' : 'disabled'} with ${updatedData.dailyTrialLimit} slots/day`,
+        visibilityTime: 2000,
+      });
+    },
+    onError: (err: any, _newPayload, context: any) => {
+      // Rollback to snapshot on error
+      if (context?.previousSettings) {
+        queryClient.setQueryData(['trial-settings'], context.previousSettings);
+      }
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to update settings',
+        text2: err?.response?.data?.message || err?.message || 'Please try again',
+      });
+    },
+  });
+
+  const toggleTrialEnabled = useCallback(() => {
+    const nextVal = !isTrialEnabled;
+    updateMutation.mutate({
+      isTrialEnabled: nextVal,
+      dailyTrialLimit,
     });
-    return thisMonthTrials.length > 0 ? thisMonthTrials.length : allTrials.length;
-  }, [query.data?.freeLeadsThisMonth, allTrials, currentMonthPrefix]);
+  }, [isTrialEnabled, dailyTrialLimit, updateMutation]);
+
+  const incrementLimit = useCallback(() => {
+    const nextLimit = dailyTrialLimit + 1;
+    updateMutation.mutate({
+      isTrialEnabled,
+      dailyTrialLimit: nextLimit,
+    });
+  }, [dailyTrialLimit, isTrialEnabled, updateMutation]);
+
+  const decrementLimit = useCallback(() => {
+    if (dailyTrialLimit <= minLimit) {
+      Toast.show({
+        type: 'info',
+        text1: 'Minimum Limit Reached',
+        text2: `Cannot set slots lower than today's ${minLimit} booked trial${minLimit === 1 ? '' : 's'}.`,
+        visibilityTime: 2500,
+      });
+      return;
+    }
+    const nextLimit = Math.max(minLimit, dailyTrialLimit - 1);
+    updateMutation.mutate({
+      isTrialEnabled,
+      dailyTrialLimit: nextLimit,
+    });
+  }, [dailyTrialLimit, minLimit, isTrialEnabled, updateMutation]);
 
   return {
     settings: query.data,
@@ -155,6 +176,7 @@ export const useTrialSettings = () => {
     upcomingTrials,
     isTrialEnabled,
     dailyTrialLimit,
+    minLimit,
     freeLeadsCount,
     toggleTrialEnabled,
     incrementLimit,

@@ -10,8 +10,8 @@ export const SlotProgressBar: React.FC<SlotProgressBarProps> = ({
   totalSlots,
   filledSlots,
 }) => {
-  // Ensure we have at least 1 slot to prevent empty row
-  const count = Math.max(totalSlots, 1);
+  const count = Math.max(totalSlots, filledSlots);
+  if (count <= 0) return null;
   const slotsArray = Array.from({ length: count }, (_, i) => i);
 
   return (

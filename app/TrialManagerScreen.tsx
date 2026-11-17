@@ -28,6 +28,7 @@ export default function TrialManagerScreen() {
     upcomingTrials,
     isTrialEnabled,
     dailyTrialLimit,
+    minLimit,
     freeLeadsCount,
     toggleTrialEnabled,
     incrementLimit,
@@ -109,6 +110,7 @@ export default function TrialManagerScreen() {
             <TrialBanner
               isTrialEnabled={isTrialEnabled}
               dailyTrialLimit={dailyTrialLimit}
+              minLimit={minLimit}
               onToggle={toggleTrialEnabled}
               onIncrement={incrementLimit}
               onDecrement={decrementLimit}
@@ -352,9 +354,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   leadsIconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 14,
     backgroundColor: '#FEE2E2',
     alignItems: 'center',
     justifyContent: 'center',
@@ -367,7 +369,7 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans-Bold',
   },
   leadsValue: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '800',
     color: '#E23744',
     fontFamily: 'PlusJakartaSans-Bold',

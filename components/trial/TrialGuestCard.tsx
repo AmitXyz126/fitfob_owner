@@ -30,18 +30,37 @@ export const TrialGuestCard: React.FC<TrialGuestCardProps> = ({
         .toUpperCase()
     : 'TG';
 
+  // Helper to format checkin time as "08:30 AM"
+  const formatTime = (timeStr?: string): string => {
+    if (!timeStr) return '';
+    try {
+      if (/^\d{1,2}:\d{2}\s*(?:AM|PM)$/i.test(timeStr.trim())) {
+        return timeStr.trim();
+      }
+      const d = new Date(timeStr);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+        });
+      }
+    } catch {}
+    return timeStr;
+  };
+
   // Format subtitle
   let subtitle = 'Booked · valid today only';
   if (isCompleted) {
-    const timeStr = item.checkinTime ? ` - ${item.checkinTime}` : '';
-    subtitle = `Checked In${timeStr}`;
+    const formattedTime = formatTime(item.checkinTime);
+    subtitle = formattedTime ? `Checked In - ${formattedTime}` : 'Checked In';
   } else if (!isToday && item.trialDate) {
     try {
       const d = new Date(item.trialDate);
       if (!isNaN(d.getTime())) {
-        const weekday = d.toLocaleString('en-US', { weekday: 'short' });
+        const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
         const day = d.getDate();
-        const month = d.toLocaleString('en-US', { month: 'short' });
+        const month = d.toLocaleDateString('en-US', { month: 'short' });
         subtitle = `Booked for ${weekday}, ${day} ${month}`;
       }
     } catch {}
@@ -85,7 +104,7 @@ export const TrialGuestCard: React.FC<TrialGuestCardProps> = ({
 
       {/* Info */}
       <View style={styles.infoWrapper}>
-        <Text style={styles.nameText} numberOfLines={1}>
+        <Text style={[styles.nameText, {textTransform: 'capitalize'}]} numberOfLines={1}>
           {item.client?.name || 'Trial Guest'}
         </Text>
         <Text
@@ -103,14 +122,14 @@ export const TrialGuestCard: React.FC<TrialGuestCardProps> = ({
         <View style={styles.completedBadge}>
           <Ionicons name="checkmark" size={20} color="#16A34A" />
         </View>
-      ) : (
+      ) : isToday ? (
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={() => onScan?.(item)}
           style={styles.scanButton}>
           <Ionicons name="scan-outline" size={20} color="#FFFFFF" />
         </TouchableOpacity>
-      )}
+      ) : null}
     </View>
   );
 };

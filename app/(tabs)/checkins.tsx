@@ -49,6 +49,9 @@ export default function CheckinsScreen() {
     time?: string;
     message?: string;
     clientType?: string;
+    checkinType?: 'trial' | 'membership' | string;
+    trialDate?: string;
+    trialStatus?: string;
   } | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
@@ -59,7 +62,7 @@ export default function CheckinsScreen() {
   // Scanning laser animation
   const [scanAnim] = useState(() => new RNAnimated.Value(0));
 
-  const snapPoints = useMemo(() => ['56%'], []);
+  const snapPoints = useMemo(() => ['50%'], []);
 
   // Reanimated Shared Values for High-Level Background Animations
   const orb1X = useSharedValue(0);
@@ -381,15 +384,12 @@ export default function CheckinsScreen() {
       if (!rawVal) {
         throw new Error('Invalid or empty QR code.');
       }
-
-      let payload: any = {};
       let extractedClientId = rawVal;
 
       try {
         const parsed = JSON.parse(rawVal);
         console.log('PARSED QR OBJECT:', parsed);
         if (parsed && typeof parsed === 'object') {
-          payload = parsed;
           extractedClientId =
             parsed.clientId ||
             parsed.client_id ||
@@ -410,11 +410,6 @@ export default function CheckinsScreen() {
 
       const finalPayload = {
         clientId: extractedClientId,
-        id: extractedClientId,
-        checkInId: extractedClientId,
-        qrData: rawVal,
-        code: extractedClientId,
-        ...payload,
       };
 
       console.log('🚀 API ENDPOINT:', ENDPOINTS.CLIENT_CHECKIN_SCAN);
@@ -436,7 +431,21 @@ export default function CheckinsScreen() {
         resData.status !== 'error' &&
         resData.valid !== false &&
         !resData.error &&
-        (resData.data || resData.user || resData.client || resData.customer || resData.success === true || resData.status === 'success');
+        (
+          resData.clientName ||
+          resData.checkinType ||
+          resData.trialstatus ||
+          resData.trialStatus ||
+          resData.trialDate ||
+          resData.selfieUrl ||
+          resData.data ||
+          resData.user ||
+          resData.client ||
+          resData.customer ||
+          resData.success === true ||
+          resData.status === 'success' ||
+          resData.status === 'checked-in'
+        );
 
       if (!isSuccess) {
         const failMessage = formatErrorMessage(resData);
@@ -477,7 +486,23 @@ export default function CheckinsScreen() {
         userObj?.logo ||
         '';
 
-      const clientType = resData?.type || dataObj?.type || userObj?.type || '';
+      const checkinType =
+        resData?.checkinType ||
+        dataObj?.checkinType ||
+        resData?.type ||
+        dataObj?.type ||
+        userObj?.type ||
+        '';
+
+      const trialDate = resData?.trialDate || dataObj?.trialDate || '';
+      const trialStatus =
+        resData?.trialstatus ||
+        resData?.trialStatus ||
+        dataObj?.trialstatus ||
+        dataObj?.trialStatus ||
+        'completed';
+
+      const clientType = checkinType || resData?.type || dataObj?.type || userObj?.type || '';
 
       const userEmail =
         resData?.clientEmail ||
@@ -493,7 +518,9 @@ export default function CheckinsScreen() {
         ? resData.message
         : (typeof dataObj?.message === 'string'
           ? dataObj.message
-          : `${userName} checked in successfully.`);
+          : checkinType === 'trial'
+            ? `${userName} completed Free Trial check-in.`
+            : `${userName} checked in successfully.`);
 
       setCheckinDetails({
         userName,
@@ -502,12 +529,16 @@ export default function CheckinsScreen() {
         time: timeStr,
         message: msgStr,
         clientType,
+        checkinType,
+        trialDate,
+        trialStatus,
       });
 
-      console.log('🎉 CHECKIN SUCCESS FOR:', userName, '| IMAGE:', userImage, '| TYPE:', clientType);
-      // Invalidate React Query check-in cache & update store immediately
+      console.log('🎉 CHECKIN SUCCESS FOR:', userName, '| IMAGE:', userImage, '| TYPE:', checkinType, '| STATUS:', trialStatus);
+      // Invalidate React Query check-in & trial caches and update store immediately
       queryClient.invalidateQueries({ queryKey: ['today-checkins'] });
-      useCheckinStore.getState().fetchTodayCheckins().catch(() => {});
+      queryClient.invalidateQueries({ queryKey: ['trial-settings'] });
+      useCheckinStore.getState().fetchTodayCheckins().catch(() => { });
 
       setStatus('success');
       setScanned(true);
@@ -672,11 +703,10 @@ export default function CheckinsScreen() {
                     <TouchableOpacity
                       onPress={() => setTorch((prev) => !prev)}
                       activeOpacity={0.8}
-                      className={`absolute top-3.5 right-3.5 z-30 h-10 w-10 items-center justify-center rounded-full border shadow-lg ${
-                        torch
-                          ? 'bg-[#F6163C] border-[#F6163C]'
-                          : 'bg-black/60 border-white/30'
-                      }`}>
+                      className={`absolute top-3.5 right-3.5 z-30 h-10 w-10 items-center justify-center rounded-full border shadow-lg ${torch
+                        ? 'bg-[#F6163C] border-[#F6163C]'
+                        : 'bg-black/60 border-white/30'
+                        }`}>
                       <Ionicons
                         name={torch ? 'flash' : 'flash-off'}
                         size={20}
@@ -728,18 +758,24 @@ export default function CheckinsScreen() {
           onClose={() => {
             if (status === 'success') {
               queryClient.invalidateQueries({ queryKey: ['today-checkins'] });
-              useCheckinStore.getState().fetchTodayCheckins().catch(() => {});
+              queryClient.invalidateQueries({ queryKey: ['trial-settings'] });
+              useCheckinStore.getState().fetchTodayCheckins().catch(() => { });
               router.replace('/(tabs)');
             } else {
               setScanned(false);
               setManualId('');
             }
           }}>
-          <BottomSheetView style={{ padding: 24, alignItems: 'center' }}>
+          <BottomSheetView style={{ padding: 16, alignItems: 'center' }}>
             {status === 'success' ? (
               <View className="w-full items-center">
-                {/* Pulsing Avatar Frame */}
-                <View style={styles.successAvatarBorder} className="mb-3 rounded-full p-1 bg-emerald-50 border-2 border-emerald-400">
+                {/* Avatar Frame */}
+                <View
+                  style={styles.successAvatarBorder}
+                  className={`mb-3 rounded-full p-1 border-2 ${checkinDetails?.checkinType === 'trial'
+                    ? 'bg-rose-50 border-rose-400'
+                    : 'bg-emerald-50 border-emerald-400'
+                    }`}>
                   {checkinDetails?.userImage ? (
                     <Image
                       source={{ uri: checkinDetails.userImage }}
@@ -765,14 +801,27 @@ export default function CheckinsScreen() {
                   />
                 </View>
 
-                {/* Client Type Tag */}
-                {checkinDetails?.clientType ? (
-                  <View className="mt-1.5 rounded-full bg-emerald-50 px-3 py-0.5 border border-emerald-200">
-                    <Text className="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">
-                      {checkinDetails.clientType} Check-in
+                {/* Badges Row (Check-in Type + Status) */}
+                <View className="flex-row items-center gap-2 mt-2">
+                  {checkinDetails?.checkinType === 'trial' ? (
+                    <View className="flex-row items-center gap-1 rounded-full bg-rose-50 px-3 py-1 border border-rose-200">
+                      <Ionicons name="sparkles" size={12} color="#E23744" />
+                      <Text className="text-xs font-bold text-[#E23744]">Free Trial</Text>
+                    </View>
+                  ) : (
+                    <View className="flex-row items-center gap-1 rounded-full bg-blue-50 px-3 py-1 border border-blue-200">
+                      <Ionicons name="card-outline" size={12} color="#2563EB" />
+                      <Text className="text-xs font-bold text-blue-700">Membership</Text>
+                    </View>
+                  )}
+
+                  <View className="flex-row items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 border border-emerald-200">
+                    <Ionicons name="checkmark-circle" size={13} color="#10B981" />
+                    <Text className="text-xs font-bold text-emerald-700 capitalize">
+                      {checkinDetails?.trialStatus || 'Completed'}
                     </Text>
                   </View>
-                ) : null}
+                </View>
 
                 {/* Success Message */}
                 <Text className="mt-3 text-center font-bold text-2xl text-emerald-500">
@@ -783,16 +832,38 @@ export default function CheckinsScreen() {
                   {checkinDetails?.message || `${checkinDetails?.userName || 'Customer'} has checked in at ${checkinDetails?.time || '9:41 AM'}`}
                 </Text>
 
+                {/* Details Summary Card */}
+                <View className="mt-3.5 w-full rounded-2xl border border-slate-100 bg-slate-50/80 p-3">
+                  <View className="flex-row items-center justify-between py-1">
+                    <View className="flex-row items-center gap-2">
+                      <Ionicons name="time-outline" size={16} color="#64748B" />
+                      <Text className="text-xs font-medium text-slate-500">Check-in Time</Text>
+                    </View>
+                    <Text className="text-xs font-bold text-slate-800">{checkinDetails?.time || 'Today'}</Text>
+                  </View>
+
+                  {checkinDetails?.trialDate ? (
+                    <View className="flex-row items-center justify-between py-1 border-t border-slate-200/50 mt-1 pt-1.5">
+                      <View className="flex-row items-center gap-2">
+                        <Ionicons name="calendar-outline" size={16} color="#64748B" />
+                        <Text className="text-xs font-medium text-slate-500">Trial Date</Text>
+                      </View>
+                      <Text className="text-xs font-bold text-slate-800">{checkinDetails.trialDate}</Text>
+                    </View>
+                  ) : null}
+                </View>
+
                 {/* Done Button */}
                 <TouchableOpacity
                   onPress={() => {
                     bottomSheetRef.current?.close();
                     queryClient.invalidateQueries({ queryKey: ['today-checkins'] });
-                    useCheckinStore.getState().fetchTodayCheckins().catch(() => {});
+                    queryClient.invalidateQueries({ queryKey: ['trial-settings'] });
+                    useCheckinStore.getState().fetchTodayCheckins().catch(() => { });
                     router.replace('/(tabs)');
                   }}
                   activeOpacity={0.8}
-                  className="mt-6 w-full items-center justify-center rounded-2xl bg-[#F6163C] py-4">
+                  className="mt-5 w-full items-center justify-center rounded-2xl bg-[#F6163C] py-4">
                   <Text className="font-bold text-base text-white">Done</Text>
                 </TouchableOpacity>
               </View>
