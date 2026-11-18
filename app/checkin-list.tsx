@@ -1201,7 +1201,7 @@ const CheckinList = () => {
                     </Text>
                   </View>
 
-                  {selectedMember?.checkinType && (
+                  {Boolean(selectedMember?.checkinType) && (
                     <View style={styles.detailRow}>
                       <View style={styles.detailLeft}>
                         <Ionicons name="fitness-outline" size={18} color="#64748B" />

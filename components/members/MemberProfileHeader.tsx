@@ -56,11 +56,11 @@ export const MemberProfileHeader: React.FC<MemberProfileHeaderProps> = ({
               {client?.name || 'Member Details'}
             </Text>
             {/* Gender icon instead of text */}
-            {client?.gender && (
+            {client?.gender ? (
               <View style={styles.genderIconContainer}>
                 <MemberGenderIcon gender={client.gender} size={13} />
               </View>
-            )}
+            ) : null}
           </View>
 
           <Text style={styles.subText} numberOfLines={1}>

@@ -147,7 +147,7 @@ const CheckinItem = ({ item, index, scrollY, onSelect }: any) => {
 
         <View className="ml-4 flex-1 ">
           <View className="flex-row items-center gap-1 ">
-            <Text className="font-bold text-[15px] text-slate-900 capitalize">{item.name}</Text>{" "}
+            <Text className="font-bold text-[15px] text-slate-900 capitalize">{item.name}</Text>
             <Image className="h-4 w-4" source={require('../../assets/images/tick.png')} />
           </View>
           <Text className="text-xs text-slate-400">{item.time}</Text>
@@ -712,7 +712,7 @@ const HomeScreen = () => {
                   </View>
 
 
-                  {selectedMember?.checkinType && (
+                  {Boolean(selectedMember?.checkinType) && (
                     <View style={styles.detailRow}>
                       <View style={styles.detailLeft}>
                         <Ionicons name="fitness-outline" size={18} color="#64748B" />

@@ -278,7 +278,7 @@ const MenuOption = memo(({
     </View>
 
     <View className="flex-row items-center">
-      {value && <Text className="mr-2 text-sm text-gray-400">{value}</Text>}
+      {value ? <Text className="mr-2 text-sm text-gray-400">{value}</Text> : null}
       {showBadge && (
         <View className="mr-1">
           <Image

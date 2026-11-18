@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable react/no-unescaped-entities */
-import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
+import React, { useCallback, useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { KeyboardAwareScrollView } from '@pietile-native-kit/keyboard-aware-scrollview';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -38,6 +39,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCheckinStore } from '@/store/useCheckinStore';
 
 export default function CheckinsScreen() {
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const bottomSheetRef = useRef<BottomSheet>(null);
   const [status, setStatus] = useState<'success' | 'failed'>('success');
@@ -61,8 +63,6 @@ export default function CheckinsScreen() {
 
   // Scanning laser animation
   const [scanAnim] = useState(() => new RNAnimated.Value(0));
-
-  const snapPoints = useMemo(() => ['56.5%'], []);
 
   // Reanimated Shared Values for High-Level Background Animations
   const orb1X = useSharedValue(0);
@@ -667,7 +667,7 @@ export default function CheckinsScreen() {
                   )}
 
                   {/* High-Tech Glowing Laser Line Overlay */}
-                  {permission?.granted && !scanned && !loading && (
+                  {Boolean(permission?.granted) && !scanned && !loading && (
                     <RNAnimated.View style={[styles.laserContainer, { transform: [{ translateY }] }]}>
                       <LinearGradient
                         colors={['rgba(246, 22, 60, 0)', '#F6163C', '#FF6B81', '#F6163C', 'rgba(246, 22, 60, 0)']}
@@ -679,7 +679,7 @@ export default function CheckinsScreen() {
                   )}
 
                   {/* Scanner Target Frame with Pulsing Glowing Corners */}
-                  {permission?.granted && (
+                  {Boolean(permission?.granted) && (
                     <View style={StyleSheet.absoluteFill} pointerEvents="none" className="items-center justify-center">
                       <Animated.View style={[{ width: 180, height: 180, borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.25)' }, cornerStyle]}>
                         <View className="absolute -left-1 -top-1 h-7 w-7 rounded-tl-xl border-l-4 border-t-4 border-[#F6163C]" style={styles.cornerGlow} />
@@ -699,7 +699,7 @@ export default function CheckinsScreen() {
                   )}
 
                   {/* Flashlight / Torch Floating Button in Top-Right Corner */}
-                  {permission?.granted && (
+                  {Boolean(permission?.granted) && (
                     <TouchableOpacity
                       onPress={() => setTorch((prev) => !prev)}
                       activeOpacity={0.8}
@@ -751,7 +751,7 @@ export default function CheckinsScreen() {
         <BottomSheet
           ref={bottomSheetRef}
           index={-1}
-          snapPoints={snapPoints}
+          enableDynamicSizing={true}
           enablePanDownToClose
           backdropComponent={renderBackdrop}
           backgroundStyle={{ borderRadius: 28 }}
@@ -766,7 +766,13 @@ export default function CheckinsScreen() {
               setManualId('');
             }
           }}>
-          <BottomSheetView style={{ padding: 16, alignItems: 'center' }}>
+          <BottomSheetView
+            style={{
+              paddingHorizontal: 20,
+              paddingTop: 16,
+              paddingBottom: Math.max(insets.bottom + 75, 40),
+              alignItems: 'center',
+            }}>
             {status === 'success' ? (
               <View className="w-full items-center">
                 {/* Avatar Frame */}
