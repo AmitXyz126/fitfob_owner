@@ -1,28 +1,39 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { userDetailsApi } from '@/api/userdetailsApi';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { useAuthStore } from '@/store/useAuthStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const useClubOwnerMe = (enabled: boolean = true) => {
+export type UseClubOwnerMeOptions = Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>;
+
+export const useClubOwnerMe = (optionsOrEnabled: boolean | UseClubOwnerMeOptions = true) => {
+  const options: UseClubOwnerMeOptions =
+    typeof optionsOrEnabled === 'boolean'
+      ? { enabled: optionsOrEnabled }
+      : optionsOrEnabled || {};
   const { user } = useAuthStore();
   const userKey = user?.id || user?.email || 'guest';
 
   return useQuery({
     queryKey: ['my-club-owner-me', userKey],
     queryFn: userDetailsApi.getMyClubOwner,
-    enabled: !!user && enabled,
+    enabled: !!user && (options.enabled ?? true),
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     retry: 1,
     refetchOnWindowFocus: false,
+    ...options,
   });
 };
 
 export interface UseUserDetailOptions {
   fetchDocs?: boolean;
   fetchPhotos?: boolean;
+  statusQueryOptions?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>;
+  docsQueryOptions?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>;
+  photosQueryOptions?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>;
 }
 
 export const useUserDetail = (options?: UseUserDetailOptions) => {
@@ -42,6 +53,7 @@ export const useUserDetail = (options?: UseUserDetailOptions) => {
     queryFn: userDetailsApi.getMe,
     retry: 1,
     enabled: !!user && (user.clubOwnerDetail === null || user.clubOwnerDetail === undefined),
+    ...options?.statusQueryOptions,
   });
 
   const isApprovedOwner = Boolean(
@@ -99,6 +111,7 @@ export const useUserDetail = (options?: UseUserDetailOptions) => {
     retry: 1,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
+    ...options?.docsQueryOptions,
   });
 
   const submitStep1 = useMutation({
@@ -299,6 +312,7 @@ export const useUserDetail = (options?: UseUserDetailOptions) => {
     retry: 1,
     staleTime: 5 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
+    ...options?.photosQueryOptions,
   });
 
   const uploadSingleClubPhoto = useMutation({
@@ -435,6 +449,7 @@ export const useUserDetail = (options?: UseUserDetailOptions) => {
     retry: 1,
     staleTime: 3 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    ...options?.photosQueryOptions,
   });
 
   const uploadMyClubPhoto = useMutation({

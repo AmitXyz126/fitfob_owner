@@ -1,7 +1,19 @@
+/* eslint-disable react-hooks/refs */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable react-hooks/set-state-in-effect */
-import React, { useState, useEffect, memo, useCallback } from 'react';
-import { View, Text, Image, TouchableOpacity, ScrollView, ImageBackground, Dimensions, Animated, Easing, StyleSheet } from 'react-native';
+import React, { useState, useEffect, memo, useCallback, useRef } from 'react';
+import {
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  ScrollView,
+  ImageBackground,
+  Dimensions,
+  Animated,
+  Easing,
+  StyleSheet,
+  RefreshControl,
+} from 'react-native';
 import {
   ChevronLeft,
   ChevronRight,
@@ -398,7 +410,13 @@ const ClubProfileScreen = () => {
   // --- States for Dynamic Data ---
   const { user } = useAuthStore();
   const { profileStatus } = useUserDetail();
-  const { data: myOwnerData } = useClubOwnerMe();
+  const {
+    data: myOwnerData,
+    refetch: refetchOwnerData,
+  } = useClubOwnerMe({
+    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes automatically
+    refetchIntervalInBackground: false,
+  });
 
   const [clubInfo, setClubInfo] = useState<{
     name: string;
@@ -537,7 +555,7 @@ const ClubProfileScreen = () => {
             setPlansCount(parsed.filter((p: any) => p.isActive).length);
           }
         }
-      } catch {}
+      } catch { }
 
       const keys = await AsyncStorage.getAllKeys();
       const pId = profileStatus?.id || profileStatus?.pendingClubOwnerId || user?.id || user?.email;
@@ -743,10 +761,33 @@ const ClubProfileScreen = () => {
     }
   }, [myOwnerData, profileStatus, user]);
 
+  const loadClubDataRef = useRef(loadClubData);
+  loadClubDataRef.current = loadClubData;
+
+  const refetchOwnerDataRef = useRef(refetchOwnerData);
+  refetchOwnerDataRef.current = refetchOwnerData;
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        refetchOwnerDataRef.current(),
+        loadClubDataRef.current(),
+      ]);
+    } catch (err) {
+      console.warn('Failed to refresh club profile:', err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      loadClubData();
-    }, [loadClubData])
+      refetchOwnerDataRef.current();
+      loadClubDataRef.current();
+    }, [])
   );
 
   return (
@@ -765,7 +806,16 @@ const ClubProfileScreen = () => {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#F6163C']}
+            tintColor="#F6163C"
+          />
+        }>
         {/* Banner */}
         <View className="mb-2 overflow-hidden rounded-[16px]">
           <ImageBackground

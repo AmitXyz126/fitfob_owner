@@ -13,7 +13,7 @@ export const attachApiLogging = (instance: AxiosInstance, tag: string = 'API') =
       const method = (config.method || 'GET').toUpperCase();
       const fullUrl = `${config.baseURL || ''}${config.url || ''}`;
 
-      console.log(`\n🚀 [${tag} HIT] ----------------------------------------- ${new Date().getTime()}`);
+      console.log(`\n🚀 [${tag} HIT] -----------------------------------------`);
       console.log(`📡 URL:    ${method} ${fullUrl}`);
       if (config.params && Object.keys(config.params).length > 0) {
         console.log(`🔍 PARAMS:`, JSON.stringify(config.params, null, 2));

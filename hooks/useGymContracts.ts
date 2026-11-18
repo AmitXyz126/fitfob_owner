@@ -1,12 +1,18 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, UseQueryOptions } from '@tanstack/react-query';
 import { gymContractApi, GymContractData } from '@/api/gymContractApi';
 
-export const useGymContracts = () => {
+export type UseGymContractsOptions = Omit<
+  UseQueryOptions<GymContractData, Error>,
+  'queryKey' | 'queryFn'
+>;
+
+export const useGymContracts = (options?: UseGymContractsOptions) => {
   const query = useQuery<GymContractData>({
     queryKey: ['gym-contracts-my-contract'],
     queryFn: gymContractApi.getMyContract,
     staleTime: 5 * 60 * 1000,
     retry: 1,
+    ...options,
   });
 
   return {

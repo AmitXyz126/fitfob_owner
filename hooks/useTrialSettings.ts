@@ -1,5 +1,5 @@
 import { useMemo, useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { trialApi, TrialSettingsResponse, UpdateTrialSettingsPayload } from '@/api/trialApi';
 import Toast from 'react-native-toast-message';
 
@@ -10,7 +10,12 @@ export const getLocalDateString = (d: Date = new Date()): string => {
   return `${year}-${month}-${day}`;
 };
 
-export const useTrialSettings = () => {
+export type UseTrialSettingsOptions = Omit<
+  UseQueryOptions<TrialSettingsResponse, Error>,
+  'queryKey' | 'queryFn'
+>;
+
+export const useTrialSettings = (options?: UseTrialSettingsOptions) => {
   const queryClient = useQueryClient();
 
   const query = useQuery<TrialSettingsResponse>({
@@ -18,6 +23,7 @@ export const useTrialSettings = () => {
     queryFn: trialApi.getTrialSettings,
     staleTime: 60 * 1000,
     retry: 1,
+    ...options,
   });
 
   const isTrialEnabled = query.data?.isTrialEnabled ?? false;

@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/purity */
 import { useState, useEffect, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, UseQueryOptions } from '@tanstack/react-query';
 import { checkinApi, CheckinItemData, CheckinQueryParams } from '@/api/checkinApi';
 import { useCheckinStore } from '@/store/useCheckinStore';
 import { useAuthStore } from '@/store/useAuthStore';
@@ -208,10 +208,20 @@ export const getSubscriptionBadge = (subscriptionType?: string, checkinType?: st
   };
 };
 
+export type UseTodayCheckinsOptions = Omit<
+  UseQueryOptions<CheckinItemData[], Error>,
+  'queryKey' | 'queryFn'
+>;
+
 export const useTodayCheckins = (
-  enabled: boolean = true,
-  dateParams?: string | CheckinQueryParams | null
+  enabledOrOptions: boolean | UseTodayCheckinsOptions = true,
+  dateParams?: string | CheckinQueryParams | null,
+  options?: UseTodayCheckinsOptions
 ) => {
+  const isBool = typeof enabledOrOptions === 'boolean';
+  const enabled = isBool ? enabledOrOptions : (enabledOrOptions?.enabled ?? true);
+  const queryOptions = isBool ? options : enabledOrOptions;
+
   const { user } = useAuthStore();
   const setTodayCheckins = useCheckinStore((state) => state.setTodayCheckins);
   const userKey = user?.id || user?.email || 'guest';
@@ -254,6 +264,7 @@ export const useTodayCheckins = (
     gcTime: 10 * 60 * 1000,
     retry: 1,
     refetchOnWindowFocus: false,
+    ...queryOptions,
   });
 
   // Keep Zustand store in sync with Query data

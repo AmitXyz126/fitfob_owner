@@ -1,11 +1,17 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { useQuery, useMutation, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { holidayApi, HolidayItemData, CreateHolidayPayload } from '@/api/holidayApi';
 import { useAuthStore } from '@/store/useAuthStore';
 
 const HOLIDAYS_CACHE_PREFIX = '@fitfob_club_holidays_';
 
-export const useHolidays = () => {
+export type UseHolidaysOptions = Omit<
+  UseQueryOptions<HolidayItemData[], Error>,
+  'queryKey' | 'queryFn'
+>;
+
+export const useHolidays = (options?: UseHolidaysOptions) => {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const userKey = user?.id || user?.email || 'guest';
@@ -42,6 +48,7 @@ export const useHolidays = () => {
       return [];
     },
     staleTime: 1000 * 60 * 2, // 2 minutes
+    ...options,
   });
 
   // 2. Mutation to create a holiday

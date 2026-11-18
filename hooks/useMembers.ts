@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, UseQueryOptions } from '@tanstack/react-query';
 import { memberApi, MemberListItem, MemberDetailsResponse } from '@/api/memberApi';
 import { useMemberStore } from '@/store/useMemberStore';
 import { useEffect, useMemo } from 'react';
@@ -67,10 +67,15 @@ export const formatMemberDate = (dateString?: string): string => {
   }
 };
 
+export type UseMemberListOptions = Omit<
+  UseQueryOptions<MemberListItem[], Error>,
+  'queryKey' | 'queryFn'
+>;
+
 /**
  * Hook to fetch and manage the member list
  */
-export const useMemberList = () => {
+export const useMemberList = (options?: UseMemberListOptions) => {
   const { members, setMembers, activeFilter, setActiveFilter, searchQuery, setSearchQuery } =
     useMemberStore();
 
@@ -79,6 +84,7 @@ export const useMemberList = () => {
     queryFn: memberApi.getMemberList,
     staleTime: 3 * 60 * 1000,
     retry: 1,
+    ...options,
   });
 
   useEffect(() => {
@@ -136,10 +142,18 @@ export const useMemberList = () => {
   };
 };
 
+export type UseMemberDetailsOptions = Omit<
+  UseQueryOptions<MemberDetailsResponse, Error>,
+  'queryKey' | 'queryFn'
+>;
+
 /**
  * Hook to fetch and manage member details by document ID
  */
-export const useMemberDetails = (docId: string | undefined) => {
+export const useMemberDetails = (
+  docId: string | undefined,
+  options?: UseMemberDetailsOptions
+) => {
   const { selectedMemberDetails, setSelectedMemberDetails } = useMemberStore();
 
   const query = useQuery<MemberDetailsResponse>({
@@ -151,6 +165,7 @@ export const useMemberDetails = (docId: string | undefined) => {
     enabled: Boolean(docId),
     staleTime: 3 * 60 * 1000,
     retry: 1,
+    ...options,
   });
 
   useEffect(() => {

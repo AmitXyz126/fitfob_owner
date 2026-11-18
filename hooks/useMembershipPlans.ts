@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import {
   membershipPlanApi,
   LocalMembershipPlan,
@@ -9,7 +9,12 @@ import { useMembershipPlanStore } from '@/store/useMembershipPlanStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import Toast from 'react-native-toast-message';
 
-export const useMembershipPlans = () => {
+export type UseMembershipPlansOptions = Omit<
+  UseQueryOptions<LocalMembershipPlan[], Error>,
+  'queryKey' | 'queryFn'
+>;
+
+export const useMembershipPlans = (options?: UseMembershipPlansOptions) => {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const userKey = user?.id ? String(user.id) : user?.email || 'guest';
@@ -35,6 +40,7 @@ export const useMembershipPlans = () => {
       }
     },
     staleTime: 1000 * 60 * 2, // 2 minutes
+    ...options,
   });
 
   // 2. Create Plan Mutation
