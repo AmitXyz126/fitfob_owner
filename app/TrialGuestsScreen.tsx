@@ -447,8 +447,8 @@ export default function TrialGuestsScreen() {
                   </Text>
                 </View>
               ) : (
-                groupedByDate.map((group) => (
-                  <View key={`group-${group.date}`} style={styles.dateGroupContainer}>
+                groupedByDate.map((group, idx) => (
+                  <View key={`group-${group.date}-${idx + 1}`} style={styles.dateGroupContainer}>
                     {/* Header Row: Date & Capacity */}
                     <View style={styles.groupHeaderRow}>
                       <Text style={styles.groupHeaderTitle}>{group.headerTitle}</Text>
@@ -459,7 +459,7 @@ export default function TrialGuestsScreen() {
                     <View style={styles.guestsCardBox}>
                       {group.trials.map((item, idx) => (
                         <TrialGuestItemRow
-                          key={item.clientId || `trial-${group.date}-${idx}`}
+                          key={`trial-${group.date}-${idx}-${item.clientId}`}
                           item={item}
                           tabMode="all"
                           onScan={handleScanPass}
@@ -494,7 +494,7 @@ export default function TrialGuestsScreen() {
                 <View style={styles.guestsCardBox}>
                   {groups.toArrive.map((item, idx) => (
                     <TrialGuestItemRow
-                      key={item.clientId || `arrive-${idx}`}
+                      key={`arrive-${idx}-${item.clientId}`}
                       item={item}
                       tabMode="today"
                       onScan={handleScanPass}
@@ -517,7 +517,7 @@ export default function TrialGuestsScreen() {
                 <View style={styles.guestsCardBox}>
                   {groups.checkedIn.map((item, idx) => (
                     <TrialGuestItemRow
-                      key={item.clientId || `in-${idx}`}
+                      key={`in-${idx}-${item.clientId}`}
                       item={item}
                       tabMode="today"
                       onScan={handleScanPass}
@@ -541,7 +541,7 @@ export default function TrialGuestsScreen() {
                   <View style={styles.guestsCardBox}>
                     {groups.cancelled.map((item, idx) => (
                       <TrialGuestItemRow
-                        key={item.clientId || `cancel-${idx}`}
+                        key={`cancel-${idx}-${item.clientId}`}
                         item={item}
                         tabMode="today"
                         isLast={idx === groups.cancelled.length - 1}
@@ -588,7 +588,7 @@ export default function TrialGuestsScreen() {
                 <View style={styles.guestsCardBox}>
                   {tomorrowTrials.map((item, idx) => (
                     <TrialGuestItemRow
-                      key={item.clientId || `tmr-${idx}`}
+                      key={`tmr-${idx}-${item.clientId}`}
                       item={item}
                       tabMode="tomorrow"
                       onScan={handleScanPass}
@@ -650,7 +650,7 @@ export default function TrialGuestsScreen() {
                 <View style={styles.guestsCardBox}>
                   {selectedDateTrials.map((item, idx, arr) => (
                     <TrialGuestItemRow
-                      key={item.clientId || `date-${idx}`}
+                      key={`date-${idx}-${item.clientId}`}
                       item={item}
                       tabMode="by-date"
                       onScan={handleScanPass}

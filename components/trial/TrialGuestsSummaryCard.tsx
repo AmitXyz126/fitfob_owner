@@ -11,11 +11,13 @@ interface TrialGuestsSummaryCardProps {
   metrics: SummaryMetric[];
 }
 
+
 export const TrialGuestsSummaryCard: React.FC<TrialGuestsSummaryCardProps> = ({ metrics }) => {
+  console.log('metrics: ', metrics)
   return (
     <View style={styles.card}>
       {metrics.map((metric, idx) => (
-        <View key={`metric-${idx}`} style={styles.metricItem}>
+        <View key={`metric-${idx}-${idx + 1}`} style={styles.metricItem}>
           <Text style={[styles.metricValue, { color: metric.color || '#0F172A' }]}>
             {metric.value}
           </Text>

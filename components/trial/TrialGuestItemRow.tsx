@@ -20,7 +20,7 @@ export const TrialGuestItemRow: React.FC<TrialGuestItemRowProps> = ({
 }) => {
   const [imageError, setImageError] = useState(false);
 
-  const status = (item.trialStatus || 'booked').toLowerCase();
+  const status = item.trialStatus;
   const isCheckedIn = status === 'completed' || status === 'checked-in';
   const isNoShow = status === 'no-show' || status === 'missed' || status === 'expired';
   const isCancelled = status === 'cancelled';
@@ -29,12 +29,12 @@ export const TrialGuestItemRow: React.FC<TrialGuestItemRowProps> = ({
   // Initials generator
   const initials = item.clientName
     ? item.clientName
-        .split(' ')
-        .map((w) => w[0])
-        .filter(Boolean)
-        .slice(0, 2)
-        .join('')
-        .toUpperCase()
+      .split(' ')
+      .map((w) => w[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join('')
+      .toUpperCase()
     : 'TG';
 
   // Deterministic avatar color palette
@@ -59,55 +59,88 @@ export const TrialGuestItemRow: React.FC<TrialGuestItemRowProps> = ({
 
   const avatarColors = getAvatarColors();
 
+  // Helper to extract clean time (e.g. "12:31 PM") from ISO timestamps in info strings
+  const formatInfoWithTime = (info?: string, fallback: string = ''): string => {
+    if (!info || !info.trim()) return fallback;
+
+    if (info.includes('·')) {
+      const parts = info.split('·');
+      const prefix = parts.slice(0, -1).join('·').trim();
+      const timeCandidate = parts[parts.length - 1].trim();
+
+      // If already formatted like "11:20 AM"
+      if (/^\d{1,2}:\d{2}\s*(?:AM|PM)$/i.test(timeCandidate)) {
+        return `${prefix} · ${timeCandidate}`;
+      }
+
+      // Check if it's an ISO timestamp or valid date string
+      const d = new Date(timeCandidate);
+      if (!isNaN(d.getTime())) {
+        const timeStr = d.toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+        });
+        return `${prefix} · ${timeStr}`;
+      }
+    } else {
+      // If the entire info is an ISO date string
+      if (info.includes('T')) {
+        const d = new Date(info.trim());
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+          });
+        }
+      }
+    }
+
+    return info;
+  };
+
   // Format Subtitle
   const getFormattedSubtitle = () => {
     if (isCheckedIn) {
-      if (item.info) {
-        // e.g. "Checked in · 2026-11-18T06:27:33.882Z" -> "Checked in · 08:30 AM"
-        const parts = item.info.split('·');
-        if (parts.length > 1) {
-          const timePart = parts[1].trim();
-          const d = new Date(timePart);
-          if (!isNaN(d.getTime())) {
-            const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-            return `Checked in · ${timeStr}`;
-          }
-        }
-        return item.info;
-      }
-      return 'Checked in';
+      return formatInfoWithTime(item.info, 'Checked in');
     }
 
     if (isRescheduled) {
-      return item.info || 'Moved from previous date';
+      return formatInfoWithTime(item.info, 'Moved from previous date');
     }
 
     if (isNoShow) {
-      return item.info || 'Not visited by closing time';
+      return formatInfoWithTime(item.info, 'Not visited by closing time');
     }
 
     if (isCancelled) {
-      return item.info || 'Cancelled by guest';
+      return formatInfoWithTime(item.info, 'Cancelled by guest');
     }
 
     // Booked / default
     if (item.bookedAtText) {
       const parts = item.bookedAtText.split(' ');
       if (parts.length > 1) {
-        const d = new Date(parts[1].trim());
+        const dateCandidate = parts.slice(1).join(' ').trim();
+        const d = new Date(dateCandidate);
         if (!isNaN(d.getTime())) {
-          const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-          return `Booked ${timeStr} · valid today`;
+          const timeStr = d.toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+          });
+          return `Booked ${timeStr} · Valid today`;
         }
       }
-      return item.bookedAtText;
+      return formatInfoWithTime(item.bookedAtText, 'Booked · Valid today');
     }
 
     if (item.clientPhone) {
       return `Booked · ${item.clientPhone}`;
     }
 
-    return 'Booked · valid today';
+    return 'Booked · Valid today';
   };
 
   const subtitle = getFormattedSubtitle();
@@ -118,7 +151,7 @@ export const TrialGuestItemRow: React.FC<TrialGuestItemRowProps> = ({
       return;
     }
     if (item.clientPhone) {
-      Linking.openURL(`tel:${item.clientPhone}`).catch(() => {});
+      Linking.openURL(`tel:${item.clientPhone}`).catch(() => { });
     }
   };
 
@@ -192,16 +225,21 @@ export const TrialGuestItemRow: React.FC<TrialGuestItemRowProps> = ({
         </View>
       ) : tabMode === 'tomorrow' ? (
         <View style={styles.tomorrowActionsRow}>
-          {isRescheduled ? (
-            <View style={[styles.pillBadge, styles.badgeRescheduled]}>
-              <Text style={[styles.pillBadgeText, styles.badgeTextRescheduled]}>Rescheduled</Text>
+          {isCancelled ? (
+            <View style={[styles.pillBadge, styles.badgeCancelled]}>
+              <Text style={[styles.pillBadgeText, styles.badgeTextCancelled]}>Cancelled</Text>
             </View>
-          ) : (
-            <View style={[styles.pillBadge, styles.badgeBooked]}>
-              <Text style={[styles.pillBadgeText, styles.badgeTextBooked]}>Booked</Text>
-            </View>
-          )}
-          {item.clientPhone ? (
+          ) :
+            isRescheduled ? (
+              <View style={[styles.pillBadge, styles.badgeRescheduled]}>
+                <Text style={[styles.pillBadgeText, styles.badgeTextRescheduled]}>Rescheduled</Text>
+              </View>
+            ) : (
+              <View style={[styles.pillBadge, styles.badgeBooked]}>
+                <Text style={[styles.pillBadgeText, styles.badgeTextBooked]}>Booked</Text>
+              </View>
+            )}
+          {!isCancelled && item.clientPhone ? (
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={handlePhoneCall}

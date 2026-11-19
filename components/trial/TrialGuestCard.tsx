@@ -50,7 +50,7 @@ export const TrialGuestCard: React.FC<TrialGuestCardProps> = ({
   };
 
   // Format subtitle
-  let subtitle = 'Booked · valid today only';
+  let subtitle = 'Booked · Valid today only';
   if (isCompleted) {
     const formattedTime = formatTime(item.checkinTime);
     subtitle = formattedTime ? `Checked In - ${formattedTime}` : 'Checked In';
