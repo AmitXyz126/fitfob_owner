@@ -92,6 +92,7 @@ export default function Layout() {
           <Stack.Screen name="members" />
           <Stack.Screen name="member-details" />
           <Stack.Screen name="TrialManagerScreen" />
+          <Stack.Screen name="TrialGuestsScreen" />
         </Stack>
         <Toast />
       </QueryClientProvider>

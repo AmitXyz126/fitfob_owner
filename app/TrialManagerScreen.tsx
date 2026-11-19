@@ -117,10 +117,33 @@ export default function TrialManagerScreen() {
               isUpdating={isUpdating}
             />
 
+            {/* Quick Link to Trial Guests Screen */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => router.push('/TrialGuestsScreen')}
+              style={styles.guestListLinkCard}>
+              <View style={styles.guestListLinkLeft}>
+                <View style={styles.guestListLinkIcon}>
+                  <Ionicons name="people" size={18} color="#E23744" />
+                </View>
+                <View>
+                  <Text style={styles.guestListLinkTitle}>All Trial Guests</Text>
+                  <Text style={styles.guestListLinkSubtitle}>View attendance, dates & guest passes</Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+            </TouchableOpacity>
+
             {/* 2. Today's Trial Guests Section Card */}
             <View style={styles.sectionCard}>
               <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>Today&apos;s trial guests</Text>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => router.push('/TrialGuestsScreen')}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={styles.sectionTitle}>Today&apos;s trial guests</Text>
+                  <Ionicons name="chevron-forward" size={16} color="#64748B" />
+                </TouchableOpacity>
                 <Text style={styles.slotCountText}>
                   {`${todayTrials.length} of ${dailyTrialLimit} filled`}
                 </Text>
@@ -154,7 +177,13 @@ export default function TrialManagerScreen() {
             {/* 3. Tomorrow Section Card */}
             <View style={styles.sectionCard}>
               <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>Tomorrow</Text>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => router.push('/TrialGuestsScreen')}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={styles.sectionTitle}>Tomorrow</Text>
+                  <Ionicons name="chevron-forward" size={16} color="#64748B" />
+                </TouchableOpacity>
                 <Text style={styles.slotCountText}>
                   {`${tomorrowTrials.length} of ${dailyTrialLimit} filled`}
                 </Text>
@@ -466,5 +495,46 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     fontFamily: 'PlusJakartaSans-Bold',
+  },
+  guestListLinkCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 1,
+  },
+  guestListLinkLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  guestListLinkIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  guestListLinkTitle: {
+    fontSize: 14.5,
+    fontWeight: '800',
+    color: '#0F172A',
+    fontFamily: 'PlusJakartaSans-Bold',
+  },
+  guestListLinkSubtitle: {
+    fontSize: 11.5,
+    color: '#64748B',
+    fontFamily: 'PlusJakartaSans-Medium',
+    marginTop: 1,
   },
 });
