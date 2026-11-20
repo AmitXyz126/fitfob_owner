@@ -1,6 +1,5 @@
 import { storageAPI } from '@/utility/storage';
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
  interface User {
   id: number;
@@ -49,6 +48,14 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   logOut: async () => {
     try {
+      // Unregister push notification device token from backend
+      try {
+        const { unregisterDeviceTokenWithBackend } = await import('@/services/notificationService');
+        await unregisterDeviceTokenWithBackend();
+      } catch (tokenErr) {
+        console.warn('⚠️ Could not unregister push token on logout:', tokenErr);
+      }
+
       set({ user: null });
       await storageAPI.removeItem(STORAGE_KEY);
     } catch (error) {

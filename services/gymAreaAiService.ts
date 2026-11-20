@@ -138,7 +138,7 @@ export async function analyzeGymImage(photoUri: string): Promise<GymAreaAnalysis
   // 2. Call Groq Vision (qwen/qwen3.8-27b)
   let textOutput = '';
   try {
-    console.log('[AiService] Scanning gym area with Groq Vision...');
+    // console.log('[AiService] Scanning gym area with Groq Vision...');
     const startTime = Date.now();
 
     const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -172,7 +172,7 @@ export async function analyzeGymImage(photoUri: string): Promise<GymAreaAnalysis
       const content = data?.choices?.[0]?.message?.content;
       if (content && content.trim().length > 0) {
         textOutput = content.trim();
-        console.log(`[AiService] Groq scan completed in ${elapsedMs}ms`);
+        // console.log(`[AiService] Groq scan completed in ${elapsedMs}ms`);
       }
     } else {
       const errText = await groqRes.text();
@@ -196,7 +196,7 @@ export async function analyzeGymImage(photoUri: string): Promise<GymAreaAnalysis
     const area = normalizeArea(parsed?.area || parsed?.category || '');
     const confidence = typeof parsed?.confidence === 'number' ? parsed.confidence : 0.95;
 
-    console.log(`[AiService] Auto-detected category: "${area}" (${Math.round(confidence * 100)}% match)`);
+    // console.log(`[AiService] Auto-detected category: "${area}" (${Math.round(confidence * 100)}% match)`);
 
     return {
       area,
@@ -207,7 +207,7 @@ export async function analyzeGymImage(photoUri: string): Promise<GymAreaAnalysis
     const areaMatch = textOutput.match(/"(?:area|category)"\s*:\s*"([^"]+)"/i);
     if (areaMatch) {
       const area = normalizeArea(areaMatch[1]);
-      console.log(`[AiService] Auto-detected category (regex fallback): "${area}"`);
+      // console.log(`[AiService] Auto-detected category (regex fallback): "${area}"`);
       return { area, category: area, confidence: 0.9 };
     }
     return null;

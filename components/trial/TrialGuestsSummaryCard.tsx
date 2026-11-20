@@ -13,7 +13,6 @@ interface TrialGuestsSummaryCardProps {
 
 
 export const TrialGuestsSummaryCard: React.FC<TrialGuestsSummaryCardProps> = ({ metrics }) => {
-  console.log('metrics: ', metrics)
   return (
     <View style={styles.card}>
       {metrics.map((metric, idx) => (

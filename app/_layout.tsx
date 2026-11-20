@@ -7,6 +7,11 @@ import { useEffect } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { useAuthStore } from '@/store/useAuthStore';
+import {
+  registerDeviceTokenWithBackend,
+  setupNotificationListeners,
+} from '@/services/notificationService';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -53,11 +58,41 @@ export default function Layout() {
     'PlusJakartaSans-Bold': require('../assets/fonts/PlusJakartaSans-Bold.ttf'),
   });
 
+  const user = useAuthStore((state) => state.user);
+
   useEffect(() => {
     if (loaded) {
       SplashScreen.hideAsync().catch(() => {});
     }
   }, [loaded]);
+
+  // Setup push notification listeners (foreground alerts, taps, token refresh)
+  useEffect(() => {
+    const unsubscribe = setupNotificationListeners(
+      (notification) => {
+        console.log('🔔 Foreground push notification received:', notification);
+      },
+      (response) => {
+        console.log('📲 Push notification tapped by user:', response);
+      }
+    );
+
+    return () => {
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
+  }, []);
+
+  // Automatically register device token with FitFob backend once user is authenticated
+  useEffect(() => {
+    const authToken = user?.token || user?.jwt;
+    if (authToken) {
+      registerDeviceTokenWithBackend().catch((e) => {
+        console.warn('⚠️ Push notification device token registration warning:', e);
+      });
+    }
+  }, [user?.token, user?.jwt]);
 
   if (!loaded) return null;
 

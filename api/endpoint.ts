@@ -77,4 +77,8 @@ export const ENDPOINTS = {
   // Trial Settings & Guests
   TRIAL_SETTINGS: `${BASE_URL}/api/club-owner/trial-settings`,
   TRIAL_GUESTS: `${BASE_URL}/api/club-owner/trial-guests`,
+
+  // Notifications
+  REGISTER_DEVICE_TOKEN: `${BASE_URL}/api/device-tokens/register`,
+  UNREGISTER_DEVICE_TOKEN: `${BASE_URL}/api/device-tokens/unregister`,
 };

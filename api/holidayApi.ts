@@ -109,7 +109,7 @@ export const holidayApi = {
         },
       };
 
-      console.log('📤 [createHoliday] Submitting payload to /api/holidays:', JSON.stringify(payload));
+      // console.log('📤 [createHoliday] Submitting payload to /api/holidays:', JSON.stringify(payload));
       const response = await api.post(ENDPOINTS.HOLIDAYS, payload);
       const returnedData = response.data?.data || response.data;
       return normalizeHolidayItem(returnedData);
@@ -158,7 +158,7 @@ export const holidayApi = {
           endTime: holidayData.endTime || holidayData.endtime || '23:59:59.000',
         },
       };
-      console.log(`📤 [updateHoliday] Submitting payload to /api/holidays/${id}:`, JSON.stringify(payload));
+      // console.log(`📤 [updateHoliday] Submitting payload to /api/holidays/${id}:`, JSON.stringify(payload));
       const response = await api.put(ENDPOINTS.HOLIDAY_BY_ID(id), payload);
       const returnedData = response.data?.data || response.data;
       return normalizeHolidayItem(returnedData);

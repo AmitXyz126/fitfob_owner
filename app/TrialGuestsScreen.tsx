@@ -55,6 +55,7 @@ export default function TrialGuestsScreen() {
   const [datePickerVisible, setDatePickerVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
 
   // TanStack Query for trial guests
   const {
@@ -67,14 +68,13 @@ export default function TrialGuestsScreen() {
     groupedByDate,
     groups,
     isLoading,
-    isRefetching,
-    isPlaceholderData,
     refetch,
     error,
   } = useTrialGuests({
     filter: activeTab,
     date: selectedDate,
     search: searchQuery,
+    refetchInterval: 10000,
     placeholderData: keepPreviousData,
   });
 
@@ -121,6 +121,15 @@ export default function TrialGuestsScreen() {
       setDatePickerVisible(true);
     } else {
       setActiveTab(tab);
+    }
+  };
+
+  const handleManualRefresh = async () => {
+    setIsManualRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setIsManualRefreshing(false);
     }
   };
 
@@ -394,12 +403,12 @@ export default function TrialGuestsScreen() {
       </View>
 
       {/* Main Content Area */}
-      {isLoading && !isRefetching && !isPlaceholderData ? (
+      {!data && isLoading ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#E23744" />
           <Text style={styles.loadingText}>Loading trial guests...</Text>
         </View>
-      ) : error ? (
+      ) : !data && error ? (
         <View style={styles.centerContainer}>
           <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
           <Text style={styles.errorTitle}>Failed to load trial guests</Text>
@@ -423,10 +432,8 @@ export default function TrialGuestsScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={() => {
-                refetch();
-              }}
+              refreshing={isManualRefreshing}
+              onRefresh={handleManualRefresh}
               colors={['#E23744']}
               tintColor="#E23744"
             />
