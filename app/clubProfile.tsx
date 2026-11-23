@@ -31,6 +31,7 @@ import {
   Calendar,
   BadgePercent,
   Sparkles,
+  UserPlus,
 } from 'lucide-react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Container } from '@/components/Container';
@@ -951,6 +952,18 @@ const ClubProfileScreen = () => {
             icon={BadgePercent}
             title="Gym Contracts & Plans"
             onPress={() => router.push('/gym-contracts')}
+          />
+          <LineGradient />
+
+          <MenuOption
+            icon={UserPlus}
+            title="Offline Members"
+            value="Add & Manage"
+            showBadge={true}
+            onPress={() => {
+              console.log('👉 [clubProfile] Navigating to /offline-members');
+              (router.push as any)('/offline-members');
+            }}
           />
           <LineGradient />
 

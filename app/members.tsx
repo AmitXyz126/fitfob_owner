@@ -153,7 +153,7 @@ export default function MemberListScreen() {
           renderItem={renderMemberItem}
           contentContainerStyle={[
             styles.listContent,
-            { paddingBottom: insets.bottom + 20 },
+            { paddingBottom: insets.bottom + 80 },
           ]}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -181,6 +181,50 @@ export default function MemberListScreen() {
           }
         />
       )}
+
+      {/* Floating / Bottom CTA: Add Offline Member (Opens Figma Flow) */}
+      <View
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: '#FFFFFF',
+          paddingHorizontal: 20,
+          paddingTop: 10,
+          paddingBottom: Math.max(insets.bottom, 16),
+          borderTopWidth: 1,
+          borderTopColor: '#F1F5F9',
+        }}>
+        <TouchableOpacity
+          onPress={() => router.push('/offline-members' as any)}
+          activeOpacity={0.85}
+          style={{
+            height: 48,
+            backgroundColor: '#F6163C',
+            borderRadius: 16,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            shadowColor: '#F6163C',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.2,
+            shadowRadius: 4,
+            elevation: 3,
+          }}>
+          <Ionicons name="add" size={20} color="#FFFFFF" />
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 15,
+              fontWeight: '700',
+              fontFamily: 'PlusJakartaSans-Bold',
+              marginLeft: 4,
+            }}>
+            Add Offline Member
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }

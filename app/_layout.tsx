@@ -125,6 +125,7 @@ export default function Layout() {
           <Stack.Screen name="MembershipPlansScreen" />
           <Stack.Screen name="gym-contracts" />
           <Stack.Screen name="members" />
+          <Stack.Screen name="offline-members" />
           <Stack.Screen name="member-details" />
           <Stack.Screen name="TrialManagerScreen" />
           <Stack.Screen name="TrialGuestsScreen" />
