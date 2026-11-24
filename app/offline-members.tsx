@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,14 +11,22 @@ import {
   Pressable,
   Platform,
   KeyboardAvoidingView,
+  Keyboard,
+  UIManager,
+  LayoutAnimation,
   Animated,
   Easing,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
+import offlineMemberApi, { CreateOfflineMemberPayload } from '@/api/offlineMemberApi';
+import { gymContractApi } from '@/api/gymContractApi';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 // -------------------------------------------------------------
 // Sample Initial Data (Matching Figma Screenshots 01, 02, 03, 04)
@@ -33,6 +41,11 @@ interface MemberItem {
   expiryText: string;
   status: 'active' | 'expiring_soon' | 'invite_sent';
   phone: string;
+  claimStatus?: 'claimed' | 'unclaimed' | string;
+  statusBadge?: string;
+  statusColor?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 interface PendingApprovalItem {
@@ -52,10 +65,10 @@ interface PlanOption {
 }
 
 const MEMBERSHIP_PLANS: PlanOption[] = [
-  { id: '1m', name: '1-Month Basic', price: '₹2,000', months: 1 },
-  { id: '3m', name: '3-Month Pro', price: '₹4,500', months: 3 },
-  { id: '6m', name: '6-Month Gold', price: '₹8,000', months: 6 },
-  { id: '12m', name: 'Annual Pro', price: '₹15,000', months: 12 },
+  { id: 'monthly', name: '1-Month Basic', price: '₹2,000', months: 1 },
+  { id: 'three_months', name: '3-Month Pro', price: '₹4,500', months: 3 },
+  { id: 'six_months', name: '6-Month Gold', price: '₹8,000', months: 6 },
+  { id: 'twelve_months', name: 'Annual Pro', price: '₹15,000', months: 12 },
 ];
 
 const INITIAL_MEMBERS: MemberItem[] = [
@@ -143,19 +156,44 @@ const INITIAL_PENDING: PendingApprovalItem[] = [
   },
 ];
 
-// Helper: Calculate Expiry Date given Start Date & Months
-function calculateExpiry(startDateStr: string, months: number): string {
-  try {
-    const d = new Date(startDateStr);
-    if (isNaN(d.getTime())) {
-      const now = new Date();
-      now.setMonth(now.getMonth() + months);
-      return now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-    }
-    d.setMonth(d.getMonth() + months);
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-  } catch {
-    return '23 May 2027';
+// Helper: Format Date to YYYY-MM-DD
+function formatDateToYMD(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+// Helper: Format Date for Display (e.g. 24 Nov 2026)
+function formatDateDisplay(d: Date): string {
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+// Helper: Compute End Date given Start Date & Months
+function computeEndDate(startDate: Date, months: number): Date {
+  const end = new Date(startDate);
+  end.setMonth(end.getMonth() + months);
+  return end;
+}
+
+function formatPlanTitle(duration?: string): string {
+  switch (duration?.toLowerCase()) {
+    case 'monthly':
+    case '1_month':
+      return '1-Month Basic';
+    case 'three_months':
+    case '3_months':
+      return '3-Month Pro';
+    case 'six_months':
+    case '6_months':
+      return '6-Month Gold';
+    case 'twelve_months':
+    case '12_months':
+    case 'annual':
+    case 'yearly':
+      return 'Annual Pro';
+    default:
+      return duration ? duration.replace(/_/g, ' ') : 'Membership Plan';
   }
 }
 
@@ -215,21 +253,222 @@ export default function OfflineMembersScreen() {
   // Modal 03: Double-check details
   const [isDoubleCheckVisible, setIsDoubleCheckVisible] = useState(false);
 
-  // Dashboard state
-  const [members, setMembers] = useState<MemberItem[]>(INITIAL_MEMBERS);
+  // Dashboard state (starts empty, loads real members from GET /api/club-owner/offline-members)
+  const [members, setMembers] = useState<MemberItem[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState<PendingApprovalItem[]>(INITIAL_PENDING);
   const [selectedTab, setSelectedTab] = useState<'active' | 'pending'>('active');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<'expiry' | 'name'>('expiry');
 
-  // Add Member Form state (Default prefilled as per Figma Screen 02)
-  const [phone, setPhone] = useState('9876543210');
-  const [fullName, setFullName] = useState('Rohit Sharma');
-  const [selectedPlan, setSelectedPlan] = useState<PlanOption>(MEMBERSHIP_PLANS[2]); // 6-Month Gold
-  const [startDate, setStartDate] = useState('23 Nov 2026');
-  const [expiryDate, setExpiryDate] = useState('23 May 2027');
+  // Plans list state (loaded from gym contract or defaults)
+  const [plansList, setPlansList] = useState<PlanOption[]>(MEMBERSHIP_PLANS);
+  const [selectedPlan, setSelectedPlan] = useState<PlanOption>(MEMBERSHIP_PLANS[0]); // Default to 1-Month Basic ("monthly")
+
+  // Date objects for Start Date & End Date (API requires YYYY-MM-DD, e.g. "2026-11-10")
+  const [startDateObj, setStartDateObj] = useState<Date>(() => new Date());
+  const [endDateObj, setEndDateObj] = useState<Date>(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    return d;
+  });
+
+  // Display strings
+  const startDateDisplay = useMemo(() => formatDateDisplay(startDateObj), [startDateObj]);
+  const endDateDisplay = useMemo(() => formatDateDisplay(endDateObj), [endDateObj]);
+  const startDateYMD = useMemo(() => formatDateToYMD(startDateObj), [startDateObj]);
+  const endDateYMD = useMemo(() => formatDateToYMD(endDateObj), [endDateObj]);
+
+  // Date picker state for manual start date selection
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const onStartDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    if (selectedDate && (event.type === 'set' || Platform.OS === 'ios')) {
+      setStartDateObj(selectedDate);
+      // Auto-compute expiry date according to the selected plan
+      setEndDateObj(computeEndDate(selectedDate, selectedPlan.months));
+    }
+  };
+
+  // Add Member Form state (Default empty so owner fills details themselves)
+  const [phone, setPhone] = useState('');
+  const [fullName, setFullName] = useState('');
   const [sendWhatsApp, setSendWhatsApp] = useState(true);
   const [sendSms, setSendSms] = useState(true);
+
+  // Track keyboard visibility and height so button moves to top of keyboard on Android & iOS
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setIsKeyboardVisible(true);
+        if (Platform.OS === 'android' && e?.endCoordinates?.height) {
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+          setKeyboardHeight(e.endCoordinates.height);
+        }
+      }
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setIsKeyboardVisible(false);
+        if (Platform.OS === 'android') {
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+          setKeyboardHeight(0);
+        }
+      }
+    );
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  // Loading & Submitting states
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingOfflineMembers, setIsLoadingOfflineMembers] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Invite channel representation for backend payload: "both" | "whatsapp" | "sms"
+  const channelPayload = useMemo<'both' | 'whatsapp' | 'sms'>(() => {
+    if (sendWhatsApp && sendSms) return 'both';
+    if (sendWhatsApp) return 'whatsapp';
+    if (sendSms) return 'sms';
+    return 'both';
+  }, [sendWhatsApp, sendSms]);
+
+  // Fetch offline members list from backend GET /api/club-owner/offline-members
+  const fetchMembersList = useCallback(async (isPullRefresh = false) => {
+    try {
+      if (isPullRefresh) setIsRefreshing(true);
+      else setIsLoadingOfflineMembers(true);
+
+      const remote = await offlineMemberApi.getOfflineMembers();
+      console.log('📥 [fetchMembersList] Fetched remote members count:', Array.isArray(remote) ? remote.length : 0);
+
+      if (Array.isArray(remote)) {
+        if (remote.length === 0) {
+          setMembers([]);
+          return;
+        }
+
+        const avatarBgColors = ['#FCE7F3', '#FFE4E6', '#FEF3C7', '#E0F2FE', '#EDE9FE'];
+        const avatarTextColors = ['#BE185D', '#E11D48', '#B45309', '#0369A1', '#6D28D9'];
+
+        const mapped: MemberItem[] = remote.map((rm: any, idx: number) => {
+          const name = rm.name || rm.fullName || 'Member';
+          const cleanP = rm.phoneNumber || rm.phone || '';
+          const phoneFormatted = cleanP ? (cleanP.startsWith('+91') ? cleanP : `+91 ${cleanP}`) : '';
+          const planTitle = rm.planName || rm.plan || formatPlanTitle(rm.planId) || 'Monthly';
+
+          // Check if member is unclaimed -> status badge "Invite Sent"
+          const isUnclaimed =
+            rm.claimStatus?.toLowerCase() === 'unclaimed' ||
+            rm.isUnclaimed === true ||
+            rm.statusBadge?.toLowerCase() === 'invite sent' ||
+            rm.status?.toLowerCase() === 'invite_sent' ||
+            rm.status?.toLowerCase() === 'unclaimed';
+
+          let status: 'active' | 'expiring_soon' | 'invite_sent' = 'active';
+          let statusBadge = rm.statusBadge || 'Active';
+
+          if (isUnclaimed) {
+            status = 'invite_sent';
+            statusBadge = 'Invite Sent';
+          } else if (rm.isExpiringSoon || rm.status === 'expiring_soon') {
+            status = 'expiring_soon';
+            statusBadge = 'Expiring Soon';
+          } else if (rm.isExpired) {
+            status = 'expiring_soon';
+            statusBadge = 'Expired';
+          } else {
+            status = 'active';
+            statusBadge = 'Active';
+          }
+
+          let expiryText = 'Active';
+          if (isUnclaimed) {
+            expiryText = 'Invite Sent';
+          } else if (rm.endDate) {
+            try {
+              expiryText = `Exp ${formatDateDisplay(new Date(rm.endDate))}`;
+            } catch {
+              expiryText = `Exp ${rm.endDate}`;
+            }
+          }
+
+          const colorIdx = idx % avatarBgColors.length;
+
+          return {
+            id: String(rm.id || rm.documentId || rm._id || idx),
+            name,
+            initials: getInitials(name),
+            avatarBg: avatarBgColors[colorIdx],
+            avatarText: avatarTextColors[colorIdx],
+            plan: planTitle,
+            expiryText,
+            status,
+            phone: phoneFormatted,
+            claimStatus: rm.claimStatus || (isUnclaimed ? 'unclaimed' : 'claimed'),
+            statusBadge,
+            statusColor: rm.statusColor || (isUnclaimed ? 'yellow' : 'green'),
+            startDate: rm.startDate,
+            endDate: rm.endDate,
+          };
+        });
+        setMembers(mapped);
+      }
+    } catch (err: any) {
+      console.error('Note: Error fetching remote offline members list:', err?.response?.data || err?.message);
+    } finally {
+      setIsLoadingOfflineMembers(false);
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  // Fetch contract plans & existing offline members on mount
+  useEffect(() => {
+    // 1. Fetch offline members list immediately
+    fetchMembersList(false);
+
+    // 2. Fetch gym contract plans in parallel
+    const loadPlans = async () => {
+      try {
+        const contract = await gymContractApi.getMyContract();
+        if (contract?.plans && contract.plans.length > 0) {
+          const mapped: PlanOption[] = contract.plans.map((p) => {
+            let months = 1;
+            if (p.duration === 'three_months') months = 3;
+            else if (p.duration === 'six_months') months = 6;
+            else if (p.duration === 'twelve_months') months = 12;
+
+            return {
+              id: p.duration,
+              name: formatPlanTitle(p.duration),
+              price: `₹${p.customerPrice?.toLocaleString('en-IN') || 0}`,
+              months,
+            };
+          });
+          setPlansList(mapped);
+          setSelectedPlan(mapped[0]);
+          setEndDateObj(computeEndDate(new Date(), mapped[0].months));
+        }
+      } catch (err) {
+        console.log('Using default membership plans');
+      }
+    };
+
+    loadPlans();
+  }, [fetchMembersList]);
 
   // Plan picker modal
   const [isPlanPickerVisible, setIsPlanPickerVisible] = useState(false);
@@ -261,14 +500,14 @@ export default function OfflineMembersScreen() {
   // Handle plan selection in Screen 02
   const handleSelectPlan = (plan: PlanOption) => {
     setSelectedPlan(plan);
-    const newExpiry = calculateExpiry(startDate, plan.months);
-    setExpiryDate(newExpiry);
+    setEndDateObj(computeEndDate(startDateObj, plan.months));
     setIsPlanPickerVisible(false);
   };
 
   // Step 2 -> Step 3: Validate and open Double-Check modal
   const handleReviewAndSend = () => {
-    if (!phone.trim() || phone.trim().length < 10) {
+    const cleanPhone = phone.trim().replace(/^\+91/, '').replace(/\s+/g, '');
+    if (!cleanPhone || cleanPhone.length < 10) {
       Toast.show({
         type: 'error',
         text1: 'Valid Mobile Number Required',
@@ -295,27 +534,84 @@ export default function OfflineMembersScreen() {
     setIsDoubleCheckVisible(true);
   };
 
-  // Step 3 -> Step 4: Confirm and Add Member
-  const handleConfirmAddMember = () => {
-    setIsDoubleCheckVisible(false);
+  // Step 3 -> Step 4: Confirm and Add Member (Calls POST /api/club-owner/offline-members)
+  const handleConfirmAddMember = async () => {
+    const cleanPhone = phone.trim().replace(/^\+91/, '').replace(/\s+/g, '');
+    if (!cleanPhone || cleanPhone.length < 10) {
+      Toast.show({
+        type: 'error',
+        text1: 'Valid Mobile Number Required',
+        text2: 'Please enter a 10-digit mobile number.',
+      });
+      return;
+    }
+    if (!fullName.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Full Name Required',
+        text2: 'Please enter the member name.',
+      });
+      return;
+    }
 
-    // Add newly invited member to active members list
-    const newMember: MemberItem = {
-      id: Date.now().toString(),
-      name: fullName.trim(),
-      initials: getInitials(fullName),
-      avatarBg: '#FFE4E6',
-      avatarText: '#F6163C',
-      plan: selectedPlan.name,
-      expiryText: 'Invite sent',
-      status: 'invite_sent',
-      phone: `+91 ${phone.trim()}`,
-    };
+    setIsSubmitting(true);
+    try {
+      const payload: CreateOfflineMemberPayload = {
+        name: fullName.trim(),
+        phoneNumber: cleanPhone,
+        planId: selectedPlan.id,
+        startDate: startDateYMD,
+        endDate: endDateYMD,
+        channel: channelPayload,
+      };
 
-    setMembers((prev) => [newMember, ...prev]);
+      console.log('📤 Submitting to /api/club-owner/offline-members:', payload);
+      const res = await offlineMemberApi.createOfflineMember(payload);
+      console.log('✅ Offline member created successfully:', res);
 
-    // Transition to Screen 04
-    setViewMode('success');
+      setIsDoubleCheckVisible(false);
+
+      // Add newly invited member to active members list
+      const newMember: MemberItem = {
+        id: res?.data?.id ? String(res.data.id) : Date.now().toString(),
+        name: fullName.trim(),
+        initials: getInitials(fullName),
+        avatarBg: '#FFE4E6',
+        avatarText: '#F6163C',
+        plan: selectedPlan.name,
+        expiryText: 'Invite sent',
+        status: 'invite_sent',
+        phone: `+91 ${cleanPhone}`,
+      };
+
+      setMembers((prev) => [newMember, ...prev]);
+
+      // Re-fetch in background to sync with server
+      fetchMembersList(false).catch(() => {});
+
+      // Transition to Screen 04
+      setViewMode('success');
+
+      Toast.show({
+        type: 'success',
+        text1: 'Member Added Successfully! 🎉',
+        text2: res?.message || `Invite link sent to ${fullName.trim()} on ${inviteChannelText}.`,
+      });
+    } catch (error: any) {
+      const errMsg =
+        error?.response?.data?.message ||
+        error?.response?.data?.error?.message ||
+        error?.message ||
+        'Failed to add offline member. Please try again.';
+
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to Add Member',
+        text2: String(errMsg),
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Approve a Pay at Gym pending request (Screen 06 from Figma)
@@ -501,8 +797,21 @@ export default function OfflineMembersScreen() {
               {/* Members Scroll List */}
               <ScrollView
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={isRefreshing}
+                    onRefresh={() => fetchMembersList(true)}
+                    colors={['#F6163C']}
+                    tintColor="#F6163C"
+                  />
+                }
                 contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}>
-                {filteredMembers.length === 0 ? (
+                {isLoadingOfflineMembers && members.length === 0 ? (
+                  <View className="items-center py-12">
+                    <ActivityIndicator size="large" color="#F6163C" />
+                    <Text className="mt-3 text-xs font-semibold text-slate-500">Loading offline members...</Text>
+                  </View>
+                ) : filteredMembers.length === 0 ? (
                   <View className="items-center py-12">
                     <Ionicons name="people-outline" size={44} color="#CBD5E1" />
                     <Text className="mt-3 text-sm font-semibold text-slate-600">No members found</Text>
@@ -542,25 +851,14 @@ export default function OfflineMembersScreen() {
                           </View>
                         </View>
 
-                        {/* Right: Status Pill & Action */}
+                        {/* Right: Status Pill */}
                         <View className="flex-row items-center">
                           {isInviteSent ? (
-                            <View className="flex-row items-center">
-                              <View className="flex-row items-center rounded-full bg-amber-50 border border-amber-200/80 px-2.5 py-1">
-                                <Ionicons name="time-outline" size={12} color="#D97706" />
-                                <Text className="ml-1 text-[11px] font-bold text-amber-700">
-                                  Invite sent
-                                </Text>
-                              </View>
-                              <TouchableOpacity
-                                onPress={() => {
-                                  setFullName(item.name);
-                                  setPhone(item.phone.replace('+91', '').trim());
-                                  setViewMode('add_member');
-                                }}
-                                className="ml-2 h-7 w-7 items-center justify-center rounded-full bg-slate-100">
-                                <Ionicons name="create-outline" size={14} color="#64748B" />
-                              </TouchableOpacity>
+                            <View className="flex-row items-center rounded-full bg-amber-50 border border-amber-200/80 px-2.5 py-1">
+                              <Ionicons name="time-outline" size={12} color="#D97706" />
+                              <Text className="ml-1 text-[11px] font-bold text-amber-700">
+                                {item.statusBadge || 'Invite Sent'}
+                              </Text>
                             </View>
                           ) : isExpiringSoon ? (
                             <View className="flex-row items-center rounded-full bg-rose-50 border border-rose-200 px-2.5 py-1">
@@ -691,7 +989,11 @@ export default function OfflineMembersScreen() {
               className="absolute bottom-0 left-0 right-0 bg-white/95 px-5 pt-3 border-t border-slate-100"
               style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
               <TouchableOpacity
-                onPress={() => setViewMode('add_member')}
+                onPress={() => {
+                  setPhone('');
+                  setFullName('');
+                  setViewMode('add_member');
+                }}
                 activeOpacity={0.85}
                 className="h-12 w-full flex-row items-center justify-center rounded-2xl bg-[#F6163C] shadow-sm">
                 <Ionicons name="add" size={20} color="white" />
@@ -706,7 +1008,10 @@ export default function OfflineMembersScreen() {
       {/* 02 · ADD OFFLINE MEMBER FORM SCREEN                                       */}
       {/* ========================================================================= */}
       {viewMode === 'add_member' && (
-        <View className="flex-1 bg-white">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+          className="flex-1 bg-white">
           {/* Top Bar Header */}
           <View className="flex-row items-center justify-between px-5 pt-3 pb-3 border-b border-slate-100">
             <TouchableOpacity
@@ -727,8 +1032,10 @@ export default function OfflineMembersScreen() {
           </View>
 
           <ScrollView
+            keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 110 }}>
+            className="flex-1"
+            contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 }}>
             {/* Top Info Banner */}
             <View className="mb-5 flex-row items-start rounded-2xl bg-rose-50/70 border border-rose-100 p-3.5">
               <Ionicons name="information-circle-outline" size={18} color="#F6163C" style={{ marginTop: 1 }} />
@@ -747,7 +1054,7 @@ export default function OfflineMembersScreen() {
                 <TextInput
                   value={phone}
                   onChangeText={setPhone}
-                  placeholder="98765 43210"
+                  placeholder="Enter 10-digit number"
                   placeholderTextColor="#94A3B8"
                   keyboardType="phone-pad"
                   maxLength={10}
@@ -762,7 +1069,7 @@ export default function OfflineMembersScreen() {
               <TextInput
                 value={fullName}
                 onChangeText={setFullName}
-                placeholder="e.g. Rohit Sharma"
+                placeholder="Enter member's full name"
                 placeholderTextColor="#94A3B8"
                 className="rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm font-semibold text-slate-900"
               />
@@ -788,37 +1095,24 @@ export default function OfflineMembersScreen() {
               <View className="flex-1">
                 <Text className="text-xs font-bold text-slate-700 mb-1.5">Start Date</Text>
                 <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    Toast.show({
-                      type: 'info',
-                      text1: 'Start Date',
-                      text2: 'Defaults to membership start date (Today).',
-                    });
-                  }}
-                  className="flex-row items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-3">
-                  <Text className="text-xs font-semibold text-slate-800">{startDate}</Text>
-                  <Ionicons name="calendar-outline" size={16} color="#94A3B8" />
+                  activeOpacity={0.7}
+                  onPress={() => setShowDatePicker(true)}
+                  className="flex-row items-center justify-between rounded-xl border border-rose-200 bg-rose-50/30 px-3 py-3">
+                  <Text className="text-xs font-bold text-slate-900">{startDateDisplay}</Text>
+                  <Ionicons name="calendar" size={16} color="#F6163C" />
                 </TouchableOpacity>
-                <Text className="mt-1 text-[10px] text-slate-400">Defaults to today</Text>
+                <Text className="mt-1 text-[10px] text-slate-400">Tap to select start date</Text>
               </View>
 
               <View className="flex-1">
                 <Text className="text-xs font-bold text-slate-700 mb-1.5">Expiry Date</Text>
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    Toast.show({
-                      type: 'info',
-                      text1: 'Expiry Date',
-                      text2: 'Auto-calculated from selected plan duration.',
-                    });
-                  }}
-                  className="flex-row items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-3">
-                  <Text className="text-xs font-semibold text-slate-800">{expiryDate}</Text>
-                  <Ionicons name="calendar-outline" size={16} color="#94A3B8" />
-                </TouchableOpacity>
-                <Text className="mt-1 text-[10px] text-slate-400">Auto-filled from plan · editable</Text>
+                <View className="flex-row items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                  <Text className="text-xs font-bold text-slate-900">{endDateDisplay}</Text>
+                  <Ionicons name="lock-closed" size={14} color="#94A3B8" />
+                </View>
+                <Text className="mt-1 text-[10px] text-emerald-600 font-semibold">
+                  Auto-calculated ({selectedPlan.months} mo)
+                </Text>
               </View>
             </View>
 
@@ -866,10 +1160,13 @@ export default function OfflineMembersScreen() {
             </View>
           </ScrollView>
 
-          {/* Bottom Fixed Button: Review & Send Invite */}
+          {/* Bottom Button: Review & Send Invite - moves on top of keyboard */}
           <View
-            className="absolute bottom-0 left-0 right-0 bg-white/95 px-5 pt-3 border-t border-slate-100"
-            style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+            className="bg-white px-5 pt-3 border-t border-slate-100 shadow-sm"
+            style={{
+              marginBottom: Platform.OS === 'android' ? keyboardHeight : 0,
+              paddingBottom: isKeyboardVisible ? 12 : Math.max(insets.bottom, 16),
+            }}>
             <TouchableOpacity
               onPress={handleReviewAndSend}
               activeOpacity={0.85}
@@ -877,7 +1174,41 @@ export default function OfflineMembersScreen() {
               <Text className="text-[15px] font-bold text-white">Review & Send Invite</Text>
             </TouchableOpacity>
           </View>
-        </View>
+
+          {/* Manual Start Date Picker */}
+          {showDatePicker && (
+            Platform.OS === 'ios' ? (
+              <Modal transparent animationType="fade" visible={showDatePicker}>
+                <Pressable
+                  className="flex-1 bg-black/40 justify-end"
+                  onPress={() => setShowDatePicker(false)}>
+                  <View className="bg-white rounded-t-3xl p-5 pb-8">
+                    <View className="flex-row items-center justify-between pb-3 border-b border-slate-100 mb-3">
+                      <Text className="font-bold text-base text-slate-800">Select Start Date</Text>
+                      <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                        <Text className="font-bold text-sm text-[#F6163C]">Done</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <DateTimePicker
+                      value={startDateObj}
+                      mode="date"
+                      display="spinner"
+                      onChange={onStartDateChange}
+                      themeVariant="light"
+                    />
+                  </View>
+                </Pressable>
+              </Modal>
+            ) : (
+              <DateTimePicker
+                value={startDateObj}
+                mode="date"
+                display="default"
+                onChange={onStartDateChange}
+              />
+            )
+          )}
+        </KeyboardAvoidingView>
       )}
 
       {/* ========================================================================= */}
@@ -931,12 +1262,12 @@ export default function OfflineMembersScreen() {
 
                 <View className="flex-row items-center justify-between py-2 border-b border-slate-200/60">
                   <Text className="text-xs font-medium text-slate-500">Start Date</Text>
-                  <Text className="text-xs font-bold text-slate-900">{startDate}</Text>
+                  <Text className="text-xs font-bold text-slate-900">{startDateDisplay}</Text>
                 </View>
 
                 <View className="flex-row items-center justify-between py-2 border-b border-slate-200/60">
                   <Text className="text-xs font-medium text-slate-500">Expiry Date</Text>
-                  <Text className="text-xs font-bold text-slate-900">{expiryDate}</Text>
+                  <Text className="text-xs font-bold text-slate-900">{endDateDisplay}</Text>
                 </View>
 
                 <View className="flex-row items-center justify-between pt-2">
@@ -948,13 +1279,24 @@ export default function OfflineMembersScreen() {
               {/* Action Buttons */}
               <TouchableOpacity
                 onPress={handleConfirmAddMember}
+                disabled={isSubmitting}
                 activeOpacity={0.85}
-                className="h-12 w-full items-center justify-center rounded-2xl bg-[#F6163C] mb-2.5">
-                <Text className="text-sm font-bold text-white">Confirm & Add Member</Text>
+                className={`h-12 w-full flex-row items-center justify-center rounded-2xl bg-[#F6163C] mb-2.5 ${
+                  isSubmitting ? 'opacity-70' : ''
+                }`}>
+                {isSubmitting ? (
+                  <>
+                    <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
+                    <Text className="text-sm font-bold text-white">Adding Member...</Text>
+                  </>
+                ) : (
+                  <Text className="text-sm font-bold text-white">Confirm & Add Member</Text>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => setIsDoubleCheckVisible(false)}
+                disabled={isSubmitting}
                 activeOpacity={0.7}
                 className="h-11 w-full flex-row items-center justify-center rounded-2xl border border-slate-200 bg-white">
                 <Ionicons name="create-outline" size={15} color="#475569" />
@@ -1030,7 +1372,7 @@ export default function OfflineMembersScreen() {
                 </View>
                 <View className="items-end">
                   <Text className="text-[11px] text-slate-400 font-medium">Valid till</Text>
-                  <Text className="text-xs font-bold text-slate-800 mt-0.5">{expiryDate}</Text>
+                  <Text className="text-xs font-bold text-slate-800 mt-0.5">{endDateDisplay}</Text>
                 </View>
               </View>
 
@@ -1097,7 +1439,7 @@ export default function OfflineMembersScreen() {
               </View>
 
               <View className="mt-3 gap-2">
-                {MEMBERSHIP_PLANS.map((plan) => {
+                {plansList.map((plan) => {
                   const isSelected = selectedPlan.id === plan.id;
                   return (
                     <TouchableOpacity
