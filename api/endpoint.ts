@@ -77,6 +77,8 @@ export const ENDPOINTS = {
   // Offline Members & Approvals
   OFFLINE_MEMBERS: `${BASE_URL}/api/club-owner/offline-members`,
   PENDING_APPROVALS: `${BASE_URL}/api/club-owner/pending-approvals`,
+  PENDING_APPROVAL_APPROVE: (id: string | number) => `${BASE_URL}/api/club-owner/pending-approvals/${id}/approve`,
+  PENDING_APPROVAL_REJECT: (id: string | number) => `${BASE_URL}/api/club-owner/pending-approvals/${id}/reject`,
 
   // Trial Settings & Guests
   TRIAL_SETTINGS: `${BASE_URL}/api/club-owner/trial-settings`,

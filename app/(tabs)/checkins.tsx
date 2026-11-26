@@ -40,6 +40,13 @@ import { useCheckinStore } from '@/store/useCheckinStore';
 
 export default function CheckinsScreen() {
   const insets = useSafeAreaInsets();
+  // Dynamic bottom padding to ensure sheet content and buttons ('Try Again' & 'Done')
+  // remain cleanly above the custom floating bottom tab bar on every device (iOS & Android).
+  const bottomSheetPaddingBottom = Platform.select({
+    ios: Math.max(insets.bottom + 115, 125),
+    android: Math.max(insets.bottom + 130, 145),
+    default: 135,
+  });
   const queryClient = useQueryClient();
   const bottomSheetRef = useRef<BottomSheet>(null);
   const [status, setStatus] = useState<'success' | 'failed'>('success');
@@ -770,7 +777,7 @@ export default function CheckinsScreen() {
             style={{
               paddingHorizontal: 20,
               paddingTop: 16,
-              paddingBottom: Math.max(insets.bottom + 75, 40),
+              paddingBottom: bottomSheetPaddingBottom,
               alignItems: 'center',
             }}>
             {status === 'success' ? (
@@ -898,7 +905,7 @@ export default function CheckinsScreen() {
                 <TouchableOpacity
                   onPress={() => bottomSheetRef.current?.close()}
                   activeOpacity={0.8}
-                  className="mt-8 w-full items-center justify-center rounded-2xl bg-[#F6163C] py-4">
+                  className="mt-6 w-full items-center justify-center rounded-2xl bg-[#F6163C] py-4 shadow-sm">
                   <Text className="font-bold text-base text-white">Try Again</Text>
                 </TouchableOpacity>
               </View>

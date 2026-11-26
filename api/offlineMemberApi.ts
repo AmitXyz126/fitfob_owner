@@ -151,6 +151,86 @@ export const offlineMemberApi = {
       throw error;
     }
   },
+
+  /**
+   * Decline / Reject a pending approval request
+   * Endpoint: POST /api/club-owner/pending-approvals/:id/reject
+   * Payload: { "reason": "Payment not received at reception" }
+   * Response: { "success": true, "message": "Request declined and customer notified" }
+   */
+  declinePendingApproval: async (
+    id: string | number,
+    reason: string = 'Payment not received at reception'
+  ): Promise<{ success: boolean; message: string; [key: string]: any }> => {
+    const payload = { reason };
+    try {
+      const url = ENDPOINTS.PENDING_APPROVAL_REJECT(id);
+      console.log('📤 [offlineMemberApi.declinePendingApproval] Calling POST:', url, 'with payload:', payload);
+      try {
+        const response = await api.post(url, payload);
+        console.log('✅ [offlineMemberApi.declinePendingApproval] POST Success:', response.data);
+        return response.data;
+      } catch (postErr: any) {
+        const status = postErr?.response?.status;
+        if (status === 404 || status === 405) {
+          console.log('⚠️ [offlineMemberApi.declinePendingApproval] POST returned', status, ', trying DELETE fallback:', ENDPOINTS.OFFLINE_MEMBER_BY_ID(id));
+          const delRes = await api.delete(ENDPOINTS.OFFLINE_MEMBER_BY_ID(id), { data: payload });
+          return delRes.data;
+        }
+        throw postErr;
+      }
+    } catch (error: any) {
+      console.error('❌ [offlineMemberApi.declinePendingApproval] Error:', error?.response?.data || error?.message);
+      throw error;
+    }
+  },
+
+  /**
+   * Approve / Accept a pending approval request ("Pay at Gym")
+   * Endpoint: POST /api/club-owner/pending-approvals/:id/approve
+   * Supported modes: "cash", "upi", "card", "pos", "bank_transfer"
+   * Payload: { "paymentMode": "cash" }
+   * Response: {
+   *   "success": true,
+   *   "message": "Membership activated successfully and Customer Entry QR unlocked!",
+   *   "data": { ... }
+   * }
+   */
+  approvePendingApproval: async (
+    id: string | number,
+    paymentMode: 'cash' | 'upi' | 'card' | 'pos' | 'bank_transfer' | string = 'cash'
+  ): Promise<{ success: boolean; message: string; data?: any; [key: string]: any }> => {
+    const payload = {
+      paymentMode: paymentMode.toLowerCase(),
+    };
+    try {
+      // Primary: POST /api/club-owner/pending-approvals/:id/approve
+      const url = ENDPOINTS.PENDING_APPROVAL_APPROVE(id);
+      console.log('📤 [offlineMemberApi.approvePendingApproval] Calling POST:', url, 'with payload:', payload);
+      try {
+        const response = await api.post(url, payload);
+        console.log('✅ [offlineMemberApi.approvePendingApproval] POST Success:', response.data);
+        return response.data;
+      } catch (postErr: any) {
+        const status = postErr?.response?.status;
+        if (status === 404 || status === 405) {
+          console.log('⚠️ [offlineMemberApi.approvePendingApproval] POST /approve returned', status, ', trying PUT fallback:', ENDPOINTS.PENDING_APPROVAL_BY_ID(id));
+          try {
+            const putRes = await api.put(ENDPOINTS.PENDING_APPROVAL_BY_ID(id), payload);
+            return putRes.data;
+          } catch (putErr: any) {
+            console.log('⚠️ Trying POST /api/club-owner/pending-approvals with { id, paymentMode }');
+            const postRootRes = await api.post(ENDPOINTS.PENDING_APPROVALS, { id, ...payload });
+            return postRootRes.data;
+          }
+        }
+        throw postErr;
+      }
+    } catch (error: any) {
+      console.error('❌ [offlineMemberApi.approvePendingApproval] Error:', error?.response?.data || error?.message);
+      throw error;
+    }
+  },
 };
 
 export default offlineMemberApi;

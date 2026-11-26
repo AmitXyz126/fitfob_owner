@@ -20,54 +20,7 @@ interface NotificationItem {
   isUnread?: boolean;
 }
 
-// DUMMY NOTIFICATIONS DATA (COMMENTED OUT FOR LIVE DATA / EMPTY STATE)
-/*
-const DUMMY_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: '1',
-    title: 'Booked for Tomorrow Morning',
-    description:
-      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et...',
-    date: '15 Oct 2024 · 9:30 AM',
-    isUnread: true,
-  },
-  {
-    id: '2',
-    title: 'Personal training sessions available!',
-    description:
-      'Engage with our certified trainers for personalized workouts tailored to your fitness goals. Experience...',
-    date: '17 Oct 2024 · 10:00 AM',
-  },
-  {
-    id: '3',
-    title: 'Unlimited gyms with anywhere pass!',
-    description:
-      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et...',
-    date: '15 Oct 2024 · 9:30 AM',
-  },
-  {
-    id: '4',
-    title: 'Nutrition counseling sessions offered!',
-    description:
-      'Transform your health with our nutrition experts who provide guidance on meal planning and healthy eat...',
-    date: '21 Oct 2024 · 1:00 PM',
-  },
-  {
-    id: '5',
-    title: 'Group fitness classes every week!',
-    description:
-      'Join our vibrant community in various group classes ranging from yoga to high-intensity interval training...',
-    date: '19 Oct 2024 · 5:30 PM',
-  },
-  {
-    id: '6',
-    title: 'Access to wellness workshops!',
-    description:
-      'Enhance your mind and body connection through workshops on stress management, meditation, and wellness...',
-    date: '15 Oct 2024 · 9:30 AM',
-  },
-];
-*/
+
 
 const mockNotifications: NotificationItem[] = [];
 

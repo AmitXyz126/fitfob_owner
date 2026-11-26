@@ -236,9 +236,9 @@ export default function OfflineMembersScreen() {
   const [viewMode, setViewMode] = useState<'dashboard' | 'add_member' | 'success'>('dashboard');
 
   // 3D Flip & Pop Animation for Success Badge (Screen 04)
-  const flipAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.3)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const [flipAnim] = useState(() => new Animated.Value(0));
+  const [scaleAnim] = useState(() => new Animated.Value(0.3));
+  const [opacityAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     if (viewMode === 'success') {
@@ -298,10 +298,10 @@ export default function OfflineMembersScreen() {
   });
 
   // Display strings
-  const startDateDisplay = useMemo(() => formatDateDisplay(startDateObj), [startDateObj]);
-  const endDateDisplay = useMemo(() => formatDateDisplay(endDateObj), [endDateObj]);
-  const startDateYMD = useMemo(() => formatDateToYMD(startDateObj), [startDateObj]);
-  const endDateYMD = useMemo(() => formatDateToYMD(endDateObj), [endDateObj]);
+  const startDateDisplay = formatDateDisplay(startDateObj);
+  const endDateDisplay = formatDateDisplay(endDateObj);
+  const startDateYMD = formatDateToYMD(startDateObj);
+  const endDateYMD = formatDateToYMD(endDateObj);
 
   // Date picker state for manual start date selection
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -329,12 +329,18 @@ export default function OfflineMembersScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Invite channel representation for backend payload: "both" | "whatsapp" | "sms"
-  const channelPayload = useMemo<'both' | 'whatsapp' | 'sms'>(() => {
-    if (sendWhatsApp && sendSms) return 'both';
-    if (sendWhatsApp) return 'whatsapp';
-    if (sendSms) return 'sms';
-    return 'both';
-  }, [sendWhatsApp, sendSms]);
+  const channelPayload: 'both' | 'whatsapp' | 'sms' =
+    sendWhatsApp && sendSms ? 'both' : sendWhatsApp ? 'whatsapp' : sendSms ? 'sms' : 'both';
+
+  // Invite channel text representation
+  const inviteChannelText =
+    sendWhatsApp && sendSms
+      ? 'WhatsApp & SMS'
+      : sendWhatsApp
+      ? 'WhatsApp'
+      : sendSms
+      ? 'SMS'
+      : 'Direct Link';
 
   // Fetch offline members list from backend GET /api/club-owner/offline-members
   const fetchMembersList = useCallback(async (isPullRefresh = false) => {
@@ -442,7 +448,7 @@ export default function OfflineMembersScreen() {
 
         const mapped: PendingApprovalItem[] = remote.map((item: any, idx: number) => {
           const name =
-            item.name ||
+            item.customerName ||
             item.clientName ||
             item.userName ||
             item.user?.name ||
@@ -469,10 +475,10 @@ export default function OfflineMembersScreen() {
             'Membership';
 
           let amount = '₹0';
-          if (item.amount !== undefined && item.amount !== null) {
-            amount = String(item.amount).startsWith('₹')
-              ? String(item.amount)
-              : `₹${typeof item.amount === 'number' ? item.amount.toLocaleString('en-IN') : item.amount}`;
+          if (item.amountDue !== undefined && item.amountDue !== null) {
+            amount = String(item.amountDue).startsWith('₹')
+              ? String(item.amountDue)
+              : `₹${typeof item.amountDue === 'number' ? item.amountDue.toLocaleString('en-IN') : item.amount}`;
           } else if (item.price !== undefined && item.price !== null) {
             amount = String(item.price).startsWith('₹')
               ? String(item.price)
@@ -484,7 +490,7 @@ export default function OfflineMembersScreen() {
             formatTimeAgo(item.createdAt || item.requestedAt || item.date || item.updatedAt);
 
           return {
-            id: String(item.id || item.documentId || item._id || idx),
+            id: String(item.documentId || item._id || idx),
             documentId: item.documentId ? String(item.documentId) : undefined,
             name,
             phone: phoneFormatted,
@@ -547,11 +553,14 @@ export default function OfflineMembersScreen() {
   const [isPlanPickerVisible, setIsPlanPickerVisible] = useState(false);
 
   // Quick Approval modal for Pending Requests (Screen 06)
+  // Supported modes: "cash", "upi", "card", "pos", "bank_transfer"
   const [confirmingItem, setConfirmingItem] = useState<PendingApprovalItem | null>(null);
-  const [paymentMode, setPaymentMode] = useState<'Cash' | 'UPI' | 'Card'>('Cash');
+  const [paymentMode, setPaymentMode] = useState<'cash' | 'upi' | 'card' | 'pos' | 'bank_transfer'>('cash');
 
   // Reject modal for Pending Requests (Screen 07)
   const [rejectingItem, setRejectingItem] = useState<PendingApprovalItem | null>(null);
+  const [declineReason, setDeclineReason] = useState('Payment not received at reception');
+  const [isProcessingAction, setIsProcessingAction] = useState(false);
 
   // Filtered members based on search
   const filteredMembers = useMemo(() => {
@@ -688,58 +697,86 @@ export default function OfflineMembersScreen() {
   };
 
   // Approve a Pay at Gym pending request (Screen 06 from Figma)
-  const handleConfirmApproval = () => {
+  const handleConfirmApproval = async () => {
     if (!confirmingItem) return;
-
-    // Convert approved customer into active member
-    const newActive: MemberItem = {
-      id: Date.now().toString(),
-      name: confirmingItem.name,
-      initials: getInitials(confirmingItem.name),
-      avatarBg: '#D1FAE5',
-      avatarText: '#047857',
-      plan: confirmingItem.plan,
-      expiryText: 'Exp 16 Jan 2027',
-      status: 'active',
-      phone: confirmingItem.phone,
-    };
-
-    setMembers((prev) => [newActive, ...prev]);
-    setPendingApprovals((prev) => prev.filter((p) => p.id !== confirmingItem.id));
+    const targetId =   confirmingItem.documentId ||  confirmingItem.raw?.id || confirmingItem.id ;
     const approvedName = confirmingItem.name;
-    setConfirmingItem(null);
-    fetchPendingList(false);
-    fetchMembersList(false);
 
-    Toast.show({
-      type: 'success',
-      text1: 'Membership Activated! 🎉',
-      text2: `${approvedName}'s QR Entry Code is now active.`,
-    });
+    try {
+      setIsProcessingAction(true);
+      const res = await offlineMemberApi.approvePendingApproval(targetId, paymentMode);
+
+      // Convert approved customer into active member locally (using response data if provided)
+      const serverData = res?.data;
+      const newActive: MemberItem = {
+        id: String(serverData?.id || serverData?.documentId || targetId),
+        name: confirmingItem.name,
+        initials: getInitials(confirmingItem.name),
+        avatarBg: '#D1FAE5',
+        avatarText: '#047857',
+        plan: confirmingItem.plan,
+        expiryText: serverData?.endDate ? `Exp ${formatDateDisplay(new Date(serverData.endDate))}` : 'Active',
+        status: 'active',
+        phone: confirmingItem.phone,
+      };
+
+      setMembers((prev) => [newActive, ...prev.filter((m) => m.id !== String(targetId))]);
+      setPendingApprovals((prev) => prev.filter((p) => p.id !== confirmingItem.id));
+      setConfirmingItem(null);
+
+      Toast.show({
+        type: 'success',
+        text1: 'Membership Activated! 🎉',
+        text2: res?.message || 'Membership activated successfully and Customer Entry QR unlocked!',
+      });
+
+      // Synchronize both lists from server
+      fetchPendingList(false).catch(() => {});
+      fetchMembersList(false).catch(() => {});
+    } catch (err: any) {
+      console.error('Approve failed:', err?.response?.data || err?.message);
+      Toast.show({
+        type: 'error',
+        text1: 'Approval Failed',
+        text2: err?.response?.data?.message || err?.message || 'Could not approve request.',
+      });
+    } finally {
+      setIsProcessingAction(false);
+    }
   };
 
   // Reject a Pay at Gym pending request (Screen 07 from Figma)
-  const handleConfirmReject = () => {
+  const handleConfirmReject = async () => {
     if (!rejectingItem) return;
+    const targetId = rejectingItem.raw?.id || rejectingItem.id || rejectingItem.documentId;
     const name = rejectingItem.name;
-    setPendingApprovals((prev) => prev.filter((p) => p.id !== rejectingItem.id));
-    setRejectingItem(null);
-    fetchPendingList(false);
 
-    Toast.show({
-      type: 'info',
-      text1: 'Request Declined',
-      text2: `${name}'s request has been declined.`,
-    });
+    try {
+      setIsProcessingAction(true);
+      const res = await offlineMemberApi.declinePendingApproval(targetId, declineReason);
+
+      setPendingApprovals((prev) => prev.filter((p) => p.id !== rejectingItem.id));
+      setRejectingItem(null);
+
+      Toast.show({
+        type: 'info',
+        text1: 'Request Declined',
+        text2: res?.message || 'Request declined and customer notified',
+      });
+
+      // Synchronize pending approvals from server
+      fetchPendingList(false).catch(() => {});
+    } catch (err: any) {
+      console.error('Decline failed:', err?.response?.data || err?.message);
+      Toast.show({
+        type: 'error',
+        text1: 'Decline Failed',
+        text2: err?.response?.data?.message || err?.message || 'Could not decline request.',
+      });
+    } finally {
+      setIsProcessingAction(false);
+    }
   };
-
-  // Invite channel text representation
-  const inviteChannelText = useMemo(() => {
-    if (sendWhatsApp && sendSms) return 'WhatsApp & SMS';
-    if (sendWhatsApp) return 'WhatsApp';
-    if (sendSms) return 'SMS';
-    return 'Direct Link';
-  }, [sendWhatsApp, sendSms]);
 
   return (
     <View className="flex-1 bg-white" style={{ paddingTop: insets.top }}>
@@ -894,10 +931,16 @@ export default function OfflineMembersScreen() {
                     <Text className="mt-3 text-xs font-semibold text-slate-500">Loading offline members...</Text>
                   </View>
                 ) : filteredMembers.length === 0 ? (
-                  <View className="items-center py-12">
-                    <Ionicons name="people-outline" size={44} color="#CBD5E1" />
-                    <Text className="mt-3 text-sm font-semibold text-slate-600">No members found</Text>
-                    <Text className="mt-1 text-xs text-slate-400">
+                  <View className="items-center py-10 px-6">
+                    <View className="mb-2 items-center justify-center">
+                      <Image
+                        source={require('../assets/images/empty_members_3d.jpg')}
+                        style={{ width: 180, height: 180 }}
+                        resizeMode="contain"
+                      />
+                    </View>
+                    <Text className="text-base font-bold text-slate-800 text-center">No members found</Text>
+                    <Text className="mt-1 text-xs text-slate-400 text-center max-w-[250px] leading-4">
                       Try searching with another name or phone number.
                     </Text>
                   </View>
@@ -993,11 +1036,11 @@ export default function OfflineMembersScreen() {
                     <Text className="mt-3 text-xs font-semibold text-slate-500">Loading pending approvals...</Text>
                   </View>
                 ) : pendingApprovals.length === 0 ? (
-                  <View className="items-center py-12 px-6">
+                  <View className="items-center py-10 px-6">
                     <View className="mb-2 items-center justify-center">
                       <Image
-                        source={require('../assets/images/approval_check_3d_red.jpg')}
-                        style={{ width: 140, height: 140 }}
+                        source={require('../assets/images/pending_hourglass_3d.jpg')}
+                        style={{ width: 180, height: 180 }}
                         resizeMode="contain"
                       />
                     </View>
@@ -1143,7 +1186,7 @@ export default function OfflineMembersScreen() {
             <View className="mb-5 flex-row items-start rounded-2xl bg-rose-50/70 border border-rose-100 p-3.5">
               <Ionicons name="information-circle-outline" size={18} color="#F6163C" style={{ marginTop: 1 }} />
               <Text className="ml-2.5 text-xs text-rose-700 leading-5 flex-1">
-                For members who already paid at your gym. They'll get an invite to claim their pass.
+                {"For members who already paid at your gym. They'll get an invite to claim their pass."}
               </Text>
             </View>
 
@@ -1484,7 +1527,7 @@ export default function OfflineMembersScreen() {
 
               {/* Help Note */}
               <Text className="mt-3 text-[11px] text-slate-400 text-center leading-4">
-                You can edit or cancel this invite from the dashboard until it's claimed.
+                {"You can edit or cancel this invite from the dashboard until it's claimed."}
               </Text>
             </View>
           </ScrollView>
@@ -1605,21 +1648,23 @@ export default function OfflineMembersScreen() {
 
               {/* Subtitle */}
               <Text className="text-xs text-slate-400 leading-5 mt-1.5 mb-4">
-                {confirmingItem?.plan} · The membership activates and {confirmingItem?.name ? confirmingItem.name.split(' ')[0] : 'member'}'s entry QR unlocks immediately.
+                {`${confirmingItem?.plan || ''} · The membership activates and ${confirmingItem?.name ? confirmingItem.name.split(' ')[0] : 'member'}'s entry QR unlocks immediately.`}
               </Text>
 
               {/* Payment Mode Selection */}
               <Text className="text-xs font-bold text-slate-700 mb-2.5">
-                Payment mode (optional, for your records)
+                Payment mode (Cash, UPI, Card, POS, Bank Transfer)
               </Text>
 
-              {/* 3 Payment Mode Cards */}
-              <View className="flex-row mb-3.5" style={{ gap: 10 }}>
+              {/* Supported Payment Mode Chips */}
+              <View className="flex-row flex-wrap mb-3.5">
                 {(
                   [
-                    { id: 'Cash', label: 'Cash', icon: 'cash-outline' },
-                    { id: 'UPI', label: 'UPI', icon: 'flash-outline' },
-                    { id: 'Card', label: 'Card', icon: 'card-outline' },
+                    { id: 'cash', label: 'Cash', icon: 'cash-outline' },
+                    { id: 'upi', label: 'UPI', icon: 'flash-outline' },
+                    { id: 'card', label: 'Card', icon: 'card-outline' },
+                    { id: 'pos', label: 'POS Machine', icon: 'hardware-chip-outline' },
+                    { id: 'bank_transfer', label: 'Bank Transfer', icon: 'business-outline' },
                   ] as const
                 ).map((mode) => {
                   const isSelected = paymentMode === mode.id;
@@ -1628,28 +1673,27 @@ export default function OfflineMembersScreen() {
                       key={mode.id}
                       onPress={() => setPaymentMode(mode.id)}
                       activeOpacity={0.7}
-                      className={`flex-1 py-3 px-2 rounded-2xl border items-center justify-center relative ${
+                      className={`py-2 px-3 rounded-xl border flex-row items-center mr-2 mb-2 ${
                         isSelected
-                          ? 'bg-rose-50/70 border-[#F6163C]'
-                          : 'bg-white border-slate-200/80'
+                          ? 'bg-rose-50 border-[#F6163C]'
+                          : 'bg-white border-slate-200'
                       }`}>
-                      {/* Top-Right Red Selected Checkmark Badge */}
-                      {isSelected && (
-                        <View className="absolute top-1.5 right-1.5 h-4 w-4 rounded-full bg-[#F6163C] items-center justify-center">
-                          <Ionicons name="checkmark" size={10} color="white" />
-                        </View>
-                      )}
                       <Ionicons
                         name={mode.icon as any}
-                        size={20}
+                        size={15}
                         color={isSelected ? '#F6163C' : '#64748B'}
                       />
                       <Text
-                        className={`text-xs font-bold mt-1 ${
+                        className={`text-xs font-bold ml-1.5 ${
                           isSelected ? 'text-[#F6163C]' : 'text-slate-700'
                         }`}>
                         {mode.label}
                       </Text>
+                      {isSelected && (
+                        <View className="ml-1.5 h-3.5 w-3.5 rounded-full bg-[#F6163C] items-center justify-center">
+                          <Ionicons name="checkmark" size={9} color="white" />
+                        </View>
+                      )}
                     </TouchableOpacity>
                   );
                 })}
@@ -1666,14 +1710,22 @@ export default function OfflineMembersScreen() {
               {/* Action Buttons */}
               <TouchableOpacity
                 onPress={handleConfirmApproval}
+                disabled={isProcessingAction}
                 activeOpacity={0.85}
                 className="h-12 w-full flex-row items-center justify-center rounded-2xl bg-[#F6163C] mb-3 shadow-sm">
-                <Ionicons name="checkmark" size={16} color="white" style={{ marginRight: 6 }} />
-                <Text className="text-sm font-bold text-white">Yes, Activate Membership</Text>
+                {isProcessingAction ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark" size={16} color="white" style={{ marginRight: 6 }} />
+                    <Text className="text-sm font-bold text-white">Yes, Activate Membership</Text>
+                  </>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => setConfirmingItem(null)}
+                disabled={isProcessingAction}
                 activeOpacity={0.7}
                 className="py-1.5 items-center justify-center">
                 <Text className="text-xs font-semibold text-slate-500">Not yet</Text>
@@ -1709,12 +1761,14 @@ export default function OfflineMembersScreen() {
 
               {/* Title */}
               <Text className="font-bold text-[18px] text-slate-900 leading-snug">
-                Reject {rejectingItem?.name}'s request?
+                {`Reject ${rejectingItem?.name || 'Member'}'s request?`}
               </Text>
 
               {/* Subtitle / Warning Note */}
               <Text className="text-xs text-slate-400 leading-5 mt-1.5 mb-4">
-                Only reject if you didn't receive the payment. The request will be declined and {rejectingItem?.name ? rejectingItem.name.split(' ')[0] : 'member'} will be notified so he can try again or pay online.
+                {"Only reject if you didn't receive the payment. The request will be declined and "}
+                {rejectingItem?.name ? rejectingItem.name.split(' ')[0] : 'member'}
+                {" will be notified so he can try again or pay online."}
               </Text>
 
               {/* Request Summary Card */}
@@ -1728,12 +1782,31 @@ export default function OfflineMembersScreen() {
                 <Text className="font-bold text-sm text-slate-900">{rejectingItem?.amount}</Text>
               </View>
 
+              {/* Decline Reason Input */}
+              <View className="mb-4">
+                <Text className="text-[11px] font-bold text-slate-700 mb-1.5">Decline Reason</Text>
+                <View className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5">
+                  <TextInput
+                    value={declineReason}
+                    onChangeText={setDeclineReason}
+                    placeholder="Reason for declining"
+                    placeholderTextColor="#94A3B8"
+                    className="text-xs font-semibold text-slate-800 p-0"
+                  />
+                </View>
+              </View>
+
               {/* Action Buttons */}
               <TouchableOpacity
                 onPress={handleConfirmReject}
+                disabled={isProcessingAction}
                 activeOpacity={0.85}
                 className="h-12 w-full items-center justify-center rounded-2xl bg-[#F6163C] mb-3 shadow-sm">
-                <Text className="text-sm font-bold text-white">Yes, Reject Request</Text>
+                {isProcessingAction ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text className="text-sm font-bold text-white">Yes, Reject Request</Text>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity
