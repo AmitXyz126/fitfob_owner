@@ -74,8 +74,9 @@ export const ENDPOINTS = {
   MEMBER_LIST: `${BASE_URL}/api/member-list`,
   MEMBER_DETAILS: (docId: string) => `${BASE_URL}/api/member-list/${docId}`,
 
-  // Offline Members
+  // Offline Members & Approvals
   OFFLINE_MEMBERS: `${BASE_URL}/api/club-owner/offline-members`,
+  PENDING_APPROVALS: `${BASE_URL}/api/club-owner/pending-approvals`,
 
   // Trial Settings & Guests
   TRIAL_SETTINGS: `${BASE_URL}/api/club-owner/trial-settings`,

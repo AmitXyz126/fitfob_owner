@@ -41,6 +41,30 @@ export interface CreateOfflineMemberResponse {
   [key: string]: any;
 }
 
+export interface PendingApprovalApiItem {
+  id?: string | number;
+  documentId?: string;
+  name?: string;
+  clientName?: string;
+  userName?: string;
+  phone?: string;
+  phoneNumber?: string;
+  plan?: string;
+  planName?: string;
+  amount?: string | number;
+  price?: string | number;
+  status?: string;
+  paymentMode?: string;
+  createdAt?: string;
+  requestedAt?: string;
+  date?: string;
+  timeAgo?: string;
+  user?: any;
+  client?: any;
+  membershipPlan?: any;
+  [key: string]: any;
+}
+
 export const offlineMemberApi = {
   /**
    * Fetch list of offline members
@@ -85,6 +109,45 @@ export const offlineMemberApi = {
       return response.data;
     } catch (error: any) {
       console.error('❌ [offlineMemberApi.createOfflineMember] Error:', error?.response?.data || error?.message);
+      throw error;
+    }
+  },
+
+  /**
+   * Fetch list of pending approvals ("Pay at Gym" requests)
+   * GET /api/club-owner/pending-approvals
+   */
+  getPendingApprovals: async (): Promise<PendingApprovalApiItem[]> => {
+    try {
+      console.log('📥 [offlineMemberApi.getPendingApprovals] Fetching from:', ENDPOINTS.PENDING_APPROVALS);
+      const response = await api.get(ENDPOINTS.PENDING_APPROVALS);
+      const raw = response.data;
+      console.log('📥 [offlineMemberApi.getPendingApprovals] Response received:', Array.isArray(raw) ? `Array(${raw.length})` : typeof raw);
+
+      if (Array.isArray(raw)) {
+        return raw;
+      }
+      if (Array.isArray(raw?.data)) {
+        return raw.data;
+      }
+      if (Array.isArray(raw?.pendingApprovals)) {
+        return raw.pendingApprovals;
+      }
+      if (Array.isArray(raw?.requests)) {
+        return raw.requests;
+      }
+      if (Array.isArray(raw?.items)) {
+        return raw.items;
+      }
+      if (Array.isArray(raw?.approvals)) {
+        return raw.approvals;
+      }
+      if (Array.isArray(raw?.result)) {
+        return raw.result;
+      }
+      return [];
+    } catch (error: any) {
+      console.error('❌ [offlineMemberApi.getPendingApprovals] Error:', error?.response?.data || error?.message);
       throw error;
     }
   },

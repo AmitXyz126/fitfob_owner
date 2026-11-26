@@ -50,11 +50,13 @@ interface MemberItem {
 
 interface PendingApprovalItem {
   id: string;
+  documentId?: string;
   name: string;
   phone: string;
   plan: string;
   amount: string;
   timeAgo: string;
+  raw?: any;
 }
 
 interface PlanOption {
@@ -156,6 +158,27 @@ const INITIAL_PENDING: PendingApprovalItem[] = [
   },
 ];
 
+// Helper: Format relative time (e.g. 2 min ago, 1 hr ago)
+function formatTimeAgo(dateString?: string): string {
+  if (!dateString) return 'Just now';
+  try {
+    const diffMs = Date.now() - new Date(dateString).getTime();
+    if (isNaN(diffMs) || diffMs < 0) return 'Just now';
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+
+    if (diffMin < 1) return 'Just now';
+    if (diffMin < 60) return `${diffMin} min ago`;
+    if (diffHour < 24) return `${diffHour} hr${diffHour > 1 ? 's' : ''} ago`;
+    if (diffDay < 7) return `${diffDay} day${diffDay > 1 ? 's' : ''} ago`;
+    return new Date(dateString).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  } catch {
+    return 'Recently';
+  }
+}
+
 // Helper: Format Date to YYYY-MM-DD
 function formatDateToYMD(d: Date): string {
   const y = d.getFullYear();
@@ -253,9 +276,11 @@ export default function OfflineMembersScreen() {
   // Modal 03: Double-check details
   const [isDoubleCheckVisible, setIsDoubleCheckVisible] = useState(false);
 
-  // Dashboard state (starts empty, loads real members from GET /api/club-owner/offline-members)
+  // Dashboard state (starts empty, loads real members and pending approvals from backend)
   const [members, setMembers] = useState<MemberItem[]>([]);
-  const [pendingApprovals, setPendingApprovals] = useState<PendingApprovalItem[]>(INITIAL_PENDING);
+  const [pendingApprovals, setPendingApprovals] = useState<PendingApprovalItem[]>([]);
+  const [isLoadingPending, setIsLoadingPending] = useState(false);
+  const [isRefreshingPending, setIsRefreshingPending] = useState(false);
   const [selectedTab, setSelectedTab] = useState<'active' | 'pending'>('active');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<'expiry' | 'name'>('expiry');
@@ -297,41 +322,6 @@ export default function OfflineMembersScreen() {
   const [fullName, setFullName] = useState('');
   const [sendWhatsApp, setSendWhatsApp] = useState(true);
   const [sendSms, setSendSms] = useState(true);
-
-  // Track keyboard visibility and height so button moves to top of keyboard on Android & iOS
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
-
-  useEffect(() => {
-    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-      UIManager.setLayoutAnimationEnabledExperimental(true);
-    }
-
-    const showSub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => {
-        setIsKeyboardVisible(true);
-        if (Platform.OS === 'android' && e?.endCoordinates?.height) {
-          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-          setKeyboardHeight(e.endCoordinates.height);
-        }
-      }
-    );
-    const hideSub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => {
-        setIsKeyboardVisible(false);
-        if (Platform.OS === 'android') {
-          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-          setKeyboardHeight(0);
-        }
-      }
-    );
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
 
   // Loading & Submitting states
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -435,12 +425,95 @@ export default function OfflineMembersScreen() {
     }
   }, []);
 
-  // Fetch contract plans & existing offline members on mount
+  // Fetch pending approvals from backend GET /api/club-owner/pending-approvals
+  const fetchPendingList = useCallback(async (isPullRefresh = false) => {
+    try {
+      if (isPullRefresh) setIsRefreshingPending(true);
+      else setIsLoadingPending(true);
+
+      const remote = await offlineMemberApi.getPendingApprovals();
+      console.log('📥 [fetchPendingList] Fetched pending approvals count:', Array.isArray(remote) ? remote.length : 0);
+
+      if (Array.isArray(remote)) {
+        if (remote.length === 0) {
+          setPendingApprovals([]);
+          return;
+        }
+
+        const mapped: PendingApprovalItem[] = remote.map((item: any, idx: number) => {
+          const name =
+            item.name ||
+            item.clientName ||
+            item.userName ||
+            item.user?.name ||
+            item.client?.name ||
+            item.fullName ||
+            'Member';
+          const cleanP =
+            item.phoneNumber ||
+            item.phone ||
+            item.user?.phoneNumber ||
+            item.client?.phoneNumber ||
+            '';
+          const phoneFormatted = cleanP
+            ? cleanP.startsWith('+91')
+              ? cleanP
+              : `+91 ${cleanP}`
+            : '';
+          const plan =
+            item.planName ||
+            item.plan ||
+            item.planTitle ||
+            item.membershipPlan?.name ||
+            item.duration ||
+            'Membership';
+
+          let amount = '₹0';
+          if (item.amount !== undefined && item.amount !== null) {
+            amount = String(item.amount).startsWith('₹')
+              ? String(item.amount)
+              : `₹${typeof item.amount === 'number' ? item.amount.toLocaleString('en-IN') : item.amount}`;
+          } else if (item.price !== undefined && item.price !== null) {
+            amount = String(item.price).startsWith('₹')
+              ? String(item.price)
+              : `₹${typeof item.price === 'number' ? item.price.toLocaleString('en-IN') : item.price}`;
+          }
+
+          const timeAgo =
+            item.timeAgo ||
+            formatTimeAgo(item.createdAt || item.requestedAt || item.date || item.updatedAt);
+
+          return {
+            id: String(item.id || item.documentId || item._id || idx),
+            documentId: item.documentId ? String(item.documentId) : undefined,
+            name,
+            phone: phoneFormatted,
+            plan,
+            amount,
+            timeAgo,
+            raw: item,
+          };
+        });
+
+        setPendingApprovals(mapped);
+      }
+    } catch (err: any) {
+      console.error('Note: Error fetching pending approvals list:', err?.response?.data || err?.message);
+    } finally {
+      setIsLoadingPending(false);
+      setIsRefreshingPending(false);
+    }
+  }, []);
+
+  // Fetch contract plans & existing offline members & pending approvals on mount
   useEffect(() => {
     // 1. Fetch offline members list immediately
     fetchMembersList(false);
 
-    // 2. Fetch gym contract plans in parallel
+    // 2. Fetch pending approvals list immediately
+    fetchPendingList(false);
+
+    // 3. Fetch gym contract plans in parallel
     const loadPlans = async () => {
       try {
         const contract = await gymContractApi.getMyContract();
@@ -468,7 +541,7 @@ export default function OfflineMembersScreen() {
     };
 
     loadPlans();
-  }, [fetchMembersList]);
+  }, [fetchMembersList, fetchPendingList]);
 
   // Plan picker modal
   const [isPlanPickerVisible, setIsPlanPickerVisible] = useState(false);
@@ -635,6 +708,8 @@ export default function OfflineMembersScreen() {
     setPendingApprovals((prev) => prev.filter((p) => p.id !== confirmingItem.id));
     const approvedName = confirmingItem.name;
     setConfirmingItem(null);
+    fetchPendingList(false);
+    fetchMembersList(false);
 
     Toast.show({
       type: 'success',
@@ -649,6 +724,7 @@ export default function OfflineMembersScreen() {
     const name = rejectingItem.name;
     setPendingApprovals((prev) => prev.filter((p) => p.id !== rejectingItem.id));
     setRejectingItem(null);
+    fetchPendingList(false);
 
     Toast.show({
       type: 'info',
@@ -719,7 +795,10 @@ export default function OfflineMembersScreen() {
           <View className="px-5 pt-2 pb-3">
             <View className="flex-row rounded-2xl bg-slate-100 p-1">
               <TouchableOpacity
-                onPress={() => setSelectedTab('active')}
+                onPress={() => {
+                  setSelectedTab('active');
+                  fetchMembersList(false);
+                }}
                 activeOpacity={0.8}
                 style={{
                   backgroundColor: selectedTab === 'active' ? '#FFFFFF' : 'transparent',
@@ -739,7 +818,10 @@ export default function OfflineMembersScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => setSelectedTab('pending')}
+                onPress={() => {
+                  setSelectedTab('pending');
+                  fetchPendingList(false);
+                }}
                 activeOpacity={0.8}
                 style={{
                   backgroundColor: selectedTab === 'pending' ? '#FFFFFF' : 'transparent',
@@ -896,16 +978,33 @@ export default function OfflineMembersScreen() {
 
               <ScrollView
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={isRefreshingPending}
+                    onRefresh={() => fetchPendingList(true)}
+                    colors={['#F6163C']}
+                    tintColor="#F6163C"
+                  />
+                }
                 contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 60 }}>
-                {pendingApprovals.length === 0 ? (
+                {isLoadingPending && pendingApprovals.length === 0 ? (
                   <View className="items-center py-16">
-                    <View className="h-16 w-16 items-center justify-center rounded-full bg-emerald-50 mb-3">
-                      <Ionicons name="checkmark-done-circle" size={36} color="#10B981" />
+                    <ActivityIndicator size="large" color="#F6163C" />
+                    <Text className="mt-3 text-xs font-semibold text-slate-500">Loading pending approvals...</Text>
+                  </View>
+                ) : pendingApprovals.length === 0 ? (
+                  <View className="items-center py-12 px-6">
+                    <View className="mb-2 items-center justify-center">
+                      <Image
+                        source={require('../assets/images/approval_check_3d_red.jpg')}
+                        style={{ width: 140, height: 140 }}
+                        resizeMode="contain"
+                      />
                     </View>
-                    <Text className="text-base font-bold text-slate-800">
+                    <Text className="text-base font-bold text-slate-800 text-center">
                       No Pending Approvals
                     </Text>
-                    <Text className="mt-1 text-xs text-slate-400 text-center max-w-[240px]">
+                    <Text className="mt-1 text-xs text-slate-400 text-center max-w-[250px] leading-4">
                       All front-desk payment requests have been processed.
                     </Text>
                   </View>
@@ -1010,7 +1109,7 @@ export default function OfflineMembersScreen() {
       {viewMode === 'add_member' && (
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+          keyboardVerticalOffset={0}
           className="flex-1 bg-white">
           {/* Top Bar Header */}
           <View className="flex-row items-center justify-between px-5 pt-3 pb-3 border-b border-slate-100">
@@ -1035,7 +1134,11 @@ export default function OfflineMembersScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             className="flex-1"
-            contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24 }}>
+            contentContainerStyle={{
+              paddingHorizontal: 20,
+              paddingTop: 16,
+              paddingBottom: Math.max(insets.bottom, 24) + 40,
+            }}>
             {/* Top Info Banner */}
             <View className="mb-5 flex-row items-start rounded-2xl bg-rose-50/70 border border-rose-100 p-3.5">
               <Ionicons name="information-circle-outline" size={18} color="#F6163C" style={{ marginTop: 1 }} />
@@ -1158,22 +1261,17 @@ export default function OfflineMembersScreen() {
                 />
               </View>
             </View>
-          </ScrollView>
 
-          {/* Bottom Button: Review & Send Invite - moves on top of keyboard */}
-          <View
-            className="bg-white px-5 pt-3 border-t border-slate-100 shadow-sm"
-            style={{
-              marginBottom: Platform.OS === 'android' ? keyboardHeight : 0,
-              paddingBottom: isKeyboardVisible ? 12 : Math.max(insets.bottom, 16),
-            }}>
-            <TouchableOpacity
-              onPress={handleReviewAndSend}
-              activeOpacity={0.85}
-              className="h-12 w-full items-center justify-center rounded-2xl bg-[#F6163C] shadow-sm">
-              <Text className="text-[15px] font-bold text-white">Review & Send Invite</Text>
-            </TouchableOpacity>
-          </View>
+            {/* Action Button: Review & Send Invite (Inside ScrollView) */}
+            <View className="mt-4 pt-2 pb-4">
+              <TouchableOpacity
+                onPress={handleReviewAndSend}
+                activeOpacity={0.85}
+                className="h-12 w-full items-center justify-center rounded-2xl bg-[#F6163C] shadow-sm">
+                <Text className="text-[15px] font-bold text-white">Review & Send Invite</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
 
           {/* Manual Start Date Picker */}
           {showDatePicker && (
