@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SplashScreen, Stack, ErrorBoundaryProps } from 'expo-router';
-import Toast from 'react-native-toast-message';
+import Toast, { BaseToast, ErrorToast, InfoToast, ToastConfig } from 'react-native-toast-message';
 import '../global.css';
 import { useFonts } from 'expo-font';
 import { useEffect } from 'react';
@@ -27,7 +27,7 @@ const queryClient = new QueryClient({
 });
 
 // Keep the splash screen visible while loading fonts and assets to avoid white screen flash
-SplashScreen.preventAutoHideAsync().catch(() => {});
+SplashScreen.preventAutoHideAsync().catch(() => { });
 
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   return (
@@ -49,6 +49,39 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   );
 }
 
+const toastConfig: ToastConfig = {
+  success: (props) => (
+    <BaseToast
+      {...props}
+      text1NumberOfLines={2}
+      text2NumberOfLines={3}
+      style={{ borderLeftColor: '#28a745', height: 'auto', minHeight: 60, paddingVertical: 8, zIndex: 9999999 }}
+      text1Style={{ fontSize: 13, fontWeight: '700' }}
+      text2Style={{ fontSize: 12, color: '#475569', lineHeight: 16 }}
+    />
+  ),
+  error: (props) => (
+    <ErrorToast
+      {...props}
+      text1NumberOfLines={2}
+      text2NumberOfLines={3}
+      style={{ borderLeftColor: '#FE6301', height: 'auto', minHeight: 60, paddingVertical: 8, zIndex: 9999999 }}
+      text1Style={{ fontSize: 13, fontWeight: '700' }}
+      text2Style={{ fontSize: 12, color: '#475569', lineHeight: 16 }}
+    />
+  ),
+  info: (props) => (
+    <InfoToast
+      {...props}
+      text1NumberOfLines={2}
+      text2NumberOfLines={3}
+      style={{ borderLeftColor: '#87CEFA', height: 'auto', minHeight: 60, paddingVertical: 8, zIndex: 9999999 }}
+      text1Style={{ fontSize: 13, fontWeight: '700' }}
+      text2Style={{ fontSize: 12, color: '#475569', lineHeight: 16 }}
+    />
+  ),
+};
+
 export default function Layout() {
 
   const [loaded] = useFonts({
@@ -62,7 +95,7 @@ export default function Layout() {
 
   useEffect(() => {
     if (loaded) {
-      SplashScreen.hideAsync().catch(() => {});
+      SplashScreen.hideAsync().catch(() => { });
     }
   }, [loaded]);
 
@@ -130,10 +163,9 @@ export default function Layout() {
           <Stack.Screen name="TrialManagerScreen" />
           <Stack.Screen name="TrialGuestsScreen" />
         </Stack>
-        <Toast />
+        <Toast config={toastConfig} />
       </QueryClientProvider>
     </SafeAreaProvider>
   );
 }
 
- 

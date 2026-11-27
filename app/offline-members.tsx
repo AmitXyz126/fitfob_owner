@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable react-hooks/set-state-in-effect */
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   View,
@@ -71,91 +74,6 @@ const MEMBERSHIP_PLANS: PlanOption[] = [
   { id: 'three_months', name: '3-Month Pro', price: '₹4,500', months: 3 },
   { id: 'six_months', name: '6-Month Gold', price: '₹8,000', months: 6 },
   { id: 'twelve_months', name: 'Annual Pro', price: '₹15,000', months: 12 },
-];
-
-const INITIAL_MEMBERS: MemberItem[] = [
-  {
-    id: '1',
-    name: 'Rahul Verma',
-    initials: 'RV',
-    avatarBg: '#FCE7F3',
-    avatarText: '#BE185D',
-    plan: 'Annual Pro',
-    expiryText: 'Exp 16 Jan 2027',
-    status: 'active',
-    phone: '+91 98765 11223',
-  },
-  {
-    id: '2',
-    name: 'Priya Kaur',
-    initials: 'PK',
-    avatarBg: '#FFE4E6',
-    avatarText: '#E11D48',
-    plan: '6-Month Gold',
-    expiryText: 'Expires in 3 days',
-    status: 'expiring_soon',
-    phone: '+91 98765 22334',
-  },
-  {
-    id: '3',
-    name: 'Arjun Mehta',
-    initials: 'AM',
-    avatarBg: '#FEF3C7',
-    avatarText: '#B45309',
-    plan: '3-Month Pro',
-    expiryText: 'Exp 10 Feb 2027',
-    status: 'active',
-    phone: '+91 98765 33445',
-  },
-  {
-    id: '4',
-    name: 'Simran Gill',
-    initials: 'SG',
-    avatarBg: '#FEE2E2',
-    avatarText: '#DC2626',
-    plan: '1-Month Basic',
-    expiryText: 'Expires in 5 days',
-    status: 'expiring_soon',
-    phone: '+91 98765 44556',
-  },
-  {
-    id: '5',
-    name: 'Neha Joshi',
-    initials: 'NJ',
-    avatarBg: '#F3E8FF',
-    avatarText: '#7E22CE',
-    plan: '6-Month Gold',
-    expiryText: 'Invite sent',
-    status: 'invite_sent',
-    phone: '+91 98765 55667',
-  },
-];
-
-const INITIAL_PENDING: PendingApprovalItem[] = [
-  {
-    id: 'p1',
-    name: 'Karan Singh',
-    phone: '+91 98140 55672',
-    plan: '3-Month Pro',
-    amount: '₹4,500',
-    timeAgo: '2 min ago',
-  },
-  {
-    id: 'p2',
-    name: 'Ananya Rao',
-    phone: '+91 99150 33811',
-    plan: '1-Month Basic',
-    amount: '₹1,800',
-    timeAgo: '18 min ago',
-  },
-  {
-    id: 'p3',
-    name: 'Vikram Das',
-    phone: '+91 97790 21045',
-    plan: '6-Month Gold',
-    amount: '₹8,000',
-    timeAgo: '1 hr ago',
-  },
 ];
 
 // Helper: Format relative time (e.g. 2 min ago, 1 hr ago)
@@ -337,10 +255,10 @@ export default function OfflineMembersScreen() {
     sendWhatsApp && sendSms
       ? 'WhatsApp & SMS'
       : sendWhatsApp
-      ? 'WhatsApp'
-      : sendSms
-      ? 'SMS'
-      : 'Direct Link';
+        ? 'WhatsApp'
+        : sendSms
+          ? 'SMS'
+          : 'Direct Link';
 
   // Fetch offline members list from backend GET /api/club-owner/offline-members
   const fetchMembersList = useCallback(async (isPullRefresh = false) => {
@@ -669,7 +587,7 @@ export default function OfflineMembersScreen() {
       setMembers((prev) => [newMember, ...prev]);
 
       // Re-fetch in background to sync with server
-      fetchMembersList(false).catch(() => {});
+      fetchMembersList(false).catch(() => { });
 
       // Transition to Screen 04
       setViewMode('success');
@@ -690,6 +608,7 @@ export default function OfflineMembersScreen() {
         type: 'error',
         text1: 'Failed to Add Member',
         text2: String(errMsg),
+        visibilityTime: 4000,
       });
     } finally {
       setIsSubmitting(false);
@@ -699,7 +618,7 @@ export default function OfflineMembersScreen() {
   // Approve a Pay at Gym pending request (Screen 06 from Figma)
   const handleConfirmApproval = async () => {
     if (!confirmingItem) return;
-    const targetId =   confirmingItem.documentId ||  confirmingItem.raw?.id || confirmingItem.id ;
+    const targetId = confirmingItem.documentId || confirmingItem.raw?.id || confirmingItem.id;
     const approvedName = confirmingItem.name;
 
     try {
@@ -731,8 +650,8 @@ export default function OfflineMembersScreen() {
       });
 
       // Synchronize both lists from server
-      fetchPendingList(false).catch(() => {});
-      fetchMembersList(false).catch(() => {});
+      fetchPendingList(false).catch(() => { });
+      fetchMembersList(false).catch(() => { });
     } catch (err: any) {
       console.error('Approve failed:', err?.response?.data || err?.message);
       Toast.show({
@@ -765,7 +684,7 @@ export default function OfflineMembersScreen() {
       });
 
       // Synchronize pending approvals from server
-      fetchPendingList(false).catch(() => {});
+      fetchPendingList(false).catch(() => { });
     } catch (err: any) {
       console.error('Decline failed:', err?.response?.data || err?.message);
       Toast.show({
@@ -847,9 +766,8 @@ export default function OfflineMembersScreen() {
                 }}
                 className="flex-1 py-2.5 rounded-xl items-center justify-center flex-row">
                 <Text
-                  className={`text-xs font-bold ${
-                    selectedTab === 'active' ? 'text-slate-900' : 'text-slate-500'
-                  }`}>
+                  className={`text-xs font-bold ${selectedTab === 'active' ? 'text-slate-900' : 'text-slate-500'
+                    }`}>
                   Active Members ({members.length})
                 </Text>
               </TouchableOpacity>
@@ -870,9 +788,8 @@ export default function OfflineMembersScreen() {
                 }}
                 className="flex-1 py-2.5 rounded-xl items-center justify-center flex-row">
                 <Text
-                  className={`text-xs font-bold mr-1.5 ${
-                    selectedTab === 'pending' ? 'text-slate-900' : 'text-slate-500'
-                  }`}>
+                  className={`text-xs font-bold mr-1.5 ${selectedTab === 'pending' ? 'text-slate-900' : 'text-slate-500'
+                    }`}>
                   Pending Approvals
                 </Text>
                 {pendingApprovals.length > 0 && (
@@ -1361,8 +1278,9 @@ export default function OfflineMembersScreen() {
           transparent={true}
           animationType="slide"
           statusBarTranslucent={true}
+          className='bg-transparent'
           onRequestClose={() => setIsDoubleCheckVisible(false)}>
-          <View className="flex-1 justify-end bg-black/60">
+          <View className="flex-1 justify-end bg-black/5">
             <Pressable className="flex-1" onPress={() => setIsDoubleCheckVisible(false)} />
 
             <View
@@ -1422,9 +1340,8 @@ export default function OfflineMembersScreen() {
                 onPress={handleConfirmAddMember}
                 disabled={isSubmitting}
                 activeOpacity={0.85}
-                className={`h-12 w-full flex-row items-center justify-center rounded-2xl bg-[#F6163C] mb-2.5 ${
-                  isSubmitting ? 'opacity-70' : ''
-                }`}>
+                className={`h-12 w-full flex-row items-center justify-center rounded-2xl bg-[#F6163C] mb-2.5 ${isSubmitting ? 'opacity-70' : ''
+                  }`}>
                 {isSubmitting ? (
                   <>
                     <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
@@ -1483,7 +1400,7 @@ export default function OfflineMembersScreen() {
               Member Added!
             </Text>
             <Text className="mt-1.5 text-xs text-slate-500 text-center px-4 leading-5">
-              The invite link has been sent to {fullName ? fullName.split(' ')[0] : 'Member'}'s phone on {inviteChannelText}.
+              The invite link has been sent to {fullName ? fullName.split(' ')[0] : 'Member'}&apos;s phone on {inviteChannelText}.
             </Text>
 
             {/* Member Summary Card */}
@@ -1587,23 +1504,20 @@ export default function OfflineMembersScreen() {
                       key={plan.id}
                       onPress={() => handleSelectPlan(plan)}
                       activeOpacity={0.7}
-                      className={`flex-row items-center justify-between p-3.5 rounded-2xl border ${
-                        isSelected ? 'bg-rose-50 border-[#F6163C]' : 'bg-slate-50 border-slate-200/80'
-                      }`}>
+                      className={`flex-row items-center justify-between p-3.5 rounded-2xl border ${isSelected ? 'bg-rose-50 border-[#F6163C]' : 'bg-slate-50 border-slate-200/80'
+                        }`}>
                       <View>
                         <Text
-                          className={`text-sm font-bold ${
-                            isSelected ? 'text-[#F6163C]' : 'text-slate-800'
-                          }`}>
+                          className={`text-sm font-bold ${isSelected ? 'text-[#F6163C]' : 'text-slate-800'
+                            }`}>
                           {plan.name}
                         </Text>
                         <Text className="text-xs text-slate-400 mt-0.5">{plan.months} Months Duration</Text>
                       </View>
                       <View className="flex-row items-center">
                         <Text
-                          className={`text-sm font-bold mr-2 ${
-                            isSelected ? 'text-[#F6163C]' : 'text-slate-700'
-                          }`}>
+                          className={`text-sm font-bold mr-2 ${isSelected ? 'text-[#F6163C]' : 'text-slate-700'
+                            }`}>
                           {plan.price}
                         </Text>
                         {isSelected && <Ionicons name="checkmark-circle" size={18} color="#F6163C" />}
@@ -1673,20 +1587,18 @@ export default function OfflineMembersScreen() {
                       key={mode.id}
                       onPress={() => setPaymentMode(mode.id)}
                       activeOpacity={0.7}
-                      className={`py-2 px-3 rounded-xl border flex-row items-center mr-2 mb-2 ${
-                        isSelected
-                          ? 'bg-rose-50 border-[#F6163C]'
-                          : 'bg-white border-slate-200'
-                      }`}>
+                      className={`py-2 px-3 rounded-xl border flex-row items-center mr-2 mb-2 ${isSelected
+                        ? 'bg-rose-50 border-[#F6163C]'
+                        : 'bg-white border-slate-200'
+                        }`}>
                       <Ionicons
                         name={mode.icon as any}
                         size={15}
                         color={isSelected ? '#F6163C' : '#64748B'}
                       />
                       <Text
-                        className={`text-xs font-bold ml-1.5 ${
-                          isSelected ? 'text-[#F6163C]' : 'text-slate-700'
-                        }`}>
+                        className={`text-xs font-bold ml-1.5 ${isSelected ? 'text-[#F6163C]' : 'text-slate-700'
+                          }`}>
                         {mode.label}
                       </Text>
                       {isSelected && (

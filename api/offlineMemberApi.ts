@@ -64,8 +64,7 @@ export interface PendingApprovalApiItem {
   membershipPlan?: any;
   [key: string]: any;
 }
-
-export const offlineMemberApi = {
+const offlineMemberApi = {
   /**
    * Fetch list of offline members
    * GET /api/club-owner/offline-members
@@ -173,9 +172,7 @@ export const offlineMemberApi = {
       } catch (postErr: any) {
         const status = postErr?.response?.status;
         if (status === 404 || status === 405) {
-          console.log('⚠️ [offlineMemberApi.declinePendingApproval] POST returned', status, ', trying DELETE fallback:', ENDPOINTS.OFFLINE_MEMBER_BY_ID(id));
-          const delRes = await api.delete(ENDPOINTS.OFFLINE_MEMBER_BY_ID(id), { data: payload });
-          return delRes.data;
+          console.log('⚠️ [offlineMemberApi.declinePendingApproval] POST returned', status,);
         }
         throw postErr;
       }
@@ -214,15 +211,7 @@ export const offlineMemberApi = {
       } catch (postErr: any) {
         const status = postErr?.response?.status;
         if (status === 404 || status === 405) {
-          console.log('⚠️ [offlineMemberApi.approvePendingApproval] POST /approve returned', status, ', trying PUT fallback:', ENDPOINTS.PENDING_APPROVAL_BY_ID(id));
-          try {
-            const putRes = await api.put(ENDPOINTS.PENDING_APPROVAL_BY_ID(id), payload);
-            return putRes.data;
-          } catch (putErr: any) {
-            console.log('⚠️ Trying POST /api/club-owner/pending-approvals with { id, paymentMode }');
-            const postRootRes = await api.post(ENDPOINTS.PENDING_APPROVALS, { id, ...payload });
-            return postRootRes.data;
-          }
+          console.log('⚠️ [offlineMemberApi.approvePendingApproval] POST /approve returned', status,);
         }
         throw postErr;
       }
@@ -233,4 +222,4 @@ export const offlineMemberApi = {
   },
 };
 
-export default offlineMemberApi;
+export default  offlineMemberApi;
