@@ -22,7 +22,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -261,10 +261,10 @@ export default function OfflineMembersScreen() {
           : 'Direct Link';
 
   // Fetch offline members list from backend GET /api/club-owner/offline-members
-  const fetchMembersList = useCallback(async (isPullRefresh = false) => {
+  const fetchMembersList = useCallback(async (isPullRefresh = false, isSilent = false) => {
     try {
       if (isPullRefresh) setIsRefreshing(true);
-      else setIsLoadingOfflineMembers(true);
+      else if (!isSilent) setIsLoadingOfflineMembers(true);
 
       const remote = await offlineMemberApi.getOfflineMembers();
       console.log('📥 [fetchMembersList] Fetched remote members count:', Array.isArray(remote) ? remote.length : 0);
@@ -344,16 +344,16 @@ export default function OfflineMembersScreen() {
     } catch (err: any) {
       console.error('Note: Error fetching remote offline members list:', err?.response?.data || err?.message);
     } finally {
-      setIsLoadingOfflineMembers(false);
-      setIsRefreshing(false);
+      if (!isSilent) setIsLoadingOfflineMembers(false);
+      if (isPullRefresh) setIsRefreshing(false);
     }
   }, []);
 
   // Fetch pending approvals from backend GET /api/club-owner/pending-approvals
-  const fetchPendingList = useCallback(async (isPullRefresh = false) => {
+  const fetchPendingList = useCallback(async (isPullRefresh = false, isSilent = false) => {
     try {
       if (isPullRefresh) setIsRefreshingPending(true);
-      else setIsLoadingPending(true);
+      else if (!isSilent) setIsLoadingPending(true);
 
       const remote = await offlineMemberApi.getPendingApprovals();
       console.log('📥 [fetchPendingList] Fetched pending approvals count:', Array.isArray(remote) ? remote.length : 0);
@@ -424,8 +424,8 @@ export default function OfflineMembersScreen() {
     } catch (err: any) {
       console.error('Note: Error fetching pending approvals list:', err?.response?.data || err?.message);
     } finally {
-      setIsLoadingPending(false);
-      setIsRefreshingPending(false);
+      if (!isSilent) setIsLoadingPending(false);
+      if (isPullRefresh) setIsRefreshingPending(false);
     }
   }, []);
 
@@ -479,6 +479,37 @@ export default function OfflineMembersScreen() {
   const [rejectingItem, setRejectingItem] = useState<PendingApprovalItem | null>(null);
   const [declineReason, setDeclineReason] = useState('Payment not received at reception');
   const [isProcessingAction, setIsProcessingAction] = useState(false);
+
+  // Auto-refetch members and pending approvals every 10 seconds while screen is active
+  const isSubmittingRef = useRef(isSubmitting);
+  const isProcessingActionRef = useRef(isProcessingAction);
+
+  useEffect(() => {
+    isSubmittingRef.current = isSubmitting;
+    isProcessingActionRef.current = isProcessingAction;
+  }, [isSubmitting, isProcessingAction]);
+
+  const isInitialFocusRef = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (isInitialFocusRef.current) {
+        isInitialFocusRef.current = false;
+      } else {
+        // Silently refresh on returning to the screen
+        fetchMembersList(false, true);
+        fetchPendingList(false, true);
+      }
+
+      const interval = setInterval(() => {
+        // Skip background poll if an add/approval mutation is actively in-flight
+        if (isSubmittingRef.current || isProcessingActionRef.current) return;
+        fetchMembersList(false, true);
+        fetchPendingList(false, true);
+      }, 10000);
+
+      return () => clearInterval(interval);
+    }, [fetchMembersList, fetchPendingList])
+  );
 
   // Filtered members based on search
   const filteredMembers = useMemo(() => {
@@ -1280,7 +1311,7 @@ export default function OfflineMembersScreen() {
           statusBarTranslucent={true}
           className='bg-transparent'
           onRequestClose={() => setIsDoubleCheckVisible(false)}>
-          <View className="flex-1 justify-end bg-black/5">
+          <View className="flex-1 justify-end bg-black/15">
             <Pressable className="flex-1" onPress={() => setIsDoubleCheckVisible(false)} />
 
             <View
